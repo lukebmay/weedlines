@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Project-root entry: install the Weedlines Inkscape extension from this clone.
+# Delegates to scripts/install.py
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+exec python3 "$ROOT/scripts/install.py" "$@"

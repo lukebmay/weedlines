@@ -17,9 +17,14 @@ Initial extract landed from `inkcut_luke` archive:
 
 ## Next
 
-1. Refine island-hop pictures / pause-resume if cancel-only is not enough
+1. Island-hop picture QA / refine algorithms
 2. Keep adding named algorithms; do not default island-hop
 3. Later: integrate `weedlib` into `~/dev/me/inkcut` → PR to OG
+
+## Installed locally
+
+`weedlines install` → symlinks in `~/.config/inkscape/extensions/`.
+Restart Inkscape after pulls. Pause/Resume is in the dialog (2026-08-21).
 
 ## Source archive
 

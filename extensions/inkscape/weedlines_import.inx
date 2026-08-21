@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
+  <name>Import last result</name>
+  <id>org.lukebmay.weedlines.import</id>
+  <dependency type="executable" location="extensions">weedlines_import.py</dependency>
+  <dependency type="executable" location="extensions">weedlines_job.py</dependency>
+  <dependency type="executable" location="extensions">weedlines.py</dependency>
+  <effect needs-live-preview="false">
+    <object-type>all</object-type>
+    <effects-menu>
+      <submenu name="Weedlines"/>
+    </effects-menu>
+    <menu-tip>Import last Weedlines result (design + cuts) at original document size and position</menu-tip>
+  </effect>
+  <script>
+    <command location="inx" interpreter="python">weedlines_import.py</command>
+  </script>
+</inkscape-extension>

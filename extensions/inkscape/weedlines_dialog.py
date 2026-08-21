@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 """Interactive Weedlines dialog for the Inkscape extension.
 
-Start / Cancel, scrolling stdout+stderr log (keeps Inkscape from showing
-the "additional data" popup), and a live graphics view of accepted cuts.
+Start / Pause / Resume / Cancel, scrolling stdout+stderr log (keeps
+Inkscape from showing the "additional data" popup), and a live graphics
+view of accepted cuts. Pause is cooperative so you can inspect the
+preview mid-run, then resume.
 """
 from __future__ import division
 
@@ -62,11 +64,18 @@ class _QueueLogHandler(logging.Handler):
             pass
 
 
-def run_weedlines_dialog(keep_path, defaults=None):
+def run_weedlines_dialog(keep_path, defaults=None, platform_lines=None,
+                         quit_app=True):
     """Show the weedlines UI. Returns ``(weed_path, layer_name)`` or ``(None, None)``.
 
     *keep_path* is design geometry (QPainterPath). *defaults* may include
     mode, padding, spacing, collar, layer_name.
+
+    *platform_lines* is an optional deque fed by ``NativeStdioCapture``
+    (Qt/OS stderr). Those lines are shown in the log and never reach Inkscape.
+
+    *quit_app*: when this call created the QApplication, quit it on return
+    (default). Detached host passes False so it can show a follow-up box.
     """
     from weedlib.qt import QPainterPath, load_widgets
     from weedlib.progress import WeedCancelled
@@ -84,7 +93,9 @@ def run_weedlines_dialog(keep_path, defaults=None):
     dialog = QtWidgets.QDialog()
     dialog.setWindowTitle('Weedlines')
     dialog.resize(720, 640)
-    dialog.setWindowModality(QtCore.Qt.ApplicationModal)
+    # WindowModal: don't freeze every Qt window in a multi-app session;
+    # when hosted inside Inkscape's process this still blocks that app.
+    dialog.setWindowModality(QtCore.Qt.WindowModal)
 
     root = QtWidgets.QVBoxLayout(dialog)
 
@@ -120,17 +131,24 @@ def run_weedlines_dialog(keep_path, defaults=None):
 
     btn_row = QtWidgets.QHBoxLayout()
     start_btn = QtWidgets.QPushButton('Start Algorithm')
+    pause_btn = QtWidgets.QPushButton('Pause')
+    pause_btn.hide()
     cancel_btn = QtWidgets.QPushButton('Cancel…')
     cancel_btn.hide()
-    apply_btn = QtWidgets.QPushButton('Apply layer & Close')
+    apply_btn = QtWidgets.QPushButton('Apply')
     apply_btn.setEnabled(False)
     close_btn = QtWidgets.QPushButton('Close')
     btn_row.addWidget(start_btn)
+    btn_row.addWidget(pause_btn)
     btn_row.addWidget(cancel_btn)
     btn_row.addStretch(1)
     btn_row.addWidget(apply_btn)
     btn_row.addWidget(close_btn)
     root.addLayout(btn_row)
+
+    status_label = QtWidgets.QLabel('')
+    status_label.setStyleSheet('color: #c0c0c0;')
+    root.addWidget(status_label)
 
     log_label = QtWidgets.QLabel('Algorithm output (stdout / stderr)')
     root.addWidget(log_label)
@@ -140,7 +158,6 @@ def run_weedlines_dialog(keep_path, defaults=None):
     log_view.setMinimumHeight(72)
     log_view.setSizePolicy(
         QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
-    # User-expandable: put log in a splitter with the preview
     splitter = QtWidgets.QSplitter(QtCore.Qt.Vertical)
     splitter.addWidget(log_view)
 
@@ -156,7 +173,6 @@ def run_weedlines_dialog(keep_path, defaults=None):
     splitter.setSizes([90, 400])
     root.addWidget(splitter, stretch=1)
 
-    # Draw keep geometry (design) once
     keep_pen = QtGui.QPen(QtGui.QColor('#6a9fb5'))
     keep_pen.setWidthF(0.0)
     keep_pen.setCosmetic(True)
@@ -168,7 +184,9 @@ def run_weedlines_dialog(keep_path, defaults=None):
 
     state = {
         'busy': False,
+        'paused': False,
         'cancel': threading.Event(),
+        'pause': threading.Event(),  # set => paused (worker blocks)
         'result': None,
         'error': None,
         'log_q': deque(),
@@ -183,13 +201,44 @@ def run_weedlines_dialog(keep_path, defaults=None):
         log_view.insertPlainText(text)
         log_view.moveCursor(QtGui.QTextCursor.End)
 
-    def set_busy(busy):
+    def drain_platform_lines():
+        """Pull Qt/OS stderr captures into the dialog log (not Inkscape)."""
+        if platform_lines is None:
+            return
+        while platform_lines:
+            try:
+                line = platform_lines.popleft()
+            except IndexError:
+                break
+            append_log('[platform] %s\n' % line)
+
+    # QApplication often emits the Wayland warning during construction above.
+    drain_platform_lines()
+
+    def set_controls(busy, paused=False):
         state['busy'] = busy
+        state['paused'] = bool(paused) if busy else False
         start_btn.setVisible(not busy)
         start_btn.setEnabled(not busy)
+        pause_btn.setVisible(busy)
+        pause_btn.setEnabled(busy and not state['cancel'].is_set())
+        if busy and state['paused']:
+            pause_btn.setText('Resume')
+            status_label.setText('Paused — inspect preview, then Resume or Cancel.')
+        elif busy:
+            pause_btn.setText('Pause')
+            status_label.setText('Running…')
+        else:
+            pause_btn.setText('Pause')
+            status_label.setText('')
         cancel_btn.setVisible(busy)
-        cancel_btn.setEnabled(busy)
-        cancel_btn.setText('Cancel…')
+        cancel_btn.setEnabled(busy and not state['cancel'].is_set())
+        if state['cancel'].is_set() and busy:
+            cancel_btn.setText('Cancelling…')
+            cancel_btn.setEnabled(False)
+            pause_btn.setEnabled(False)
+        else:
+            cancel_btn.setText('Cancel…')
         mode_box.setEnabled(not busy)
         pad_spin.setEnabled(not busy)
         space_spin.setEnabled(not busy)
@@ -209,11 +258,12 @@ def run_weedlines_dialog(keep_path, defaults=None):
         state['result'] = None
         state['error'] = None
         state['cancel'].clear()
+        state['pause'].clear()
         state['seg_q'].clear()
         apply_btn.setEnabled(False)
         log_view.clear()
         append_log('Starting %s…\n' % mode_box.currentData())
-        set_busy(True)
+        set_controls(True, paused=False)
 
         mode = mode_box.currentData()
         padding = float(pad_spin.value())
@@ -231,11 +281,19 @@ def run_weedlines_dialog(keep_path, defaults=None):
             handler = _QueueLogHandler(log_q)
             handler.setFormatter(logging.Formatter(
                 '%(levelname)s %(name)s: %(message)s'))
-            root_log = logging.getLogger()
             weed_log = logging.getLogger('weedlib')
-            root_log.addHandler(handler)
+            # Avoid double lines: debug.py also installs a StreamHandler to
+            # stderr, and we redirect stderr into the same queue.
+            removed_handlers = []
+            for h in list(weed_log.handlers):
+                if isinstance(h, logging.StreamHandler) and h is not handler:
+                    weed_log.removeHandler(h)
+                    removed_handlers.append(h)
             weed_log.addHandler(handler)
-            prev_dbg = os.environ.get('WEEDLINES_LOG') or os.environ.get('INKCUT_WEED_DEBUG')
+            weed_log.setLevel(logging.DEBUG)
+            weed_log.propagate = False
+            prev_dbg = os.environ.get('WEEDLINES_LOG') or os.environ.get(
+                'INKCUT_WEED_DEBUG')
             if not prev_dbg:
                 os.environ['WEEDLINES_LOG'] = '1'
 
@@ -250,6 +308,7 @@ def run_weedlines_dialog(keep_path, defaults=None):
             weed_progress.install(
                 progress=on_phase,
                 cancel=lambda: state['cancel'].is_set(),
+                pause=lambda: state['pause'].is_set(),
                 geometry=on_seg,
             )
             try:
@@ -275,8 +334,9 @@ def run_weedlines_dialog(keep_path, defaults=None):
                 weed_progress.clear()
                 sys.stdout = old_out
                 sys.stderr = old_err
-                root_log.removeHandler(handler)
                 weed_log.removeHandler(handler)
+                for h in removed_handlers:
+                    weed_log.addHandler(h)
                 if not prev_dbg:
                     os.environ.pop('WEEDLINES_LOG', None)
                     os.environ.pop('INKCUT_WEED_DEBUG', None)
@@ -289,10 +349,10 @@ def run_weedlines_dialog(keep_path, defaults=None):
         last_fit = [0.0]
 
         def pump():
+            drain_platform_lines()
             while state['log_q']:
                 append_log(state['log_q'].popleft())
             added = False
-            # Drain a bounded batch so the UI stays responsive
             for _ in range(200):
                 if not state['seg_q']:
                     break
@@ -312,8 +372,9 @@ def run_weedlines_dialog(keep_path, defaults=None):
             if thread.is_alive() or state['seg_q'] or state['log_q']:
                 QtCore.QTimer.singleShot(50, pump)
                 return
+            drain_platform_lines()
 
-            set_busy(False)
+            set_controls(False)
             if state['error'] is not None:
                 if isinstance(state['error'], WeedCancelled):
                     append_log('Algorithm cancelled.\n')
@@ -325,20 +386,36 @@ def run_weedlines_dialog(keep_path, defaults=None):
                 append_log('No weed cuts produced.\n')
                 apply_btn.setEnabled(False)
                 return
-            append_log('Done. Review cuts, then Apply layer & Close.\n')
+            append_log('Done. Review cuts, then Apply.\n')
             view.fitInView(
                 scene.itemsBoundingRect(), QtCore.Qt.KeepAspectRatio)
             apply_btn.setEnabled(True)
 
         QtCore.QTimer.singleShot(50, pump)
 
+    def on_pause_toggle():
+        if not state['busy'] or state['cancel'].is_set():
+            return
+        if state['pause'].is_set():
+            state['pause'].clear()
+            append_log('Resumed.\n')
+            set_controls(True, paused=False)
+        else:
+            state['pause'].set()
+            append_log('Paused — worker waiting; inspect preview.\n')
+            set_controls(True, paused=True)
+
     def on_cancel():
         if not state['busy']:
             return
+        # Wake a paused worker so it can see cancel
+        state['pause'].clear()
         state['cancel'].set()
         append_log('Cancel requested — stopping algorithm…\n')
+        set_controls(True, paused=False)
         cancel_btn.setEnabled(False)
         cancel_btn.setText('Cancelling…')
+        pause_btn.setEnabled(False)
 
     def on_apply():
         if state['result'] is None or state['busy']:
@@ -348,6 +425,7 @@ def run_weedlines_dialog(keep_path, defaults=None):
 
     def on_close():
         if state['busy']:
+            state['pause'].clear()
             state['cancel'].set()
             thread = state.get('thread')
             if thread is not None and thread.is_alive():
@@ -355,22 +433,25 @@ def run_weedlines_dialog(keep_path, defaults=None):
         dialog.reject()
 
     start_btn.clicked.connect(on_start)
+    pause_btn.clicked.connect(on_pause_toggle)
     cancel_btn.clicked.connect(on_cancel)
     apply_btn.clicked.connect(on_apply)
     close_btn.clicked.connect(on_close)
 
     hint = QtWidgets.QLabel(
-        'Builds a Weedlines layer only (no cutter travel planning). '
-        'Send the design + this layer to your cutter app afterward. '
-        'If the desktop asks to Force Quit Inkscape, choose Wait — this dialog '
-        'is still running in the extension process.')
+        'Builds weed cuts only (no cutter travel planning). '
+        'Pause freezes the algorithm so you can inspect the live preview, '
+        'then Resume or Cancel. '
+        'After Apply, use Extensions → Weedlines → Import last result '
+        'in Inkscape — that brings back the design and cuts together at '
+        'the original size and position.')
     hint.setWordWrap(True)
     root.addWidget(hint)
 
     result_code = dialog.exec_()
     layer_name = layer_edit.text().strip() or 'Weed lines'
     weed = state['result'] if state['accepted'] and result_code else None
-    if owns_app:
+    if owns_app and quit_app:
         app.quit()
     if weed is None:
         return None, None
@@ -380,6 +461,5 @@ def run_weedlines_dialog(keep_path, defaults=None):
 def _add_path_to_scene(scene, path, pen, QtCore):
     if path is None or path.isEmpty():
         return
-    # QPainterPath can be added directly in Qt
     item = scene.addPath(path, pen)
     return item

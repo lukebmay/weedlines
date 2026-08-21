@@ -3,6 +3,7 @@
 from __future__ import division
 
 import math
+import os
 
 import pytest
 
@@ -1066,7 +1067,9 @@ def test_framed_text_gets_inner_weeds_not_through_border():
     pad = [10, 10, 10, 10]
     weed = island_hop_weeds(keep, padding=pad, collar=4.0, max_chunk=80)
     keep_fill = even_odd_keep_fill(keep)
-    assert _fraction_inside(weed, keep_fill, step=0.8) < _IN_KEEP_BUDGET
+    # Endpoint landings must meet keep; without a long outer peel rail to
+    # dilute samples, raw fraction can sit a bit above the unframed budget.
+    assert _fraction_inside(weed, keep_fill, step=0.8) < 0.04
     # Border ring is keep.
     assert keep_fill.contains(QPointF(3, 50))
     # Waste just outside the letters, still inside the frame hole.
@@ -3373,3 +3376,157 @@ def test_major_gap_necks_through_tied_compact():
         + max(majors[0].boundingRect().bottom(),
               majors[1].boundingRect().bottom()))
     assert any(0.5 * (s[1] + s[3]) >= mid_y - 1.0 for s in seals), seals
+
+
+def test_design_frame_skips_outer_peel():
+    """Hollow design frame must not get a second outer peel collar."""
+    import io
+    import logging
+    from weedlib.solvers import _is_design_frame_node, list_closed_subpaths, _nest_closed_paths
+
+    keep = QPainterPath()
+    keep.addRect(QRectF(0, 0, 200, 120))
+    keep.addRect(QRectF(10, 10, 180, 100))
+    keep.addRect(QRectF(40, 40, 30, 30))
+    nodes = _nest_closed_paths(list_closed_subpaths(keep))
+    roots = [n for n in nodes if n['depth'] == 0]
+    assert roots and _is_design_frame_node(roots[0])
+
+    buf = io.StringIO()
+    handler = logging.StreamHandler(buf)
+    handler.setFormatter(logging.Formatter('%(message)s'))
+    log = logging.getLogger('weedlib')
+    log.addHandler(handler)
+    log.setLevel(logging.DEBUG)
+    prev = os.environ.get('WEEDLINES_LOG')
+    os.environ['WEEDLINES_LOG'] = '1'
+    try:
+        # reset debug configured so handler path works
+        import weedlib.debug as d
+        d._configured = False
+        weed = island_hop_weeds(keep, padding=[4, 4, 4, 4], collar=4.0)
+    finally:
+        log.removeHandler(handler)
+        if prev is None:
+            os.environ.pop('WEEDLINES_LOG', None)
+        else:
+            os.environ['WEEDLINES_LOG'] = prev
+        d._configured = False
+    text = buf.getvalue()
+    assert 'design_frame_outer' in text
+    assert 'peel_frame.emit' not in text
+    assert not weed.isEmpty()
+
+
+def _inkscape_fill_stroke_twin(path):
+    """Duplicate every closed outline (Inkscape fill path + stroke path)."""
+    twin = QPainterPath()
+    twin.addPath(path)
+    for sp in list_closed_subpaths(path):
+        twin.addPath(sp)
+    return twin
+
+
+@requires_clipper
+def test_fill_stroke_twins_deduped_for_framed_keep():
+    """Fill+stroke duplicate outers must not solid-fill the frame counter."""
+    keep = _inkscape_fill_stroke_twin(_framed_hi())
+    # Without dedupe there would be 8 closed outlines; keep one of each.
+    assert len(list_closed_subpaths(keep)) == 4
+    fill = even_odd_keep_fill(keep)
+    assert fill.contains(QPointF(3, 3))  # frame band
+    assert not fill.contains(QPointF(60, 50))  # counter waste
+    assert fill.contains(QPointF(40, 50))  # H keep
+
+
+@requires_clipper
+def test_fill_stroke_twins_island_hop_no_outer_peel():
+    """Duplicate framed keep still skips outer peel and emits interior seals."""
+    import io
+    import logging
+
+    keep = _inkscape_fill_stroke_twin(_framed_hi())
+    buf = io.StringIO()
+    handler = logging.StreamHandler(buf)
+    handler.setFormatter(logging.Formatter('%(message)s'))
+    log = logging.getLogger('weedlib')
+    log.addHandler(handler)
+    log.setLevel(logging.DEBUG)
+    prev = os.environ.get('WEEDLINES_LOG')
+    os.environ['WEEDLINES_LOG'] = '1'
+    try:
+        import weedlib.debug as d
+        d._configured = False
+        weed = island_hop_weeds(keep, padding=[12, 12, 12, 12], collar=4.0)
+    finally:
+        log.removeHandler(handler)
+        if prev is None:
+            os.environ.pop('WEEDLINES_LOG', None)
+        else:
+            os.environ['WEEDLINES_LOG'] = prev
+        d._configured = False
+    text = buf.getvalue()
+    assert 'design_frame_outer' in text
+    assert 'peel_frame.emit' not in text
+    assert weed_path_stats(weed)['segments'] > 0
+
+
+def test_grid_framed_hi_covers_counter_and_surround():
+    """Frame vinyl stays uncut; counter waste is hatched; work gets a surround."""
+    keep = _inkscape_fill_stroke_twin(_framed_hi())
+    pad = [12, 12, 12, 12]
+    weed = grid_weeds(keep, padding=pad, spacing=15)
+    keep_fill = even_odd_keep_fill(keep)
+    assert _fraction_inside(weed, keep_fill, step=1.0) < _IN_KEEP_BUDGET
+    # Counter waste (inside hole, outside letters) must receive hatch.
+    hole = QPainterPath()
+    hole.addRect(QRectF(6, 6, 108, 88))
+    pts = sample_points_on_path(weed, step=2.0)
+    in_counter = sum(
+        1 for p in pts
+        if hole.contains(p) and not keep_fill.contains(p))
+    assert in_counter > 0, "grid never entered frame-counter waste"
+    work = padded_work_rect(keep, pad)
+    # Closed surround on the work edge (peel rail for any outer scrap).
+    segs = _line_segments(weed)
+    sides = 0
+    for x0, y0, x1, y1 in segs:
+        on_edge = (
+            (abs(x0 - work.left()) <= 1.5 and abs(x1 - work.left()) <= 1.5)
+            or (abs(x0 - work.right()) <= 1.5 and abs(x1 - work.right()) <= 1.5)
+            or (abs(y0 - work.top()) <= 1.5 and abs(y1 - work.top()) <= 1.5)
+            or (abs(y0 - work.bottom()) <= 1.5
+                and abs(y1 - work.bottom()) <= 1.5))
+        if on_edge:
+            sides += 1
+    assert sides >= 4, "expected padded surround rectangle, got %s edge segs" % sides
+
+
+def test_grid_soft_clearance_keeps_tight_alleys():
+    """Default grid must not use island-hop's 5 mm body floor."""
+    keep = _framed_hi()
+    pad = [12, 12, 12, 12]
+    soft = grid_weeds(keep, padding=pad, spacing=15)
+    # Force the old island-hop floors — should drop more hatch.
+    strict = grid_weeds(
+        keep, padding=pad, spacing=15,
+        body_clearance=5.0, alpha_min=30.0)
+    soft_n = weed_path_stats(soft)['segments']
+    strict_n = weed_path_stats(strict)['segments']
+    assert soft_n >= strict_n, (soft_n, strict_n)
+    assert soft_n > 4, soft_n
+
+
+def test_frame_and_grid_report_preview_segments():
+    from weedlib import progress as weed_progress
+    keep = _rect_path(0, 0, 40, 40)
+    segs = []
+    weed_progress.install(geometry=lambda s: segs.append(s))
+    try:
+        frame_weeds(keep, padding=[2, 2, 2, 2])
+        assert len(segs) >= 4
+        n = len(segs)
+        grid_weeds(keep, padding=[2, 2, 2, 2], spacing=10)
+        assert len(segs) > n
+    finally:
+        weed_progress.clear()

@@ -42,13 +42,17 @@ def _ensure_handler():
         return
     _configured = True
     _log.setLevel(logging.DEBUG)
-    if not any(isinstance(h, logging.StreamHandler) for h in _log.handlers):
-        handler = logging.StreamHandler()
-        handler.setLevel(logging.DEBUG)
-        handler.setFormatter(logging.Formatter(
-            '%(levelname)s weedlib: %(message)s'))
-        _log.addHandler(handler)
+    # Host UIs (Inkscape dialog) may already attach a queue handler — do
+    # not also add stderr, or the same lines appear twice.
+    if _log.handlers:
         _log.propagate = False
+        return
+    handler = logging.StreamHandler()
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(logging.Formatter(
+        '%(levelname)s weedlib: %(message)s'))
+    _log.addHandler(handler)
+    _log.propagate = False
 
 
 def phase_name():

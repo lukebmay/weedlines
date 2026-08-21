@@ -4,12 +4,13 @@
   <id>org.lukebmay.weedlines</id>
   <dependency type="executable" location="extensions">weedlines.py</dependency>
   <dependency type="executable" location="extensions">weedlines_dialog.py</dependency>
+  <dependency type="executable" location="extensions">stdio_capture.py</dependency>
   <effect implements-custom-gui="true" needs-live-preview="false" show-stderr="false">
     <object-type>all</object-type>
     <effects-menu>
       <submenu name="Weedlines"/>
     </effects-menu>
-    <menu-tip>Build a Weedlines layer with Start/Cancel, log, and live cut preview</menu-tip>
+    <menu-tip>Open Weedlines in a separate window (Inkscape stays usable); then Import last result</menu-tip>
   </effect>
   <script>
     <command location="inx" interpreter="python">weedlines.py</command>

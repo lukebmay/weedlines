@@ -12,6 +12,12 @@ WEED_FILES = (
     'weedlines.inx',
     'weedlines.py',
     'weedlines_dialog.py',
+    'weedlines_job.py',
+    'weedlines_host.py',
+    'weedlines_import.inx',
+    'weedlines_import.py',
+    'weedlines_svg.py',
+    'stdio_capture.py',
 )
 
 

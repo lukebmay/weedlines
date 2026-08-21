@@ -79,7 +79,10 @@ _CREATED_PREFER = 55.0
 # Mouth joins: drop mediocre created-min when a square-ish cand exists.
 _CREATED_MOUTH_PREFER = 70.0
 # Grid clip sample gap: snap ends to keep / ortho crossing within this.
-_GRID_END_SNAP = 2.0
+_GRID_END_SNAP = 3.5
+# Grid hatch only needs nick clearance — island-hop's 5 mm body floor
+# drops too many lines in letter counters / tight alleys.
+_GRID_BODY_CLEARANCE = 0.75
 _CLIPPER_SCALE = 1000.0
 
 # padding indices match job.models.Padding
@@ -170,29 +173,64 @@ def generate_weeds(keep_path,
     )
 
 
+def _publish_path_segments(path):
+    """Push each line segment to the live-preview geometry hook."""
+    if path is None or path.isEmpty():
+        return
+    from . import progress as _progress
+    for seg in _iter_line_segs(path):
+        _progress.report_segment(seg)
+
+
 def frame_weeds(keep_path, padding=None):
     """Padded rectangle around keep bbox (legacy weedline)."""
     padding = _normalize_padding(padding)
     rect = _padded_rect(keep_path.boundingRect(), padding)
     out = QPainterPath()
     out.addRect(rect)
+    _publish_path_segments(out)
     return out
 
 
 def grid_weeds(keep_path, padding=None, spacing=DEFAULT_GRID_SPACING,
                rules=None, body_clearance=None, alpha_min=None):
-    """Axis-aligned grid over padded bbox; omit parts inside even-odd keep."""
+    """Axis-aligned grid over design waste, plus a peel surround rectangle.
+
+    Hatch covers waste (frame interiors, letter counters, gaps between
+    islands) and never the vinyl keep itself. When the design already has
+    hollow counters / a frame, hatch stays inside the design bbox — outer
+    padding is one peel sheet. Solid designs still hatch the padded work
+    annulus. A closed rectangle at the work edge always bounds the outer
+    scrap so those cuts can be pulled up.
+
+    Grid uses a softer body-clearance floor than island-hop (nick
+    protection only); parallel-hug rejection is skipped so coast-parallel
+    hatch in waste is kept.
+    """
     padding = _normalize_padding(padding)
     spacing = max(float(spacing), 1e-6)
     if rules is None:
-        rules = _cut_rules(body_clearance, alpha_min, None)
-    work = _padded_rect(keep_path.boundingRect(), padding)
+        bc = (body_clearance if body_clearance is not None
+              else _GRID_BODY_CLEARANCE)
+        rules = _cut_rules(bc, alpha_min, None)
+    keep_bbox = keep_path.boundingRect()
+    work = _padded_rect(keep_bbox, padding)
     keep_fill = even_odd_keep_fill(keep_path)
+    closed = list_closed_subpaths(keep_path)
+    nodes = _nest_closed_paths(closed)
+    has_interior_waste = any(n.get('depth', 0) % 2 == 1 for n in nodes)
+    # Framed / hollow keep: grid the counter waste. Solid keep: grid padding.
+    hatch_rect = keep_bbox if has_interior_waste else work
     weed = _grid_in_region(
-        work, keep_fill, spacing, invert_keep=True,
-        keep_path=keep_path, rules=rules)
-    weed = _require_connected_ends(weed, keep_path, tol=1.5, work=work)
-    return _clip_path_to_rect(weed, work)
+        hatch_rect, keep_fill, spacing, invert_keep=True,
+        keep_path=keep_path, rules=rules, grid_mode=True)
+    surround = QPainterPath()
+    surround.addRect(work)
+    _add_path_segs(weed, surround, min_cut=1e-6)
+    weed = _require_connected_ends(weed, keep_path, tol=2.5, work=work)
+    weed = _clip_path_to_rect(weed, work)
+    _publish_path_segments(weed)
+    return weed
 
 
 def region_weeds(keep_path, padding=None, spacing=DEFAULT_GRID_SPACING):
@@ -321,6 +359,9 @@ def enclosure_weeds(keep_path,
         frame_clearance=rules.frame_clearance, work=_wdbg.bbox_fmt(work))
 
     # One outer peel + one free working set (chords isolate; no per-box rails).
+    # Design frames (hollow keep that already bounds interior) are not peeled
+    # again — their hole coast is the wall for contained clusters (D013).
+    design_frame_ids = _design_frame_path_ids(nodes)
     free_bodies = []
     contained_groups = []
     for cluster, container in groups:
@@ -330,17 +371,32 @@ def enclosure_weeds(keep_path,
         for body in cluster:
             if body is not None and not body.isEmpty():
                 free_bodies.append(body)
+    peel_bodies = [
+        b for b in free_bodies if id(b) not in design_frame_ids
+    ]
     shared_frame = QPainterPath()
     shared_rings = []
-    if free_bodies:
+    if peel_bodies:
         shared_frame, shared_rings = _peel_frame_for_cluster(
-            free_bodies, keep_fill, work, None, rules.frame_clearance)
+            peel_bodies, keep_fill, work, None, rules.frame_clearance)
         if not shared_frame.isEmpty():
             # Rails: no-cross / redundant only — body-clearance is for seals;
             # standoff is frame_clearance (may be < body_clearance).
             _add_path_segs(out, shared_frame, min_cut)
+    elif free_bodies and design_frame_ids:
+        _wdbg.log(
+            'peel_frame.skip', reason='design_frame_outer',
+            n_frames=len(design_frame_ids), free=len(free_bodies))
     work_groups = []
-    if free_bodies:
+    # Free bodies that are only design frames need no planner pass — their
+    # hole coasts already bound contained clusters. Still plan any free
+    # (unframed) keep that is not itself a hollow design frame.
+    free_plan = [b for b in free_bodies if id(b) not in design_frame_ids]
+    if free_plan:
+        work_groups.append((free_plan, None))
+    elif free_bodies and not contained_groups:
+        # Hollow frame alone (no interior keep yet): still visit once with
+        # no peel so hole splits can run later from the holes loop.
         work_groups.append((free_bodies, None))
     work_groups.extend(contained_groups)
 
@@ -541,12 +597,54 @@ closed_fill_union = even_odd_keep_fill
 
 
 def list_closed_subpaths(path, tol=1e-4):
-    """Return closed subpaths of *path* (start≈end, enough elements)."""
+    """Return closed subpaths of *path* (start≈end, enough elements).
+
+    Near-duplicate outlines (Inkscape fill+stroke twins, etc.) are collapsed
+    so nesting / keep-fill do not treat a second copy as a solid slab that
+    paints over hollow frame waste.
+    """
     result = []
     for sp in split_painter_path(path):
         if _subpath_is_closed(sp, tol=tol):
             result.append(sp)
-    return result
+    return _dedupe_closed_subpaths(result)
+
+
+def _dedupe_closed_subpaths(closed, tol=0.05):
+    """Drop near-identical closed outlines, keeping the first of each twin."""
+    if len(closed) < 2:
+        return list(closed)
+    kept = []
+    meta = []  # (path, bbox, area, centroid)
+    for sp in closed:
+        if sp is None or sp.isEmpty():
+            continue
+        br = sp.boundingRect()
+        area = _path_area(sp)
+        c = _path_centroid(sp)
+        dup = False
+        for other, obr, oarea, oc in meta:
+            area_tol = max(tol, 0.01 * max(area, oarea, 1.0))
+            if abs(area - oarea) > area_tol:
+                continue
+            if (abs(br.x() - obr.x()) > tol
+                    or abs(br.y() - obr.y()) > tol
+                    or abs(br.width() - obr.width()) > tol
+                    or abs(br.height() - obr.height()) > tol):
+                continue
+            if math.hypot(c.x() - oc.x(), c.y() - oc.y()) > max(2.0 * tol, 1.0):
+                continue
+            # Same place + same size: treat as a twin even if winding differs.
+            probe_a = _interior_point(sp)
+            probe_b = _interior_point(other)
+            if other.contains(probe_a) or sp.contains(probe_b):
+                dup = True
+                break
+        if dup:
+            continue
+        kept.append(sp)
+        meta.append((sp, br, area, c))
+    return kept
 
 
 def padded_work_rect(keep_path, padding=None):
@@ -984,7 +1082,7 @@ def _snap_grid_seg(seg, horizontal, keep_edges, crosses, work,
 
 
 def _grid_in_region(rect, region_path, spacing, invert_keep,
-                   keep_path=None, rules=None):
+                   keep_path=None, rules=None, grid_mode=False):
     """Vertical + horizontal lines over rect, clipped by region test."""
     out = QPainterPath()
     if rect.width() <= 0 or rect.height() <= 0:
@@ -1029,7 +1127,16 @@ def _grid_in_region(rect, region_path, spacing, invert_keep,
     if rules is not None and keep_path is not None:
         kept = []
         for seg in segs:
-            if _seg_emit_ok(seg, keep_path, None, rules, other_segs=kept):
+            if grid_mode:
+                # Soft gate: nick clearance + α only (no parallel-hug).
+                if not _seg_body_clearance_ok(
+                        seg, keep_path, kept, clearance=rules.body_clearance):
+                    continue
+                if not _seg_alpha_ok(
+                        seg, keep_path, alpha_min=rules.alpha_min):
+                    continue
+                kept.append(seg)
+            elif _seg_emit_ok(seg, keep_path, None, rules, other_segs=kept):
                 kept.append(seg)
         segs = kept
     _add_line_segs(out, segs)
@@ -1314,6 +1421,49 @@ def _split_interior_groups(bodies, collar):
     out = [border]
     out.extend(_split_interior_groups(interior, collar))
     return out
+
+
+def _is_design_frame_node(node):
+    """True if *node* is a hollow keep frame (design already framed).
+
+    Matches D013 / hard-rules: do not invent another outer collar when the
+    design already provides a frame. Detected when the keep body has a
+    direct hole that either contains nested keep, or is a large hollow
+    (hole area > 35% of the outer path area).
+    """
+    if node is None or node.get('depth', 0) % 2 != 0:
+        return False
+    body = node.get('path')
+    if body is None or body.isEmpty():
+        return False
+    body_area = abs(_path_area(body))
+    if body_area < 1e-6:
+        return False
+    hole_area = 0.0
+    has_inner_keep = False
+    for child in node.get('children') or ():
+        if child.get('depth') != node['depth'] + 1:
+            continue
+        hole_area += abs(_path_area(child.get('path')))
+        for gc in child.get('children') or ():
+            if gc.get('depth', 0) % 2 == 0:
+                gp = gc.get('path')
+                if gp is not None and not gp.isEmpty():
+                    has_inner_keep = True
+                    break
+        if has_inner_keep:
+            break
+    if has_inner_keep:
+        return True
+    return hole_area > 0.35 * body_area
+
+
+def _design_frame_path_ids(nodes):
+    """``id(path)`` set for keep bodies that are design frames."""
+    return set(
+        id(n['path']) for n in nodes
+        if _is_design_frame_node(n) and n.get('path') is not None
+    )
 
 
 def _enclosure_groups(nodes, collar):

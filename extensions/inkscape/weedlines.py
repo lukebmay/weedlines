@@ -45,28 +45,35 @@ def _ensure_weedlib_on_path():
         sys.path.insert(0, src)
 
 
-def _collect_path_d(node, inkex):
-    """Yield path d strings from a node tree (paths only)."""
+def _is_svg_path_element(node, inkex):
     tag = (
         inkex.addNS('path', 'svg') if hasattr(inkex, 'addNS')
         else '{http://www.w3.org/2000/svg}path'
     )
-    if node.tag == tag or (isinstance(node.tag, str) and node.tag.endswith('path')):
-        d = node.get('d')
-        if d:
-            yield d
+    return (
+        node.tag == tag
+        or (isinstance(node.tag, str) and node.tag.endswith('}path'))
+        or (isinstance(node.tag, str) and node.tag == 'path')
+    )
+
+
+def _iter_path_elements(node, inkex):
+    """Yield every ``svg:path`` element under *node* (including *node*)."""
+    if _is_svg_path_element(node, inkex):
+        yield node
     for child in list(node):
-        for d in _collect_path_d(child, inkex):
-            yield d
+        for el in _iter_path_elements(child, inkex):
+            yield el
 
 
 def _apply_node_transform(path, node, inkex, QTransform):
-    """Apply SVG transform attribute if inkex can parse it; else identity."""
+    """Map *path* by this element's composed transform (document user units)."""
     try:
         t = node.composed_transform()
         m = t.matrix if hasattr(t, 'matrix') else None
         if m is None:
             return path
+        # inkex: ((a, c, e), (b, d, f)) — SVG matrix(a,b,c,d,e,f)
         a, c, e = m[0]
         b, d, f = m[1]
         qt = QTransform(a, b, c, d, e, f)
@@ -75,10 +82,31 @@ def _apply_node_transform(path, node, inkex, QTransform):
         return path
 
 
-def _add_weed_layer(svg, inkex, PathElement, weed_path, layer_label):
-    from weedlib.svg_paths import weed_path_to_open_d_list
+def _keep_path_from_selection(nodes, inkex, QPainterPath, QTransform):
+    """Build keep geometry in document user units.
 
-    d_list = weed_path_to_open_d_list(weed_path)
+    Each path element uses *its own* ``composed_transform()`` so nested
+    group scales/translates are not dropped (that was shifting/sizing
+    imports wrong when a parent/group/svg was selected).
+    """
+    from weedlib.svg_paths import svg_d_to_qpainterpath
+
+    keep = QPainterPath()
+    for root in nodes:
+        for el in _iter_path_elements(root, inkex):
+            d = el.get('d')
+            if not d:
+                continue
+            sub = svg_d_to_qpainterpath(d)
+            if sub.isEmpty():
+                continue
+            sub = _apply_node_transform(sub, el, inkex, QTransform)
+            keep.addPath(sub)
+    return keep
+
+
+def _add_weed_layer_from_d(svg, inkex, PathElement, d_list, layer_label):
+    """Write open SVG path `d` strings into a new Weedlines layer."""
     if not d_list:
         raise inkex.AbortExtension('Weed solver produced no cuts.')
 
@@ -103,6 +131,13 @@ def _add_weed_layer(svg, inkex, PathElement, weed_path, layer_label):
         layer.append(el)
 
 
+def _add_weed_layer(svg, inkex, PathElement, weed_path, layer_label):
+    from weedlib.svg_paths import weed_path_to_open_d_list
+
+    d_list = weed_path_to_open_d_list(weed_path)
+    _add_weed_layer_from_d(svg, inkex, PathElement, d_list, layer_label)
+
+
 class WeedLinesEffect(object):
     """inkex.EffectExtension body (mixed into a subclass of EffectExtension)."""
 
@@ -116,15 +151,8 @@ class WeedLinesEffect(object):
 
     def effect(self):
         import inkex
-        from inkex import PathElement
 
         _ensure_weedlib_on_path()
-        try:
-            from weedlib.qt import QPainterPath, QTransform
-        except ImportError as exc:
-            raise inkex.AbortExtension(
-                'weedlib / Qt not available: {}'.format(exc)
-            )
 
         ext_dir = os.path.abspath(os.path.dirname(__file__))
         if ext_dir not in sys.path:
@@ -133,21 +161,6 @@ class WeedLinesEffect(object):
         nodes = list(self.svg.selection.values()) if self.svg.selection else []
         if not nodes:
             nodes = [self.svg]
-
-        from weedlib.svg_paths import svg_d_to_qpainterpath
-
-        keep = QPainterPath()
-        for node in nodes:
-            for d in _collect_path_d(node, inkex):
-                sub = svg_d_to_qpainterpath(d)
-                if hasattr(node, 'composed_transform'):
-                    sub = _apply_node_transform(sub, node, inkex, QTransform)
-                keep.addPath(sub)
-
-        if keep.isEmpty():
-            raise inkex.AbortExtension(
-                'No path geometry found. Convert objects to paths and select them.'
-            )
 
         opts = self.options
         defaults = {
@@ -158,23 +171,89 @@ class WeedLinesEffect(object):
             'layer_name': getattr(opts, 'layer_name', None) or 'Weed lines',
         }
 
+        try:
+            from weedlib.qt import QPainterPath, QTransform
+        except ImportError as exc:
+            raise inkex.AbortExtension(
+                'weedlib / Qt not available: {}'.format(exc)
+            )
+
+        from weedlib.svg_paths import qpainterpath_to_svg_d
+        from weedlines_job import write_job, spawn_host
+        from weedlines_svg import doc_root_attrs
+
+        keep = _keep_path_from_selection(
+            nodes, inkex, QPainterPath, QTransform)
+
+        if keep.isEmpty():
+            raise inkex.AbortExtension(
+                'No path geometry found. Convert objects to paths '
+                'and select them.'
+            )
+
+        doc_attrs = doc_root_attrs(self.svg)
+        br = keep.boundingRect()
+        defaults['keep_bbox'] = [
+            br.x(), br.y(), br.width(), br.height(),
+        ]
+
+        # Default: detach so Inkscape's main thread is free. Set
+        # WEEDLINES_INLINE=1 to keep the old in-process blocking dialog.
+        inline = os.environ.get('WEEDLINES_INLINE', '').strip() in (
+            '1', 'true', 'yes', 'on')
+        if not inline:
+            keep_d = qpainterpath_to_svg_d(keep, close_subpaths=True)
+            job_path = write_job(
+                keep_d, defaults, doc_attrs=doc_attrs)
+            # Keep Inkscape's stderr clean — any chatter becomes the
+            # "additional data from the script" dialog.
+            old_err = sys.stderr
+            try:
+                sys.stderr = open(os.devnull, 'w')
+                try:
+                    spawn_host(job_path)
+                except Exception as exc:
+                    sys.stderr = old_err
+                    raise inkex.AbortExtension(
+                        'Could not start Weedlines window: {}'.format(exc)
+                    )
+            finally:
+                try:
+                    if sys.stderr is not old_err:
+                        sys.stderr.close()
+                except Exception:
+                    pass
+                sys.stderr = old_err
+            # Return immediately so Inkscape unblocks; the host window is
+            # already open. After Apply there: Import last result.
+            return
+
+        # Legacy in-process path (blocks Inkscape until the dialog closes).
+        from stdio_capture import NativeStdioCapture
+        from inkex import PathElement
         from weedlines_dialog import run_weedlines_dialog
 
         old_out, old_err = sys.stdout, sys.stderr
+        null_out = open(os.devnull, 'w')
+        null_err = open(os.devnull, 'w')
+        weed, layer_name = None, None
         try:
-            sys.stdout = open(os.devnull, 'w')
-            sys.stderr = open(os.devnull, 'w')
-            weed, layer_name = run_weedlines_dialog(keep, defaults=defaults)
+            sys.stdout = null_out
+            sys.stderr = null_err
+            with NativeStdioCapture() as capture:
+                weed, layer_name = run_weedlines_dialog(
+                    keep, defaults=defaults,
+                    platform_lines=capture.lines)
         finally:
-            try:
-                sys.stdout.close()
-            except Exception:
-                pass
-            try:
-                sys.stderr.close()
-            except Exception:
-                pass
             sys.stdout, sys.stderr = old_out, old_err
+            try:
+                null_out.close()
+            except Exception:
+                pass
+            try:
+                null_err.close()
+            except Exception:
+                pass
 
         if weed is None:
             return

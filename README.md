@@ -21,8 +21,18 @@ until picture QA is accepted.
 
 ## Install
 
+From this checkout:
+
 ```bash
 cd ~/dev/me/weedlines
+./install                  # editable pip (if needed) + Inkscape extension
+./install --dry-run
+./install --help
+```
+
+Or via the Python CLI after ``pip install -e .``:
+
+```bash
 python3 -m pip install -e '.[island-hop,dev]'   # editable + pyclipper + pytest
 # Qt binding required (one of):
 #   python3 -m pip install PyQt5   # or PyQt6 / PySide6 / …
@@ -47,6 +57,23 @@ WEEDLINES_LOG=1 rg 'phase\.|island_hop\.|emit\.|reject' …
 ```
 
 The dialog enables level `1` for the run so the live log is useful.
+
+## Pause / resume
+
+While an algorithm runs, **Pause** freezes the worker at the next
+checkpoint so you can inspect the live preview. **Resume** continues;
+**Cancel** aborts (also works while paused). Programmatically:
+
+```python
+from weedlib import progress, generate_weeds
+
+paused = False
+progress.install(
+    pause=lambda: paused,
+    cancel=lambda: False,
+)
+# set paused = True / False from another thread or UI
+```
 
 ## Library
 
