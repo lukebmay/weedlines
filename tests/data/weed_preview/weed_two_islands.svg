@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="330.0" height="108.0" viewBox="0 0 330.0 108.0">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="4" y="14" font-family="sans-serif" font-size="11" fill="#333">two_islands (gray=design keep, white=waste, orange=weed)</text>
+<g transform="translate(0.0,22.0)">
+<rect x="0.0" y="0.0" width="100.0" height="80.0" fill="#ffffff" stroke="#ddd"/>
+<g transform="translate(10.0,-10.0)">
+<path d="M 10.000 30.000 L 35.000 30.000 L 35.000 70.000 L 10.000 70.000 L 10.000 30.000 Z M 45.000 30.000 L 70.000 30.000 L 70.000 70.000 L 45.000 70.000 L 45.000 30.000 Z" fill="#9a9a9a" fill-opacity="1" fill-rule="evenodd" stroke="none"/>
+<path d="M 10.000 30.000 L 35.000 30.000 L 35.000 70.000 L 10.000 70.000 L 10.000 30.000 Z M 45.000 30.000 L 70.000 30.000 L 70.000 70.000 L 45.000 70.000 L 45.000 30.000 Z" fill="none" stroke="#666666" stroke-width="1.2"/>
+<path d="M -2.000 18.000 L 82.000 18.000 L 82.000 82.000 L -2.000 82.000 L -2.000 18.000" fill="none" stroke="#e67e22" stroke-width="1.0"/>
+</g>
+<text x="4" y="76.0" font-family="sans-serif" font-size="9" fill="#555">frame · segs=4 len=296 out=0 inkeep=0</text>
+</g>
+<g transform="translate(115.0,22.0)">
+<rect x="0.0" y="0.0" width="100.0" height="80.0" fill="#ffffff" stroke="#ddd"/>
+<g transform="translate(10.0,-10.0)">
+<path d="M 10.000 30.000 L 35.000 30.000 L 35.000 70.000 L 10.000 70.000 L 10.000 30.000 Z M 45.000 30.000 L 70.000 30.000 L 70.000 70.000 L 45.000 70.000 L 45.000 30.000 Z" fill="#9a9a9a" fill-opacity="1" fill-rule="evenodd" stroke="none"/>
+<path d="M 10.000 30.000 L 35.000 30.000 L 35.000 70.000 L 10.000 70.000 L 10.000 30.000 Z M 45.000 30.000 L 70.000 30.000 L 70.000 70.000 L 45.000 70.000 L 45.000 30.000 Z" fill="none" stroke="#666666" stroke-width="1.2"/>
+<path d="M -2.000 18.000 L -2.000 82.000 M 13.000 18.000 L 13.000 30.000 M 13.000 70.000 L 13.000 82.000 M 28.000 18.000 L 28.000 30.000 M 28.000 70.000 L 28.000 82.000 M 58.000 18.000 L 58.000 30.000 M 58.000 70.000 L 58.000 82.000 M -2.000 18.000 L 82.000 18.000 M -2.000 33.000 L 10.000 33.000 M 35.000 33.000 L 45.000 33.000 M 70.000 33.000 L 82.000 33.000 M -2.000 48.000 L 10.000 48.000 M 35.000 48.000 L 45.000 48.000 M 70.000 48.000 L 82.000 48.000 M -2.000 63.000 L 10.000 63.000 M 35.000 63.000 L 45.000 63.000 M 70.000 63.000 L 82.000 63.000 M -2.000 78.000 L 82.000 78.000" fill="none" stroke="#e67e22" stroke-width="1.0"/>
+</g>
+<text x="4" y="76.0" font-family="sans-serif" font-size="9" fill="#555">grid · segs=18 len=406 out=0 inkeep=0</text>
+</g>
+<g transform="translate(230.0,22.0)">
+<rect x="0.0" y="0.0" width="100.0" height="80.0" fill="#ffffff" stroke="#ddd"/>
+<g transform="translate(10.0,-10.0)">
+<path d="M 10.000 30.000 L 35.000 30.000 L 35.000 70.000 L 10.000 70.000 L 10.000 30.000 Z M 45.000 30.000 L 70.000 30.000 L 70.000 70.000 L 45.000 70.000 L 45.000 30.000 Z" fill="#9a9a9a" fill-opacity="1" fill-rule="evenodd" stroke="none"/>
+<path d="M 10.000 30.000 L 35.000 30.000 L 35.000 70.000 L 10.000 70.000 L 10.000 30.000 Z M 45.000 30.000 L 70.000 30.000 L 70.000 70.000 L 45.000 70.000 L 45.000 30.000 Z" fill="none" stroke="#666666" stroke-width="1.2"/>
+<path d="M 75.061 21.376 L 78.730 25.124 M 78.730 25.124 L 80.000 30.000 M 80.000 30.000 L 80.000 70.000 M 80.000 70.000 L 78.625 75.061 M 78.625 75.061 L 74.876 78.730 M 74.876 78.730 L 70.000 80.000 M 70.000 80.000 L 10.000 80.000 M 10.000 80.000 L 4.939 78.625 M 4.939 78.625 L 1.270 74.876 M 1.270 74.876 L 0.000 70.000 M 0.000 70.000 L 0.000 30.000 M 0.000 30.000 L 1.376 24.939 M 1.376 24.939 L 5.124 21.270 M 5.124 21.270 L 10.000 20.000 M 10.000 20.000 L 70.000 20.000 M 70.000 20.000 L 75.061 21.376 M 35.000 30.000 L 45.000 30.000 M 35.000 70.000 L 45.000 70.000 M 22.500 30.000 L 22.500 20.000" fill="none" stroke="#e67e22" stroke-width="1.0"/>
+</g>
+<text x="4" y="76.0" font-family="sans-serif" font-size="9" fill="#555">auto · segs=19 len=292 out=0 inkeep=0 traps=0</text>
+</g>
+</svg>

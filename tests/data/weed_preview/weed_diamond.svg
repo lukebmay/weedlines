@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="330.0" height="158.0" viewBox="0 0 330.0 158.0">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="4" y="14" font-family="sans-serif" font-size="11" fill="#333">diamond (gray=design keep, white=waste, orange=weed)</text>
+<g transform="translate(0.0,22.0)">
+<rect x="0.0" y="0.0" width="100.0" height="130.0" fill="#ffffff" stroke="#ddd"/>
+<g transform="translate(-0.0,15.0)">
+<path d="M 50.000 5.000 L 80.000 50.000 L 50.000 95.000 L 20.000 50.000 L 50.000 5.000 Z" fill="#9a9a9a" fill-opacity="1" fill-rule="evenodd" stroke="none"/>
+<path d="M 50.000 5.000 L 80.000 50.000 L 50.000 95.000 L 20.000 50.000 L 50.000 5.000 Z" fill="none" stroke="#666666" stroke-width="1.2"/>
+<path d="M 8.000 -7.000 L 92.000 -7.000 L 92.000 107.000 L 8.000 107.000 L 8.000 -7.000" fill="none" stroke="#e67e22" stroke-width="1.0"/>
+</g>
+<text x="4" y="126.0" font-family="sans-serif" font-size="9" fill="#555">frame · segs=4 len=396 out=0 inkeep=0</text>
+</g>
+<g transform="translate(115.0,22.0)">
+<rect x="0.0" y="0.0" width="100.0" height="130.0" fill="#ffffff" stroke="#ddd"/>
+<g transform="translate(-0.0,15.0)">
+<path d="M 50.000 5.000 L 80.000 50.000 L 50.000 95.000 L 20.000 50.000 L 50.000 5.000 Z" fill="#9a9a9a" fill-opacity="1" fill-rule="evenodd" stroke="none"/>
+<path d="M 50.000 5.000 L 80.000 50.000 L 50.000 95.000 L 20.000 50.000 L 50.000 5.000 Z" fill="none" stroke="#666666" stroke-width="1.2"/>
+<path d="M 8.000 -7.000 L 8.000 107.000 M 48.000 -7.000 L 48.000 8.000 M 48.000 92.000 L 48.000 107.000 M 88.000 -7.000 L 88.000 107.000 M 8.000 -7.000 L 92.000 -7.000 M 8.000 13.000 L 44.667 13.000 M 55.333 13.000 L 92.000 13.000 M 8.000 33.000 L 31.333 33.000 M 68.667 33.000 L 92.000 33.000 M 8.000 53.000 L 22.000 53.000 M 78.000 53.000 L 92.000 53.000 M 8.000 73.000 L 35.333 73.000 M 64.667 73.000 L 92.000 73.000 M 8.000 93.000 L 48.667 93.000 M 51.333 93.000 L 92.000 93.000" fill="none" stroke="#e67e22" stroke-width="1.0"/>
+</g>
+<text x="4" y="126.0" font-family="sans-serif" font-size="9" fill="#555">grid · segs=15 len=626 out=0 inkeep=0</text>
+</g>
+<g transform="translate(230.0,22.0)">
+<rect x="0.0" y="0.0" width="100.0" height="130.0" fill="#ffffff" stroke="#ddd"/>
+<g transform="translate(-0.0,15.0)">
+<path d="M 50.000 5.000 L 80.000 50.000 L 50.000 95.000 L 20.000 50.000 L 50.000 5.000 Z" fill="#9a9a9a" fill-opacity="1" fill-rule="evenodd" stroke="none"/>
+<path d="M 50.000 5.000 L 80.000 50.000 L 50.000 95.000 L 20.000 50.000 L 50.000 5.000 Z" fill="none" stroke="#666666" stroke-width="1.2"/>
+<path d="M 55.723 -3.200 L 58.321 -0.547 M 58.321 -0.547 L 88.321 44.453 M 88.321 44.453 L 89.984 49.427 M 89.984 49.427 L 88.321 55.547 M 88.321 55.547 L 58.321 100.547 M 58.321 100.547 L 54.368 103.995 M 54.368 103.995 L 49.215 104.969 M 49.215 104.969 L 44.277 103.200 M 44.277 103.200 L 41.679 100.547 M 41.679 100.547 L 11.679 55.547 M 11.679 55.547 L 10.016 50.573 M 10.016 50.573 L 11.679 44.453 M 11.679 44.453 L 41.679 -0.547 M 41.679 -0.547 L 45.632 -3.995 M 45.632 -3.995 L 50.785 -4.969 M 50.785 -4.969 L 55.723 -3.200 M 65.000 27.500 L 73.321 21.953" fill="none" stroke="#e67e22" stroke-width="1.0"/>
+</g>
+<text x="4" y="126.0" font-family="sans-serif" font-size="9" fill="#555">auto · segs=17 len=288 out=0 inkeep=0 traps=0</text>
+</g>
+</svg>

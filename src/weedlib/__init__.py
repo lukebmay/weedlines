@@ -1,0 +1,83 @@
+# -*- coding: utf-8 -*-
+"""Shared weed-line geometry (Inkscape extension + future Inkcut).
+
+Pure solvers: no Enaml UI, Job models, or device config. Path type is
+Qt ``QPainterPath`` (PyQt / PySide / enaml.qt). Hosts convert at edges.
+"""
+from __future__ import division
+
+from .solvers import (  # noqa: F401
+    DEFAULT_BRIDGE_WIDTH,
+    DEFAULT_CHANNEL_STANDOFF,
+    DEFAULT_CLEARANCE,
+    DEFAULT_COLLAR,
+    DEFAULT_BODY_CLEARANCE,
+    DEFAULT_ALPHA_MIN,
+    DEFAULT_FRAME_CLEARANCE,
+    DEFAULT_DELICATE_ANGLE_DEG,
+    DEFAULT_GRID_SPACING,
+    DEFAULT_MAX_CHUNK,
+    DEFAULT_MAX_SPOKES,
+    DEFAULT_MIN_CUT,
+    DEFAULT_PENINSULA_RATIO,
+    DEFAULT_WEED_MODE,
+    WEED_MODES,
+    auto_weeds,
+    closed_fill_union,
+    enclosure_weeds,
+    even_odd_keep_fill,
+    frame_weeds,
+    generate_weeds,
+    grid_weeds,
+    island_hop_weeds,
+    list_closed_subpaths,
+    padded_work_rect,
+    region_weeds,
+    residual_waste_traps,
+    sample_points_on_path,
+    weed_path_stats,
+    weed_sample_stats,
+)
+from .svg_paths import (  # noqa: F401
+    keep_fill_to_svg_d,
+    qpainterpath_to_svg_d,
+    svg_d_to_qpainterpath,
+    weed_path_to_open_d_list,
+)
+
+__all__ = [
+    'WEED_MODES',
+    'DEFAULT_WEED_MODE',
+    'DEFAULT_GRID_SPACING',
+    'DEFAULT_MAX_CHUNK',
+    'DEFAULT_BRIDGE_WIDTH',
+    'DEFAULT_CLEARANCE',
+    'DEFAULT_MIN_CUT',
+    'DEFAULT_DELICATE_ANGLE_DEG',
+    'DEFAULT_COLLAR',
+    'DEFAULT_BODY_CLEARANCE',
+    'DEFAULT_ALPHA_MIN',
+    'DEFAULT_FRAME_CLEARANCE',
+    'DEFAULT_MAX_SPOKES',
+    'DEFAULT_CHANNEL_STANDOFF',
+    'DEFAULT_PENINSULA_RATIO',
+    'generate_weeds',
+    'frame_weeds',
+    'grid_weeds',
+    'region_weeds',
+    'island_hop_weeds',
+    'auto_weeds',
+    'enclosure_weeds',
+    'even_odd_keep_fill',
+    'list_closed_subpaths',
+    'padded_work_rect',
+    'closed_fill_union',
+    'residual_waste_traps',
+    'sample_points_on_path',
+    'weed_path_stats',
+    'weed_sample_stats',
+    'svg_d_to_qpainterpath',
+    'qpainterpath_to_svg_d',
+    'keep_fill_to_svg_d',
+    'weed_path_to_open_d_list',
+]
