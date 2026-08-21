@@ -3,13 +3,11 @@
 """Render keep + weed paths for peel strategies (agent SVG harness).
 
 Usage:
-  QT_QPA_PLATFORM=offscreen PYTHONPATH=. python3 scripts/preview_auto_weeds.py
-  PYTHONPATH=. python3 scripts/preview_auto_weeds.py --svg path/to/keep.svg
+  QT_QPA_PLATFORM=offscreen PYTHONPATH=src python3 scripts/preview_island_hop_weeds.py
+  PYTHONPATH=src python3 scripts/preview_island_hop_weeds.py --svg path/to/keep.svg
 
-Writes SVG with design-keep fill (union, not raw evenodd) and weeds.
-Prints segs / length / outside-work / in-keep per mode; auto also prints
-residual-trap count (glyph smoke — not a pytest addText check). ViewBox
-includes the full weed extent.
+Writes SVG with design-keep fill and weeds. Prints stats per mode;
+island-hop also prints residual-trap count.
 """
 from __future__ import division, print_function
 
@@ -20,15 +18,16 @@ import sys
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
-from enaml.qt.QtCore import QPointF, QRectF
-from enaml.qt.QtGui import QPainterPath
-from enaml.qt.QtWidgets import QApplication
-
-from inkcut.job.weeds import (
+from weedlib.qt import QPointF, QRectF, QPainterPath, load_widgets
+from weedlib import (
     even_odd_keep_fill, generate_weeds, padded_work_rect,
     residual_waste_traps, weed_sample_stats,
 )
-from inkcut.weedlib.svg_paths import keep_fill_to_svg_d
+from weedlib.svg_paths import keep_fill_to_svg_d
+
+_QtCore, _QtGui, _QtWidgets = load_widgets()
+QApplication = _QtWidgets.QApplication
+QFont = _QtGui.QFont
 
 # Keep a process-wide ref; addText segfaults if QApplication is GC'd.
 _QT_APP = QApplication.instance() or QApplication([])
@@ -128,7 +127,6 @@ def wreath_hi():
 
 def quoted_word():
     """Real glyphs: letters, comma, apostrophe, quotes, bang."""
-    from enaml.qt.QtGui import QFont
     font = QFont('Noto Sans')
     font.setPixelSize(36)
     p = QPainterPath()
@@ -208,7 +206,18 @@ def letter_a():
 
 
 def load_svg_path(path):
-    from inkcut.core.svg import QtSvgDoc
+    """Load keep geometry from an SVG file.
+
+    Prefers Inkcut ``QtSvgDoc`` if installed; otherwise raises with a
+    clear message (fixtures under tests/data are usually enough).
+    """
+    try:
+        from inkcut.core.svg import QtSvgDoc
+    except ImportError as exc:
+        raise SystemExit(
+            'Loading arbitrary SVG needs inkcut.core.svg.QtSvgDoc, or use '
+            'built-in fixtures (no --svg). Install inkcut or omit --svg.'
+        ) from exc
     return QPainterPath(QtSvgDoc(path))
 
 
@@ -249,7 +258,7 @@ def render_case(name, keep, modes, padding, spacing, out_dir, auto_kw=None):
             keep, mode=mode, padding=padding, spacing=spacing, **auto_kw)
         st = weed_sample_stats(
             weed, keep_fill=keep_fill, work_rect=work, step=1.0)
-        if mode == 'auto':
+        if mode == 'island-hop':
             st['traps'] = len(residual_waste_traps(
                 keep, weed, work=work, padding=padding))
         else:
@@ -369,7 +378,7 @@ def main(argv=None):
     os.makedirs(out_dir, exist_ok=True)
 
     pad = [args.padding, args.padding, args.padding, args.padding]
-    modes = args.modes or ['frame', 'grid', 'auto']
+    modes = args.modes or ['frame', 'grid', 'island-hop']
     auto_kw = {}
     if args.max_chunk is not None:
         auto_kw['max_chunk'] = args.max_chunk
