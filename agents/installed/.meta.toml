@@ -1,0 +1,94 @@
+schema = 1
+tool_version = "0.5.0"
+catalog_version = "0.5.2"
+composer_path = "agents.py"
+installed_at = "2026-09-02T20:34:38+00:00"
+updated_at = "2026-09-02T20:35:09+00:00"
+
+[[files]]
+id = "always"
+path = "always.md"
+version = "1.0.0"
+sha256 = "8e0c86e3c09b1d9b35b806ecfa29bcc1ae02a899a2c4ef58e03a456fe5c725b7"
+title = "Hard kernel (always on)"
+read_when = "Always / kernel — inlined into AGENTS.md before other guidelines"
+
+[[files]]
+id = "ansi-colors"
+path = "ansi-colors.md"
+version = "3.1.0"
+sha256 = "08ee94d5c82f4f429215a943d44c688175b83f7911f697e23d76ef3cf5a98613"
+title = "ANSI colors"
+read_when = "Adding terminal colors, formatting CLI output, or launching user-visible CLIs from a Grok agent"
+
+[[files]]
+id = "comments"
+path = "comments.md"
+version = "2.2.0"
+sha256 = "95cf9c660a47147c27f8232952f7282ec93e239b1e748ffd69adae39f7b9675d"
+title = "Comments"
+read_when = "Adding or editing source comments"
+
+[[files]]
+id = "documentation"
+path = "documentation.md"
+version = "3.2.0"
+sha256 = "b949b395c04a21361449afabb7a5786c8c9aa7bdf996fe0aaa1d68178a1f32a7"
+title = "Documentation"
+read_when = "Writing design docs, design CHANGELOG, user docs, human-facing checklists/blockers, or choosing where “why” lives"
+
+[[files]]
+id = "general"
+path = "general.md"
+version = "3.3.0"
+sha256 = "6ea4e353757d83b93d0192c76f3d3f08115996904ec4587d55f86c39195ecb3c"
+title = "General process"
+read_when = "Always for multi-step work — plans, slices, blockers, handoffs, taskforces, orchestrator, subagents, architecture vs patches, canonical APIs"
+
+[[files]]
+id = "git"
+path = "git.md"
+version = "2.0.1"
+sha256 = "5f6c3536e727698bb98fe1cb11638a85a9c13a97d48d711cfc22dfedb0b86ea3"
+title = "Git"
+read_when = "Before any commit, push, branch, merge, rebase, or release-ladder work"
+
+[[files]]
+id = "python"
+path = "languages/python.md"
+version = "1.1.0"
+sha256 = "8138ab1c64ff33e7bb093ed20c9ff0014292ae860e6ffe81a87455bbd6c47e78"
+title = "Python"
+read_when = "Writing or reviewing Python"
+
+[[files]]
+id = "markdown"
+path = "markdown.md"
+version = "2.0.0"
+sha256 = "68c4cac0d7b06859d1b7f3c5fd588f08d25c251ceaaea50fdcecd15ef3ef5594"
+title = "Markdown"
+read_when = "Writing or editing markdown docs, plans, tasks, or README prose"
+
+[[files]]
+id = "scripting"
+path = "scripting.md"
+version = "2.3.1"
+sha256 = "4fc68ef80cc401a62bb88109da8e76fa5ec55ebfd4f2068a786e6a7646a1acd6"
+title = "Scripting"
+read_when = "Writing or changing shell/Python scripts, installers, CLI tools, bin entries, or launching user-visible apps from a Grok agent"
+
+[[files]]
+id = "security"
+path = "security.md"
+version = "2.1.0"
+sha256 = "36cce910ba2b549d36deab5a2ae10246c21d4224557cee5bc32e97f44211738a"
+title = "Security"
+read_when = "Before SSH, secrets, sudo/root, credentials, or any important live-data mutation"
+
+[[files]]
+id = "testing"
+path = "testing.md"
+version = "2.3.0"
+sha256 = "9141304a6f7983affe2596d79f24e322a764e2dd20839fafed8224fc53f2cfcc"
+title = "Testing"
+read_when = "Adding tests, changing test strategy, enabling optional features, checking Grok durable --leader mode, or reattaching headless Grok for the human"
