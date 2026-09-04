@@ -1,9 +1,9 @@
 schema = 1
 tool_version = "0.5.0"
-catalog_version = "0.5.2"
+catalog_version = "0.5.3"
 composer_path = "agents.py"
 installed_at = "2026-09-02T20:34:38+00:00"
-updated_at = "2026-09-02T20:35:09+00:00"
+updated_at = "2026-09-04T20:45:10+00:00"
 
 [[files]]
 id = "always"
@@ -32,16 +32,16 @@ read_when = "Adding or editing source comments"
 [[files]]
 id = "documentation"
 path = "documentation.md"
-version = "3.2.0"
-sha256 = "b949b395c04a21361449afabb7a5786c8c9aa7bdf996fe0aaa1d68178a1f32a7"
+version = "3.3.0"
+sha256 = "e768c817330bffcd3774325232df5002db0695b52532042104ad5db06f5c7431"
 title = "Documentation"
 read_when = "Writing design docs, design CHANGELOG, user docs, human-facing checklists/blockers, or choosing where “why” lives"
 
 [[files]]
 id = "general"
 path = "general.md"
-version = "3.3.0"
-sha256 = "6ea4e353757d83b93d0192c76f3d3f08115996904ec4587d55f86c39195ecb3c"
+version = "3.4.0"
+sha256 = "9933ad555d058dccd4ed1d0f5b6476d9c68296f73d3f2644a6f4600bb282ed0b"
 title = "General process"
 read_when = "Always for multi-step work — plans, slices, blockers, handoffs, taskforces, orchestrator, subagents, architecture vs patches, canonical APIs"
 
@@ -88,7 +88,7 @@ read_when = "Before SSH, secrets, sudo/root, credentials, or any important live-
 [[files]]
 id = "testing"
 path = "testing.md"
-version = "2.3.0"
-sha256 = "9141304a6f7983affe2596d79f24e322a764e2dd20839fafed8224fc53f2cfcc"
+version = "2.4.0"
+sha256 = "2438618ba45a3dd047bf2413d1240c388d4add827c49636c5e209cca9e357e9c"
 title = "Testing"
 read_when = "Adding tests, changing test strategy, enabling optional features, checking Grok durable --leader mode, or reattaching headless Grok for the human"

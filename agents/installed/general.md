@@ -2,7 +2,7 @@
 title: General process
 read_when: Always for multi-step work — plans, slices, blockers, handoffs, taskforces, orchestrator, subagents, architecture vs patches, canonical APIs
 order: 10
-version: 3.3.0
+version: 3.4.0
 ---
 
 # General Agent Guidelines
@@ -36,6 +36,9 @@ Agent↔agent text (handoffs, spawn notes, PRIORITY, session notes): **functiona
 
 | Rule | Detail |
 | --- | --- |
+| **Crystal-clear** | Design text must not require interpretation. Name the actor and the value. Full rule: catalog **`documentation.md`** § Design writing |
+| **Context stays with the lock** | Each lock’s user-visible problem, rejected alternatives, and scope live in `agents/design.md` — not only a one-line CHANGELOG `Why` |
+| **Cross-lock update** | Change a core element another lock uses ⇒ update those locks/plans in the **same effort**, or **stop and ask**. Full rule: **`documentation.md`** § Cross-lock update |
 | **Newest wins** | The **most recent** design meeting lock or CHANGELOG row for a topic **supersedes** older rows, plan prose, and handoff guesses |
 | **Mark history** | When replacing a decision: mark the old CHANGELOG row superseded, add a **new** dated row — do not silently rewrite history |
 | **Read order** | Current `agents/design.md` for the topic → latest CHANGELOG / meeting lock → then older plan text |
@@ -63,8 +66,14 @@ Before implementing from a plan:
 When a design meeting lands a new direction:
 
 1. **Finish-before-redesign** — ask what open work must finish **before** the new design starts (record in `agents/design.md`).
-2. **Same effort:** update, cancel, or translate affected **plans** and **ideas**; create/update `agents/design.md` if missing.
-3. Update **`docs/user/*`** when the design changes **user-visible** behavior (not RC-schedule-gated).
+2. **Same effort:** update, cancel, or translate affected **plans**,
+   **ideas**, and **other design locks** that use the same words or
+   invariants (`documentation.md` § Cross-lock update); create/update
+   `agents/design.md` if missing.
+3. Update **`docs/user/*`** when the design changes **user-visible**
+   behavior (not RC-schedule-gated).
+4. Write the lock so it cannot be misread (`documentation.md` § Design
+   writing). A vague meeting note is not a lock.
 
 ### Ideas (FIRM cleanup)
 

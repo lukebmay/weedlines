@@ -39,6 +39,58 @@ Do not chase coverage numbers. Prefer one test that would have caught a real bug
 **Do:** boundaries, invariants, critical paths once stable, focused regressions.  
 **Don’t:** assert private call order, mirror implementation, freeze experimental APIs mid-design.
 
+## Design is the test spec (FIRM)
+
+Tests encode the **product contract** (design docs, user-visible behavior),
+not the current implementation.
+
+| Do | Do not |
+| --- | --- |
+| Change tests when **design** or a **user-visible bug** changes | Rewrite a test so today’s code goes green |
+| Treat code vs test disagreement as **code wrong** until design is explicitly changed in the same effort | “Adapt the test to the helper we just wrote” |
+| E2E / acceptance: **black box** — user gesture in, observable state out | E2E whose only assert is call-order, private spies, or internals |
+
+Unit tests **may** pin a stable helper. That does not license E2E that
+mirrors the call graph. If an E2E was authored by reading production
+functions rather than the design, it is invalid — rewrite from the
+contract.
+
+Regressions that would have caught a real user bug beat twenty
+implementation-mirrors.
+
+## E2E story tree (FIRM when the project has an E2E harness)
+
+Organize E2E as a **tree of stories**, not a flat bag of scripts.
+
+| Node | Role |
+| --- | --- |
+| **Trunk** | Few coarse stories for the main user journeys. After a change, run the **lightest trunk** that covers the blast radius (catch an obvious break in that area). |
+| **Branch** | Finer stories under a trunk. Run when the trunk fails, or when the change is in that subsystem. |
+| **Leaf** | Edges and named regressions. Run when the branch fails, or on an RC. |
+
+- Day-to-day: trunk (or one branch) — not the whole forest.
+- Trunk **fail** → investigate **down that tree**. Do not weaken the trunk.
+- **Release candidate:** run the **full tree**. A green trunk is not an RC
+  bill of health.
+
+Name stories in **user sequence** language (open, split, close, apply),
+never helper names.
+
+## In-progress features (GUIDELINE)
+
+While a feature is **partially implemented**, its E2E stories **need not
+pass**. Failures must be the **expected missing contract**, recorded on
+the plan (which story, what still fails). Do not delete or weaken the
+story to go green. Unrelated trunk failures are **not** “expected.”
+
+## User-visible contract (FIRM for E2E)
+
+E2E asserts what the user **can see or depend on in the current view**.
+Work that is allowed to finish **off-screen** (background settle, hidden
+surfaces, other spaces) is not a failure unless it later **shows**
+wrong, blocks the visible path, or corrupts durable state the user will
+meet. Do not fail a story because an invisible peer is still settling.
+
 ## Brittleness
 
 Prefer observable outputs, stable fixtures, injected time/random, temp dirs. Avoid real clocks, important live data (see `security.md`).

@@ -52,6 +52,36 @@ volatile checklists out of design.md.
 - When design changes **user-visible** behavior: update `docs/user/*` in the
   same effort. Do **not** auto-generate user prose from design bullets.
 
+## Design writing (FIRM)
+
+What *is* written must be **crystal clear**. A later agent or human must
+act correctly **without guessing**. Unclear design is a bug: people will
+treat a vague lock as a permanent veto and ship around it.
+
+| Rule | Detail |
+| --- | --- |
+| **No room to interpret** | If two readers can honestly disagree on who/what/when, rewrite. If a sentence still works after swapping two domain words, it is too vague |
+| **Name the actor** | Say **who** does the thing (TOM Forest, Meta/Mutter, presenter, adapter, CLI). Do not say “write”, “observe”, “desired”, “recompute” unless the sentence also says **which layer and which value** |
+| **Context in the design** | Every lock in `agents/design.md` includes: the user-visible problem, what was rejected and why, what the lock **does**, and what it **does not** apply to. CHANGELOG `Why` is one line; the context lives in `design.md` for that topic |
+| **CHANGELOG is not enough** | A CHANGELOG row without a matching `design.md` explanation is incomplete |
+| **Plans inherit this** | Plan spines, meeting notes, and OpSet docs use the same bar. Handoff paraphrase is not a substitute |
+
+### Cross-lock update (FIRM)
+
+When you change a **core element** that another lock, plan, or glossary
+uses (a word, invariant, ε, FLOAT terminator, slot AABB, chrome identity,
+…):
+
+1. Find every `design.md` section, CHANGELOG row, plan, and OpSet doc that
+   depends on it.
+1. Update, supersede, or translate those **in the same effort**.
+1. If you cannot: **stop and ask**. Do not ship a lock that silently
+   contradicts another.
+
+This is the same-effort rule for **design dependencies**, not only for
+plans after a meeting. Leaving a dependent lock stale is how features
+disagree and block progress.
+
 ## CAPS files (agent-managed)
 
 `HANDOFF.md`, `PRIORITY.md`, `CHANGELOG.md`, generated `AGENTS.md`, and other
