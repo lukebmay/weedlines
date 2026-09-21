@@ -22,8 +22,8 @@ AGENTS_DIR = PROJECT_ROOT / "agents"
 INSTALLED_DIR = AGENTS_DIR / "installed"
 ALWAYS_FILENAME = "always.md"
 
-__version__ = "0.6.0"
-# agents-tool-version: 0.6.0
+__version__ = "0.6.1"
+# agents-tool-version: 0.6.1
 
 CORE_INSTALLED_RELS = (
     "always.md",
@@ -60,6 +60,7 @@ _KERNEL_MISSING_STUB = (
 _FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
 
 HANDBOOK_SESSION_FILES = (
+    ("user.md", "Who the human is and how to work together. Not product law"),
     ("README.md", "How this handbook is run"),
     ("project.md", "What this project is"),
     ("architecture.md", "How it is built and how it runs"),
@@ -68,7 +69,10 @@ HANDBOOK_SESSION_FILES = (
         "Host limits (when present). Human-owned; do not add an id without named permission",
     ),
     ("glossary.md", "Words"),
-    ("conflicts.md", "Leftover names and contradictions"),
+    (
+        "conflicts.md",
+        "Active rule conflicts, then leftovers. Retired decisions are `conflicts-resolved.md` and are not rules",
+    ),
     ("acceptance.md", "When work is complete"),
     ("priority.md", "What to do next"),
 )
@@ -147,9 +151,17 @@ def _ownership_table() -> List[str]:
         )
     rows.extend(
         [
+            "| `agents/user.md` | **Human** — who the human is and how to collaborate. Not product law |",
             "| `agents/glossary.md` | **Agent** — words |",
             "| `agents/priority.md` | **Agent** — ordered list of plans |",
-            "| `agents/conflicts.md` | **Agent** — leftover names and contradictions |",
+            "| `agents/conflicts.md` | **Agent** — active rule conflicts, and leftovers that lag a settled rule |",
+            "| `agents/conflicts-resolved.md` | **Agent** — append a retired row only. "
+            "Rows are **not rules** (decisions at a moment, while architecture "
+            "and the rest of the handbook were taking shape). Do not delete "
+            "this file or the section that says the rows are not rules. "
+            "Removing that section does not make the rows into rules. "
+            "Order: `agents/general.md` Conflicts, or catalog `general.md` "
+            "Conflicts when the project has no handbook copy |",
             "| `agents/plans/` | **Shared** — one plan per piece of work |",
             "| `agents/ideas/` | Parked ideas |",
             "| `agents/installed/*` | **Only** `agents install` / `agents update` — never hand-edit |",
@@ -460,10 +472,16 @@ def compose_index(fragments: Sequence[Tuple[str, Path]]) -> str:
         "| `agents/plans/` | Active plans |",
         "| `agents/plans/archived/` | Finished or dropped plans |",
         "| `agents/ideas/` | Parked ideas |",
+        "| `agents/conflicts-resolved.md` | Retired conflict decisions. "
+        "Not rules. Not a session-start read. Do not delete the file or "
+        "the section that says the rows are not rules |",
         "",
         "Load plan files **on demand** for the current work only. "
         "The target architecture is `agents/architecture.md`. "
-        "Human waits live on the plan, labeled in `agents/priority.md`.",
+        "Human waits live on the plan, labeled in `agents/priority.md`. "
+        "`agents/conflicts-resolved.md` is a trail of old decisions. "
+        "It is not architecture. Open it only to see whether a leftover "
+        "was already retired.",
         "",
         "## Guidelines (open when trigger matches)",
         "",

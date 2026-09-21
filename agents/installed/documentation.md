@@ -2,7 +2,7 @@
 title: Documentation
 read_when: Writing architecture, user docs, human-facing checklists, or choosing where “why” lives
 order: 60
-version: 4.0.0
+version: 4.1.0
 ---
 
 # Documentation
@@ -33,8 +33,10 @@ human checklist.
 | Product README (install and usage) | Repo-root `README.md`. **Human-owned.** Agents read it; write only with explicit permission in the current message. Anything beyond install and basic usage belongs in `docs/`. |
 | What the product is | `agents/project.md` |
 | How it is built and how it runs (target) | `agents/architecture.md` |
+| Who the human is and how to collaborate | `agents/user.md`. Not product law |
 | What words mean | `agents/glossary.md` |
-| Leftover names and contradictions | `agents/conflicts.md` |
+| Open rule conflicts and leftovers | `agents/conflicts.md`. **Active** and **Leftovers**, as catalog `general.md` Conflicts |
+| Retired conflict decisions | `agents/conflicts-resolved.md`. Not rules. The order is catalog `general.md` Conflicts |
 | When work is complete | `agents/acceptance.md` |
 | This piece of work | a file under `agents/plans/` |
 | How we test | `agents/testing.md` (project) / catalog `testing.md` |
@@ -47,8 +49,9 @@ Agents do not take product rules from `docs/`. Target behavior is
 with architecture, architecture wins.
 
 Do not add a parallel architecture, glossary, or acceptance in a plan,
-priority note, conflict row, or catalog file. A conflict row maps a
-leftover to the handbook word and links the resolving plan.
+priority note, conflict row, or catalog file. How a conflict row is
+written, and why a retired row is not a rule: catalog `general.md`
+Conflicts.
 
 Architecture and acceptance locks include **why** in the same file
 (user-visible problem, rejected alternatives, what the lock does, what

@@ -51,7 +51,7 @@ Agents **never** auto-merge/push `test` or `prod` unless user **explicitly** ask
 | Master by default | Implement on default; do not auto-create `plan/*` |
 | User/plan override | Honor “use a branch” / isolate flags |
 | Pull before work | Ensure default is current when origin exists |
-| Queue on default | `agents/{priority.md,plans,ideas,conflicts.md}` always on default |
+| Queue on default | `agents/{priority.md,plans,ideas,conflicts.md,conflicts-resolved.md,user.md}` always on default |
 
 **Side branch only when:** user asks; high-risk multi-day break of daily-driver; parallel incompatible experiments; external PR/review.
 

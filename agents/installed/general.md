@@ -2,7 +2,7 @@
 title: General process
 read_when: Always for multi-step work — plans, slices, handoffs, taskforces, orchestrator, subagents, architecture vs patches, canonical APIs
 order: 10
-version: 4.0.0
+version: 4.1.0
 ---
 
 # General Agent Guidelines
@@ -31,7 +31,7 @@ Agent↔agent text (plan Session notes, spawn notes, `priority.md`): **functiona
 
 Ownership is **declared in the file**, not by filename case. Filenames are lowercase except names required by an external standard (`README.md`, `AGENTS.md`).
 
-There is **no** living design changelog. The target system is `agents/architecture.md`. Leftover names and contradictions live in `agents/conflicts.md`. Gaps in the running code are **plans**, not a reason to rewrite the handbook. Git history and archived plans are the trail.
+There is **no** living design changelog. The target system is `agents/architecture.md`. Open rule conflicts and leftovers live in `agents/conflicts.md`. Retired decisions live in `agents/conflicts-resolved.md` and are not rules (Conflicts below). Gaps in the running code are **plans**, not a reason to rewrite the handbook. Git history and archived plans are the trail.
 
 Do **not** recreate `HANDOFF.md`, `PRIORITY.md` (ALL-CAPS), `design.md`, or `agents/design/CHANGELOG.md` as living law.
 
@@ -42,6 +42,7 @@ These change only with **explicit permission in the current message**. Propose a
 | File | Role |
 | --- | --- |
 | Repo-root `README.md` | Product README: install and usage only |
+| `agents/user.md` | Who the human is and how to collaborate. Not product law |
 | `agents/README.md` | How this handbook is run |
 | `agents/project.md` | What the project is |
 | `agents/architecture.md` | How it is built and how it runs (target) |
@@ -60,7 +61,8 @@ Agents update these as part of ordinary work:
 | --- | --- |
 | `agents/glossary.md` | Words |
 | `agents/priority.md` | Ordered list of plans |
-| `agents/conflicts.md` | Leftover names and contradictions |
+| `agents/conflicts.md` | **Active** rule conflicts, and **Leftovers** that lag a settled rule |
+| `agents/conflicts-resolved.md` | Retired decisions. Append a row only. Rows are not rules. Do not delete the file or the section “These rows are not rules” |
 | Plan **Session** section | Current status for the next agent on that plan |
 | `agents/ideas/` | Parked ideas |
 
@@ -79,7 +81,9 @@ A rule lives in exactly one file. Other files may link to it. They must not rest
 | How we test | `agents/testing.md` (project) / this catalog `testing.md` |
 | Where writing lives | `agents/documentation.md` (project) / this catalog `documentation.md` |
 | What to do next | `agents/priority.md` |
-| Leftover names and contradictions | `agents/conflicts.md` |
+| Open rule conflicts (**Active**) and code or names lagging a settled rule (**Leftovers**) | `agents/conflicts.md` |
+| Retired conflict decisions | `agents/conflicts-resolved.md` |
+| How the conflicts system works, including that retired rows are not rules | This file, Conflicts |
 | This piece of work | one file under `agents/plans/` |
 
 `architecture.md` is the **target** system, not a snapshot of today's tree. When code lags that file, close the gap with a plan. Do not edit the handbook to match leftovers. If the architecture itself looks directionally wrong, stop that issue and meet — see `architecture.md` “This file can be wrong.”
@@ -88,7 +92,7 @@ A rule lives in exactly one file. Other files may link to it. They must not rest
 
 **Stone** (product or architecture law) lives only in human-owned handbook files: `architecture.md`, `acceptance.md`, and any project-declared stricter files. Write it there **only when the human says to**. Each lock includes **why**: the user-visible problem, what was rejected, what it does, and what it does not apply to. A sentence without why is not a lock; stop and ask, or put it on the plan Session as exploration.
 
-**Not stone:** chat (including “don’t do X” during a hunt), plan Session notes, `priority.md` quotes of chat, and slice fences (“do not rename this file this slice”). A fence binds **that slice only**. The next agent must not copy it into architecture or priority as a standing veto.
+**Not stone:** chat (including “don’t do X” during a hunt), plan Session notes, `priority.md` quotes of chat, slice fences (“do not rename this file this slice”), and every row in `agents/conflicts-resolved.md`. A fence binds **that slice only**. The next agent must not copy it into architecture or priority as a standing veto. Retired conflict rows are decisions made at particular moments. They are not rules. Deleting that file, or the section that says the rows are not rules, does not make them rules. Full order: Conflicts below.
 
 **Why:** exploratory fences got copied as architecture. They had no why, blocked honest facts, and the next agent papered over with a fallback. Development includes trying things and being wrong. Discovery updates the handbook in a meeting; it does not accumulate vetoes.
 
@@ -96,12 +100,29 @@ If a later fact contradicts a lock, stop that issue and meet. Do not hide the mi
 
 ## Conflicts (FIRM)
 
+This section is the one home for how conflicts work. `agents/README.md` repeats only the session-start sentence, because session start does not open this file. `agents/documentation.md`, when present, names the files and links here. Do not write a second procedure in those files.
+
+**Active** in `agents/conflicts.md`: two living rules disagree (handbook vs handbook, or handbook vs another agent rule that is still in force), and a later agent could follow either one. Do not implement either side until the human picks. The row blocks only work that depends on it.
+
+**Leftovers** in that file: code or an old name lags a rule that is not itself in dispute. The rule stays. The plan on `agents/priority.md` closes the gap. A leftover does not block unrelated work.
+
 When two sources disagree (handbook vs handbook, handbook vs plan, plan vs plan, handbook vs code, handbook vs catalog), or when a leftover name is still taught as law:
 
-1. Add a row to `agents/conflicts.md` in the same turn, even if you do not yet know the fix. Tell the human you found it.
+1. Add a row to `agents/conflicts.md` in the same turn, even if you do not yet know the fix. Tell the human you found it. A fight between two living rules goes under **Active**. Code or an old name lagging a settled rule goes under **Leftovers**.
 1. Handbook wins over plans, catalog, and leftovers. If the handbook looks wrong, stop and ask. Do not silently pick.
-1. As soon as a resolution can be named, write or extend a plan and put it on `agents/priority.md`. If a plan already owns the gap, link that plan on the row. Do not open a twin plan.
+1. As soon as a leftover's fix can be named, write or extend a plan and put it on `agents/priority.md`. If a plan already owns the gap, link that plan on the row. Do not open a twin plan. An active row does not get an implementation plan until the human picks the side.
 1. A scope fence (“do not rename this slice”) forbids the big rename. It does not license new identifiers or comments that teach the leftover word.
+1. When the leftover is gone, or the handbook already says how to read it and no further hunt is queued, move the row to `agents/conflicts-resolved.md`. Record the leftover and the decision at that moment. Do not copy a living rule into that row. Do not leave a closed table in `agents/conflicts.md`.
+
+### Resolved conflicts are not rules
+
+Session-start sentence. `agents/README.md` repeats these words and does not add a second order:
+
+> The rows in `conflicts-resolved.md` are not rules. They are decisions made at particular moments to iteratively shape the actual living rules in architecture and the rest of the handbook. Do not delete that file. Do not delete, weaken, or rewrite the section “These rows are not rules.” Removing that section does not turn the rows into rules. If that section is missing, restore it before any other edit to that file.
+
+Living rules are `agents/architecture.md`, `agents/acceptance.md`, any project-declared stricter file, `agents/glossary.md` for words, and the selected OpSet document when the project has one. Architecture is a current belief and can change. When a resolved row and a living rule disagree, the living rule is what we believe now. A resolved row does not keep, restore, or block a behavior.
+
+`agents/conflicts-resolved.md` is agent-owned so a retired row can be appended. That same ownership must not become a way to clear an inconvenient decision. Do not delete a row. Do not rewrite an old decision so that it reads as the current rule. When architecture changes later, leave the old decision as it was.
 
 ## Human-readable prose (FIRM)
 
@@ -294,7 +315,9 @@ hand; do not gitignore it (Grok skips gitignored project instructions).
 | **`agents/general.md`**, **`documentation.md`**, **`testing.md`** (when present) | Project working / writing / test map | **Human** — propose; apply with permission |
 | **`agents/glossary.md`** | Words | **Agents** |
 | **`agents/priority.md`** | Ordered list of plans | **Agents** |
-| **`agents/conflicts.md`** | Leftover names and contradictions | **Agents** |
+| **`agents/user.md`** | Who the human is and how to collaborate. Not product law | **Human** |
+| **`agents/conflicts.md`** | Active rule conflicts, and leftovers that lag a settled rule | **Agents** |
+| **`agents/conflicts-resolved.md`** | Retired decisions. Not rules. Append a row only. Do not delete the file or the section “These rows are not rules” | **Agents** |
 | **`agents/plans/`**, **`plans/archived/`** | Plans + completed/abandoned archives | Shared |
 | **`agents/ideas/`** | Parked ideas | Agents + project |
 | **`agents/installed/*`** | Portable guideline bodies from the **agents-catalog** | **Only** `agents install` / `agents update` — **never** hand-edit |

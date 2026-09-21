@@ -15,9 +15,11 @@ This file is a **map**, not the full rulebook. It is **transpiled** by `agents b
 | `README.md` (product) | **Human** — agents read; write only with explicit permission |
 | `agents/README.md`, `project.md`, `architecture.md`, `acceptance.md` | **Human** — propose edits; apply only with permission |
 | `agents/general.md`, `documentation.md`, `testing.md` (when present) | **Human** — propose edits; apply only with permission |
+| `agents/user.md` | **Human** — who the human is and how to collaborate. Not product law |
 | `agents/glossary.md` | **Agent** — words |
 | `agents/priority.md` | **Agent** — ordered list of plans |
-| `agents/conflicts.md` | **Agent** — leftover names and contradictions |
+| `agents/conflicts.md` | **Agent** — active rule conflicts, and leftovers that lag a settled rule |
+| `agents/conflicts-resolved.md` | **Agent** — append a retired row only. Rows are **not rules** (decisions at a moment, while architecture and the rest of the handbook were taking shape). Do not delete this file or the section that says the rows are not rules. Removing that section does not make the rows into rules. Order: `agents/general.md` Conflicts, or catalog `general.md` Conflicts when the project has no handbook copy |
 | `agents/plans/` | **Shared** — one plan per piece of work |
 | `agents/ideas/` | Parked ideas |
 | `agents/installed/*` | **Only** `agents install` / `agents update` — never hand-edit |
@@ -50,11 +52,12 @@ Read these when beginning or resuming work on this project:
 
 | Path | Read when |
 | --- | --- |
+| `agents/user.md` | Who the human is and how to work together. Not product law |
 | `agents/README.md` | How this handbook is run |
 | `agents/project.md` | What this project is |
 | `agents/architecture.md` | How it is built and how it runs |
 | `agents/glossary.md` | Words |
-| `agents/conflicts.md` | Leftover names and contradictions |
+| `agents/conflicts.md` | Active rule conflicts, then leftovers. Retired decisions are `conflicts-resolved.md` and are not rules |
 | `agents/acceptance.md` | When work is complete |
 | `agents/priority.md` | What to do next |
 | The active plan named in `agents/priority.md` | Goal, acceptance, session |
@@ -67,15 +70,18 @@ Read these when beginning or resuming work on this project:
 | `agents/plans/` | Active plans |
 | `agents/plans/archived/` | Finished or dropped plans |
 | `agents/ideas/` | Parked ideas |
+| `agents/conflicts-resolved.md` | Retired conflict decisions. Not rules. Not a session-start read. Do not delete the file or the section that says the rows are not rules |
 
-Load plan files **on demand** for the current work only. The target architecture is `agents/architecture.md`. Human waits live on the plan, labeled in `agents/priority.md`.
+Load plan files **on demand** for the current work only. The target architecture is `agents/architecture.md`. Human waits live on the plan, labeled in `agents/priority.md`. `agents/conflicts-resolved.md` is a trail of old decisions. It is not architecture. Open it only to see whether a leftover was already retired.
 
 ## Guidelines (open when trigger matches)
 
 | Path | Title | Read when |
 | --- | --- | --- |
+| `agents/user.md` | User | Session start. Who the human is and how to work together. Not product law. |
 | `agents/installed/general.md` | General process | Always for multi-step work — plans, slices, handoffs, taskforces, orchestrator, subagents, architecture vs patches, canonical APIs |
 | `agents/conflicts.md` | Conflicts | Session start; leftover names; when two sources disagree; before adding identifiers |
+| `agents/conflicts-resolved.md` | Conflicts resolved | A leftover name looks new and you need the trail of a retired contradiction. Rows in this file are not rules. Do not open it to learn how the product works, and do not delete this file or the section that says the rows are not rules. |
 | `agents/installed/security.md` | Security | Before SSH, secrets, sudo/root, credentials, or any important live-data mutation |
 | `agents/installed/git.md` | Git | Before any commit, push, branch, merge, rebase, or release-ladder work |
 | `agents/installed/scripting.md` | Scripting | Writing or changing shell/Python scripts, installers, CLI tools, bin entries, or launching user-visible apps from a Grok agent |

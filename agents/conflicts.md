@@ -34,15 +34,14 @@ Status: **open** (noted, fix unknown) · **resolving** (a plan owns
 it) · **closed** (the leftover is gone or the reading rule is enough
 and no further hunt is queued).
 
-## Open
+## Active
+
+None.
+
+## Leftovers
 
 | Leftover | Read as | Status | Plan |
 | --- | --- | --- | --- |
 | *(none yet)* | | | |
 
-## Closed
-
-| Leftover | Read as | Status | Plan |
-| --- | --- | --- | --- |
-| `design.md` / design changelog as living law | This **handbook**. [`architecture.md`](./architecture.md). | closed | Reading rule is enough. |
-| `HANDOFF.md` as start-here | Plan **Session** + [`priority.md`](./priority.md). | closed | Reading rule is enough. |
+Retired rows live in [`conflicts-resolved.md`](./conflicts-resolved.md). Those rows are not rules. Do not delete that file or the section “These rows are not rules.”

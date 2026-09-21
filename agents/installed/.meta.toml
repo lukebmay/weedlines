@@ -1,9 +1,9 @@
 schema = 1
-tool_version = "0.6.0"
-catalog_version = "0.6.0"
+tool_version = "0.6.1"
+catalog_version = "0.6.1"
 composer_path = "agents.py"
 installed_at = "2026-09-02T20:34:38+00:00"
-updated_at = "2026-09-21T00:05:07+00:00"
+updated_at = "2026-09-21T21:35:44+00:00"
 
 [[files]]
 id = "always"
@@ -24,32 +24,32 @@ read_when = "Adding terminal colors, formatting CLI output, or launching user-vi
 [[files]]
 id = "comments"
 path = "comments.md"
-version = "2.3.0"
-sha256 = "527f50124a73fa45d06b95c018c500a6f46fb65f0416f60597f3b9b863ec27ea"
+version = "2.3.1"
+sha256 = "3e880764aaa81769e965674de25c169e26d7c27b7b157b9df81cac710eec3054"
 title = "Comments"
 read_when = "Adding or editing source comments"
 
 [[files]]
 id = "documentation"
 path = "documentation.md"
-version = "4.0.0"
-sha256 = "0f002f00456e5910f4cb56b0c876c18e87be7181a6c70a8069803183696fa80a"
+version = "4.1.0"
+sha256 = "f6d519e15708fab85fe4e97f259d262b36d8eafcabac63e9d67da86940920a40"
 title = "Documentation"
 read_when = "Writing architecture, user docs, human-facing checklists, or choosing where “why” lives"
 
 [[files]]
 id = "general"
 path = "general.md"
-version = "4.0.0"
-sha256 = "e485f51f0dc8a1de2919e23119091b20b17b6521f8cbecab7609ec8d1b0f8776"
+version = "4.1.0"
+sha256 = "63c036a0b97c657a82855564c632441b162b5da1630bf3b41400f32791659448"
 title = "General process"
 read_when = "Always for multi-step work — plans, slices, handoffs, taskforces, orchestrator, subagents, architecture vs patches, canonical APIs"
 
 [[files]]
 id = "git"
 path = "git.md"
-version = "2.1.0"
-sha256 = "c68d9fbcadb541f4268e60b2db7f9fd7ba680a6e24bffa17f046f55ae0cbe6fb"
+version = "2.1.1"
+sha256 = "115bbe8fcefac531b61a551f90ca4c7c12dfac71a9d2b00f1891f347933f79f5"
 title = "Git"
 read_when = "Before any commit, push, branch, merge, rebase, or release-ladder work"
 

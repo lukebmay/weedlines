@@ -2,7 +2,7 @@
 title: Comments
 read_when: Adding or editing source comments
 order: 50
-version: 2.3.0
+version: 2.3.1
 ---
 
 # Comments
@@ -20,7 +20,8 @@ Good: `# Grok` · `# Update check (quiet on no-op)`
 Bad: long banners, “expensive: …” essays
 
 Architecture and leftover names → `agents/architecture.md` /
-`agents/conflicts.md` / plans — not source novels.
+`agents/conflicts.md` / plans — not source novels. Retired conflict
+rows in `agents/conflicts-resolved.md` are not rules.
 
 ## General
 
