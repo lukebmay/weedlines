@@ -37,11 +37,17 @@ Even with **explicit**: do only what was asked; confirm destructive remote steps
 
 ## Privilege escalation (sudo/root)
 
+Root execution follows the same **explicit** gate as SSH (catalog
+`always.md`): the **current** user message (or task) must contain a form
+of the word **explicit**. Permission is limited to the hosts/tasks
+described, lasts one session, and may be delegated to subagents only
+with the same constraints.
+
 | Rule | Kind | Detail |
 | --- | --- | --- |
-| No silent escalate | **FIRM** | No sudo/root unless user granted permission |
-| Indirect OK | **GUIDELINE** | “install system-wide” / “use apt” can imply sudo; ask if unclear |
-| No circumvention | **FIRM** | No sudo-nopw/pkexec tricks to dodge the rule |
+| No silent escalate | **FIRM** | No sudo/root unless the current message contains **explicit** (or clearly grants that exact elevate) |
+| Indirect OK | **GUIDELINE** | “install system-wide” / “use apt” can imply sudo; still ask if the word **explicit** is missing |
+| No circumvention | **FIRM** | Never circumvent security systems (sudo-nopw, pkexec tricks, or any dodge). Ask for permission instead. |
 | Prefer unprivileged | **GUIDELINE** | User-scoped installs when they achieve the goal |
 | No root-owned `$HOME` | **FIRM** | Root must not own anything under a user’s home |
 

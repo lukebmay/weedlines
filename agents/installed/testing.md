@@ -12,9 +12,24 @@ Rule vocabulary: **FIRM** / **GUIDELINE** / **MAY** (see `general.md`).
 
 Catch real bugs without making change expensive. Tests serve the product.
 
+## When to run tests (FIRM)
+
+Run tests **after a change that can break that contract**. A green
+result is evidence until the next such change. Re-running the same
+passing suite “to be sure” wastes time and tokens.
+
+| Do | Do not |
+| --- | --- |
+| After you change behavior, run the **lightest** tests whose contract that change can break | Re-run a pack that already passed this session with **no** relevant code/harness change |
+| If a test **fails**, fix the product (or the design, in the same effort), then re-run **that** test and the blast radius | Weaken the test so today’s code goes green |
+| Use a fail to **improve** the feature you just added | Soak the full tree after every green |
+
+E2E still follows the **story tree** below (trunk first). This section
+is when to spend the run, not a license to skip tests after a real edit.
+
 ## Optional features in dev (FIRM)
 
-When implementing/debugging an optional feature: **turn it on** in local/dev for that work. Record the enable command in task/handoff. Prefer tests that force the optional path explicitly.
+When implementing/debugging an optional feature: **turn it on** in local/dev for that work. Record the enable command in the plan Session. Prefer tests that force the optional path explicitly.
 
 ## Pyramid (GUIDELINE)
 
@@ -39,21 +54,22 @@ Do not chase coverage numbers. Prefer one test that would have caught a real bug
 **Do:** boundaries, invariants, critical paths once stable, focused regressions.  
 **Don’t:** assert private call order, mirror implementation, freeze experimental APIs mid-design.
 
-## Design is the test spec (FIRM)
+## Architecture is the test spec (FIRM)
 
-Tests encode the **product contract** (design docs, user-visible behavior),
-not the current implementation.
+Tests encode the **product contract** (`agents/architecture.md`,
+`agents/acceptance.md`, user-visible behavior), not the current
+implementation.
 
 | Do | Do not |
 | --- | --- |
-| Change tests when **design** or a **user-visible bug** changes | Rewrite a test so today’s code goes green |
-| Treat code vs test disagreement as **code wrong** until design is explicitly changed in the same effort | “Adapt the test to the helper we just wrote” |
+| Change tests when **architecture / acceptance** or a **user-visible bug** changes | Rewrite a test so today’s code goes green |
+| Treat code vs test disagreement as **code wrong** until architecture is explicitly changed in the same effort | “Adapt the test to the helper we just wrote” |
 | E2E / acceptance: **black box** — user gesture in, observable state out | E2E whose only assert is call-order, private spies, or internals |
 
 Unit tests **may** pin a stable helper. That does not license E2E that
 mirrors the call graph. If an E2E was authored by reading production
-functions rather than the design, it is invalid — rewrite from the
-contract.
+functions rather than architecture and acceptance, it is invalid —
+rewrite from the contract.
 
 Regressions that would have caught a real user bug beat twenty
 implementation-mirrors.

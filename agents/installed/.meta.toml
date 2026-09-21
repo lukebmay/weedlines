@@ -1,15 +1,15 @@
 schema = 1
-tool_version = "0.5.0"
-catalog_version = "0.5.3"
+tool_version = "0.6.0"
+catalog_version = "0.6.0"
 composer_path = "agents.py"
 installed_at = "2026-09-02T20:34:38+00:00"
-updated_at = "2026-09-04T20:45:10+00:00"
+updated_at = "2026-09-21T00:05:07+00:00"
 
 [[files]]
 id = "always"
 path = "always.md"
-version = "1.0.0"
-sha256 = "8e0c86e3c09b1d9b35b806ecfa29bcc1ae02a899a2c4ef58e03a456fe5c725b7"
+version = "2.0.0"
+sha256 = "cde465adf73e1df5eecfad96cdab004152449d8465b29d7b7356eaa75025a147"
 title = "Hard kernel (always on)"
 read_when = "Always / kernel — inlined into AGENTS.md before other guidelines"
 
@@ -24,32 +24,32 @@ read_when = "Adding terminal colors, formatting CLI output, or launching user-vi
 [[files]]
 id = "comments"
 path = "comments.md"
-version = "2.2.0"
-sha256 = "95cf9c660a47147c27f8232952f7282ec93e239b1e748ffd69adae39f7b9675d"
+version = "2.3.0"
+sha256 = "527f50124a73fa45d06b95c018c500a6f46fb65f0416f60597f3b9b863ec27ea"
 title = "Comments"
 read_when = "Adding or editing source comments"
 
 [[files]]
 id = "documentation"
 path = "documentation.md"
-version = "3.3.0"
-sha256 = "e768c817330bffcd3774325232df5002db0695b52532042104ad5db06f5c7431"
+version = "4.0.0"
+sha256 = "0f002f00456e5910f4cb56b0c876c18e87be7181a6c70a8069803183696fa80a"
 title = "Documentation"
-read_when = "Writing design docs, design CHANGELOG, user docs, human-facing checklists/blockers, or choosing where “why” lives"
+read_when = "Writing architecture, user docs, human-facing checklists, or choosing where “why” lives"
 
 [[files]]
 id = "general"
 path = "general.md"
-version = "3.4.0"
-sha256 = "9933ad555d058dccd4ed1d0f5b6476d9c68296f73d3f2644a6f4600bb282ed0b"
+version = "4.0.0"
+sha256 = "e485f51f0dc8a1de2919e23119091b20b17b6521f8cbecab7609ec8d1b0f8776"
 title = "General process"
-read_when = "Always for multi-step work — plans, slices, blockers, handoffs, taskforces, orchestrator, subagents, architecture vs patches, canonical APIs"
+read_when = "Always for multi-step work — plans, slices, handoffs, taskforces, orchestrator, subagents, architecture vs patches, canonical APIs"
 
 [[files]]
 id = "git"
 path = "git.md"
-version = "2.0.1"
-sha256 = "5f6c3536e727698bb98fe1cb11638a85a9c13a97d48d711cfc22dfedb0b86ea3"
+version = "2.1.0"
+sha256 = "c68d9fbcadb541f4268e60b2db7f9fd7ba680a6e24bffa17f046f55ae0cbe6fb"
 title = "Git"
 read_when = "Before any commit, push, branch, merge, rebase, or release-ladder work"
 
@@ -80,15 +80,15 @@ read_when = "Writing or changing shell/Python scripts, installers, CLI tools, bi
 [[files]]
 id = "security"
 path = "security.md"
-version = "2.1.0"
-sha256 = "36cce910ba2b549d36deab5a2ae10246c21d4224557cee5bc32e97f44211738a"
+version = "2.2.0"
+sha256 = "d8c5ab3ec9840b4843c969dbcb08ff09897dddf334b6f07833d15eac52060439"
 title = "Security"
 read_when = "Before SSH, secrets, sudo/root, credentials, or any important live-data mutation"
 
 [[files]]
 id = "testing"
 path = "testing.md"
-version = "2.4.0"
-sha256 = "2438618ba45a3dd047bf2413d1240c388d4add827c49636c5e209cca9e357e9c"
+version = "3.0.0"
+sha256 = "b33a6adde6ff036d0a5ac49d5764f0321d9232fc04fd369a84ba6e34e75e9cee"
 title = "Testing"
 read_when = "Adding tests, changing test strategy, enabling optional features, checking Grok durable --leader mode, or reattaching headless Grok for the human"

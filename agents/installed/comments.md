@@ -2,6 +2,7 @@
 title: Comments
 read_when: Adding or editing source comments
 order: 50
+version: 2.3.0
 ---
 
 # Comments
@@ -18,7 +19,8 @@ Keep comments **short and non-specific**.
 Good: `# Grok` · `# Update check (quiet on no-op)`  
 Bad: long banners, “expensive: …” essays
 
-Design/history → `agents/design.md` / `agents/design/CHANGELOG.md` / plans — not source novels.
+Architecture and leftover names → `agents/architecture.md` /
+`agents/conflicts.md` / plans — not source novels.
 
 ## General
 

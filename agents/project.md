@@ -1,19 +1,11 @@
-# Project notes
+# Project
 
-**This is the only file you must fill out after `agents init`.**
+**Owner:** human. Agents may propose edits; apply only with explicit permission.
 
-Project-specific conventions and stack. Safe for humans to edit.
-Managed portable fragments live under `agents/installed/` (via `agents`
-install/update) — do not put portable rules here.
+## What this is
 
-## Ownership (quick)
-
-| Path | Who |
-| --- | --- |
-| **`agents/project.md`** (this file) | **You** — conventions, stack, env, offline rules, … |
-| **CAPS files** (`HANDOFF.md`, `PRIORITY.md`, `CHANGELOG.md`, …) | **Agents** manage these. You *may* edit by hand; that is not the intended workflow. |
-| **`agents/design.md`** | Guiding-light design (high-level picture, key inner workings, important tech choices + reasoning). **Not** a novel of every decision. Created after the first design meeting (by agents or you). Optional until then. |
-| **`agents/plans/`** | Work plans — agents + you via PRIORITY |
+Weedlines is an Inkscape extension and shared solvers for weed cuts on
+vinyl. How it is built: [`architecture.md`](./architecture.md).
 
 ## Stack
 

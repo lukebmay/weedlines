@@ -1,8 +1,8 @@
 ---
 title: General process
-read_when: Always for multi-step work — plans, slices, blockers, handoffs, taskforces, orchestrator, subagents, architecture vs patches, canonical APIs
+read_when: Always for multi-step work — plans, slices, handoffs, taskforces, orchestrator, subagents, architecture vs patches, canonical APIs
 order: 10
-version: 3.4.0
+version: 4.0.0
 ---
 
 # General Agent Guidelines
@@ -12,7 +12,7 @@ version: 3.4.0
 | Label | Meaning |
 | --- | --- |
 | **FIRM** | Must follow. Escalate or stop if you cannot. |
-| **GUIDELINE** | Default; override only with clear reason. |
+| **GUIDELINE** | Default. Override only with clear reason. |
 | **MAY** | Optional. |
 
 Unlabeled: treat security, git push/secrets, and SSH as **FIRM**; process/style as **GUIDELINE**.
@@ -21,74 +21,113 @@ Unlabeled: treat security, git push/secrets, and SSH as **FIRM**; process/style 
 
 Aim for ~**90%** confidence the next agent/human acts correctly. Do not shave tokens into ambiguity.
 
-Agent↔agent text (handoffs, spawn notes, PRIORITY, session notes): **functionally detailed, unambiguous, succinct** — not “short” or “long.” No transcript dumps. Redundancy only for rare strong emphasis.
+Agent↔agent text (plan Session notes, spawn notes, `priority.md`): **functionally detailed, unambiguous, succinct** — not “short” or “long.” No transcript dumps. Redundancy only for rare strong emphasis.
 
 `AGENTS.md` is a **routing index** (when to open files under `agents/`). Full rules live in those files. Open them when triggers match.
 
-## Design (FIRM)
+## The handbook (FIRM)
 
-| Layer | Role |
+`agents/` is the **agent handbook**. Policies (who may edit what, one home per fact) and procedures (how to run a plan, how to confirm acceptance) both live here. In prose, say **handbook**, not “the agents folder.”
+
+Ownership is **declared in the file**, not by filename case. Filenames are lowercase except names required by an external standard (`README.md`, `AGENTS.md`).
+
+There is **no** living design changelog. The target system is `agents/architecture.md`. Leftover names and contradictions live in `agents/conflicts.md`. Gaps in the running code are **plans**, not a reason to rewrite the handbook. Git history and archived plans are the trail.
+
+Do **not** recreate `HANDOFF.md`, `PRIORITY.md` (ALL-CAPS), `design.md`, or `agents/design/CHANGELOG.md` as living law.
+
+### Human-owned files
+
+These change only with **explicit permission in the current message**. Propose a patch and wait:
+
+| File | Role |
 | --- | --- |
-| **`agents/design.md`** | **Guiding light** — high-level picture, key inner workings, important tech choices + reasoning. **Not** a comprehensive novel of every decision. Optional until the first design meeting. |
-| **`agents/design/CHANGELOG.md`** | Thin dated history / supersessions (was `docs/DECISIONS.md`; **agent-managed** CAPS) |
-| **`docs/user/*`** | Human-facing write-ups after meetings — not a substitute for `agents/design.md` |
-| Accepted plan / meeting locks | Bind until superseded |
+| Repo-root `README.md` | Product README: install and usage only |
+| `agents/README.md` | How this handbook is run |
+| `agents/project.md` | What the project is |
+| `agents/architecture.md` | How it is built and how it runs (target) |
+| `agents/acceptance.md` | When work is complete |
+| `agents/general.md` | Project working rules (when present; amends this file) |
+| `agents/documentation.md` | Project writing map (when present) |
+| `agents/testing.md` | Project test map (when present) |
 
-| Rule | Detail |
+A project **MAY** name additional human-owned files (for example `host-constraints.md`). Those files state their own stricter permission. Architecture permission is not enough to edit a stricter file.
+
+### Agent-owned files
+
+Agents update these as part of ordinary work:
+
+| File | Role |
 | --- | --- |
-| **Crystal-clear** | Design text must not require interpretation. Name the actor and the value. Full rule: catalog **`documentation.md`** § Design writing |
-| **Context stays with the lock** | Each lock’s user-visible problem, rejected alternatives, and scope live in `agents/design.md` — not only a one-line CHANGELOG `Why` |
-| **Cross-lock update** | Change a core element another lock uses ⇒ update those locks/plans in the **same effort**, or **stop and ask**. Full rule: **`documentation.md`** § Cross-lock update |
-| **Newest wins** | The **most recent** design meeting lock or CHANGELOG row for a topic **supersedes** older rows, plan prose, and handoff guesses |
-| **Mark history** | When replacing a decision: mark the old CHANGELOG row superseded, add a **new** dated row — do not silently rewrite history |
-| **Read order** | Current `agents/design.md` for the topic → latest CHANGELOG / meeting lock → then older plan text |
-| **Conflict** | If code and an older doc disagree, believe **code + newest design**; fix the stale doc in the same effort when you touch the area |
+| `agents/glossary.md` | Words |
+| `agents/priority.md` | Ordered list of plans |
+| `agents/conflicts.md` | Leftover names and contradictions |
+| Plan **Session** section | Current status for the next agent on that plan |
+| `agents/ideas/` | Parked ideas |
 
-`agents build` may inline `agents/design.md`’s **`## Overview`** (or **`## AGENTS.md View`**) into `AGENTS.md`. Keep that section small (token budget).
+Plans under `agents/plans/` are **shared**: humans and agents both edit them. Goal, acceptance, and approach are human-readable product writing. Session notes are for the next agent on that plan.
 
-### CAPS files are agent-managed (FIRM)
+## One home per fact (FIRM)
 
-Filenames that are **ALL CAPS** under `agents/` (e.g. `HANDOFF.md`, `PRIORITY.md`, `CHANGELOG.md`, generated `AGENTS.md`) are **agent-managed**. Humans *may* edit them; that is not the intended workflow. Agents own updates to these files.
+A rule lives in exactly one file. Other files may link to it. They must not restate it.
 
-**`agents/project.md`** is the primary **user** hand file (conventions/stack). Lowercase `design.md` is agent-primary / optional until a design meeting creates it.
+| Fact | Home |
+| --- | --- |
+| What the product is | `agents/project.md` |
+| How it is built and how it runs | `agents/architecture.md` |
+| When work is complete | `agents/acceptance.md` |
+| What words mean | `agents/glossary.md` |
+| How we test | `agents/testing.md` (project) / this catalog `testing.md` |
+| Where writing lives | `agents/documentation.md` (project) / this catalog `documentation.md` |
+| What to do next | `agents/priority.md` |
+| Leftover names and contradictions | `agents/conflicts.md` |
+| This piece of work | one file under `agents/plans/` |
 
-### Plan start gate (FIRM)
+`architecture.md` is the **target** system, not a snapshot of today's tree. When code lags that file, close the gap with a plan. Do not edit the handbook to match leftovers. If the architecture itself looks directionally wrong, stop that issue and meet — see `architecture.md` “This file can be wrong.”
 
-Before implementing from a plan:
+## What is stone (FIRM)
 
-1. Align the plan with **current** `agents/design.md` when it exists.
-2. Larger date gap between plan and design ⇒ more skepticism.
-3. Conflict ⇒ **stop and ask**; **design wins**.
-4. Translate steps when acceptance no longer maps cleanly — do not execute stale steps that contradict a newer lock.
+**Stone** (product or architecture law) lives only in human-owned handbook files: `architecture.md`, `acceptance.md`, and any project-declared stricter files. Write it there **only when the human says to**. Each lock includes **why**: the user-visible problem, what was rejected, what it does, and what it does not apply to. A sentence without why is not a lock; stop and ask, or put it on the plan Session as exploration.
 
-### Design meeting hygiene (FIRM)
+**Not stone:** chat (including “don’t do X” during a hunt), plan Session notes, `priority.md` quotes of chat, and slice fences (“do not rename this file this slice”). A fence binds **that slice only**. The next agent must not copy it into architecture or priority as a standing veto.
 
-When a design meeting lands a new direction:
+**Why:** exploratory fences got copied as architecture. They had no why, blocked honest facts, and the next agent papered over with a fallback. Development includes trying things and being wrong. Discovery updates the handbook in a meeting; it does not accumulate vetoes.
 
-1. **Finish-before-redesign** — ask what open work must finish **before** the new design starts (record in `agents/design.md`).
-2. **Same effort:** update, cancel, or translate affected **plans**,
-   **ideas**, and **other design locks** that use the same words or
-   invariants (`documentation.md` § Cross-lock update); create/update
-   `agents/design.md` if missing.
-3. Update **`docs/user/*`** when the design changes **user-visible**
-   behavior (not RC-schedule-gated).
-4. Write the lock so it cannot be misread (`documentation.md` § Design
-   writing). A vague meeting note is not a lock.
+If a later fact contradicts a lock, stop that issue and meet. Do not hide the miss with a second path.
 
-### Ideas (FIRM cleanup)
+## Conflicts (FIRM)
 
-Prefer `agents/ideas/` over a single mega-file when volume warrants. After every design meeting: clear obsolete / decided / implemented ideas.
+When two sources disagree (handbook vs handbook, handbook vs plan, plan vs plan, handbook vs code, handbook vs catalog), or when a leftover name is still taught as law:
 
-### Optional leftovers (GUIDELINE → FIRM after two meetings)
+1. Add a row to `agents/conflicts.md` in the same turn, even if you do not yet know the fix. Tell the human you found it.
+1. Handbook wins over plans, catalog, and leftovers. If the handbook looks wrong, stop and ask. Do not silently pick.
+1. As soon as a resolution can be named, write or extend a plan and put it on `agents/priority.md`. If a plan already owns the gap, link that plan on the row. Do not open a twin plan.
+1. A scope fence (“do not rename this slice”) forbids the big rename. It does not license new identifiers or comments that teach the leftover word.
 
-Soft leftovers on a **shipped** plan: after **two design meetings** without pickup → close (`wontfix` / done) or spin a **new** thin plan. Do not leave soft-open forever.
+## Human-readable prose (FIRM)
+
+Handbook files, plan goal/acceptance/approach, and plan Human checklists are written for a human who has not memorized the project.
+
+- Full sentences. Name the actor.
+- No decoder required. Do not explain the system as a trail of old ids.
+- Links only to long-term stable documents. No links to short-lived chats, review threads, or session scratch.
+- No references to old conversations as if they were law.
+
+### Task ids in prose
+
+Short ids (`D118`, plan slice names) are allowed.
+
+In **human-readable files** (human-owned handbook files, `glossary.md`, plan goal/acceptance/approach/human, user docs): the **first** use of an id in that file must include the human-readable name.
+
+Write: hide-place-show (`D118`). Do not write: `D118` alone.
+
+In **agent working notes** (`priority.md`, plan Session sections): ids alone are fine if that plan already named the work. Prefer the name once per file anyway.
 
 ## User Questions (FIRM)
 
 Never use the `ask_user_question` tool.
 If something is truly blocking, ask in normal chat with full context.
 After we discuss, write the decision down and continue from that written result.
-Do not re-ask or ignore prior answers; Only re-ask if new context changed the meaning of the original answer.
+Do not re-ask or ignore prior answers; only re-ask if new context changed the meaning of the original answer.
 
 ## Residue (FIRM)
 
@@ -102,7 +141,7 @@ During active development, do **not** preserve backwards compatibility by defaul
 
 Prefer a strong architectural fix when the failure class will recur or band-aids are stacking. Temporary only if the operator **explicitly** asks for temp/stopgap.
 
-If a warranted redesign looks **very expensive** (millions+ tokens, multi-session rewrite) vs a small patch: **stop**, present options, open a **hard** design blocker. Do not silently burn a huge redesign.
+If a warranted redesign looks **very expensive** (millions+ tokens, multi-session rewrite) vs a small patch: **stop**, present options, and wait for an architecture meeting. Do not silently burn a huge redesign.
 
 When the real fix lands, remove competing crutches in the same effort when safe.
 
@@ -125,7 +164,7 @@ bypasses the shared path is a bug class: the next call site will drift
 
 ## Optional features in dev (FIRM)
 
-When working on an optional feature, **enable it** in the local/dev environment for that session. Record how in the plan/handoff. Dev-on ≠ ship default-on.
+When working on an optional feature, **enable it** in the local/dev environment for that session. Record how in the plan Session. Dev-on ≠ ship default-on.
 
 ## Plans (FIRM — all work is a plan)
 
@@ -133,17 +172,14 @@ When working on an optional feature, **enable it** in the local/dev environment 
 plan (sometimes the only slice). There is **no** second top-level work type and
 **no** peer queue at `agents/tasks/`.
 
-**Execution queue:** `agents/PRIORITY.md` (+ `agents/HANDOFF.md`) lists plan
-paths and optional `plan#slice` markers. Agents pick next work from there — not
-from a tasks directory.
+**Execution queue:** `agents/priority.md` lists plan paths. Agents pick next
+work from there. Session notes live **on the plan**, not in a separate handoff file.
 
 When the operator says “plan” they mean either ordinary English (“I was
 planning…”) or the durable in-repo system under `agents/plans/` (“Create a plan
 to…”). **Never** use Grok `/plan` mode (`enter_plan_mode` /
 `~/.grok/sessions/…/plan.md`); that scratch is not a handoff. Plans are authored
-in conversation and design meetings and stored under `agents/plans/`. The
-shellrc `bin/grok` wrapper injects `--no-plan` by default (D063); pass
-wrapper-only `--plan` only when intentionally opting into Grok plan mode.
+in conversation and architecture meetings and stored under `agents/plans/`.
 
 | Rule | Detail |
 | --- | --- |
@@ -154,103 +190,63 @@ wrapper-only `--plan` only when intentionally opting into Grok plan mode.
 | **Archive (completed)** | → `agents/plans/archived/completed/` |
 | **Archive (abandoned)** | → `agents/plans/archived/abandoned/` |
 | **Not archive-inside-self** | Do **not** use `plans/<id>/completed/` as the archive root for the whole plan. Per-plan `completed/` dirs may hold in-flight slice history until migrated. |
-| Major redesigns | Plan first under `agents/plans/`; implement after approval (conversation / design meeting) |
+| **Template** | Use `agents/plans/_TEMPLATE.md`. |
+| Major redesigns | Plan first under `agents/plans/`; implement after approval (conversation / architecture meeting) |
 | Plan reshape discovery | Stop and ask |
-| Progress note | Overwrite one note when code changes (on the **repo** plan file or its working dir) |
-| Status (slices) | `ready` / `next` / `in progress` / `blocked` / `optional` / `draft` |
+| Progress note | Overwrite the plan **Session** when code changes |
+| Status | `draft` / `active` / `waiting` / `accepted` / `abandoned` |
 | Optional | Skip unless user includes optional |
-| Blocked | Requires linked **hard** human blocker |
-| Draft | Not a stop if the next required slice has enough plan scope — refine + implement |
+| Waiting | Human section on the plan; labeled in `priority.md` |
 
-### Plan spine template
+The plan holds approach, plan-local acceptance, and session notes. It is **not** a second architecture file.
 
-```markdown
-# plan-id — Title
+When a plan is accepted, archive it. If some of its acceptance should apply to all future work, ask to promote those items into `acceptance.md`.
 
-**Status:** Accepted | in progress | draft | …
-**Branch:** master (default) | plan/… only if isolated
-**Blocker:** (none) | agents/blockers/B-….md
-**Updated:** YYYY-MM-DD
-
-## Goal
-## Acceptance
-- [ ] …
-
-## Implementation slices
-| Slice | What | …
-| **P1** | … |
-
-## Context for the next agent (complete + succinct)
-- Paths/symbols · Proven · Failed+why · Enable/test · Risks
-
-## Session note
-…
-```
+If a new plan would change shipped behavior, amend `acceptance.md` (with permission) in the same effort. If it would change how the system is built, amend `architecture.md` the same way.
 
 ### Other archives
 
 `agents/archive/INDEX.md` + `entries/` may hold searchable ship summaries.
-Do not treat `plans/archived/` trees as active work unless PRIORITY/HANDOFF
+Do not treat `plans/archived/` trees as active work unless `priority.md`
 names a hunt. Prefer archive over delete; delete only stubs/dupes/junk.
 
-## Human blockers
+## Ideas (FIRM)
+
+Park ideas in `agents/ideas/` with a category: product, architecture, tooling, or needs an architecture meeting. An idea is not a plan until it has a goal and acceptance.
+
+After an architecture meeting: clear obsolete / decided / implemented ideas.
+
+## Completion
+
+A plan is complete when:
+
+1. Its own acceptance items are met.
+2. The gestures in `agents/acceptance.md` still hold, confirmed as that file describes.
+
+Unit tests support that confirmation. They are not a substitute for it.
+
+## Human waits
 
 **Real** human work only — not agent laziness.
 
-Blocker files are **human-facing**. Write them for a human reading top→bottom
-and answering inline (checkboxes). Full audience rules: catalog
-**`documentation.md`** § Audience. Agent prep, hunts, and “done when”
-restatements live in HANDOFF / plan notes — **not** in the blocker body.
+If only a human can proceed, write that on the **plan**: a **Human** section with checkboxes, read top to bottom. Do not put agent hunt recipes there.
 
-| Difficulty | Behavior |
-| --- | --- |
-| **hard** (default if omitted) | Required path stopped; plan/slice `blocked`; taskforces skip |
-| **soft** | Optional reminder; does not stop unrelated work |
+Label the plan in `agents/priority.md` as a human blocker so the next agent does not start implementing. Other work continues unless that plan is the only active item.
 
-(`**Severity:**` on older blockers = same field; prefer **Difficulty** on new ones.)
+There is **no** separate blockers directory as the unit of work. A human wait is plan state. Leftover `agents/blockers/` trees may still exist in older repos; fold waits onto the owning plan when you touch them. Full audience rules: catalog **`documentation.md`** § Audience.
 
 | Rule | Kind |
 | --- | --- |
 | Hard only when agent must not proceed alone | **FIRM** |
 | Make human work easy (short steps + `- [ ]` checklist) | **FIRM** |
-| Prep first (install/config/branch if you can) — record in HANDOFF | **FIRM** |
+| Prep first (install/config/branch if you can) — record on the plan Session | **FIRM** |
 | Never mark human steps done yourself | **FIRM** |
 | Fake blockers forbidden | **FIRM** |
-| One-line “why human-only”; no agent-prep section in the blocker | **FIRM** |
+| One-line “why human-only”; no agent-prep section in the Human checklist | **FIRM** |
 
-Kinds: design · permission · credentials · expensive-test · verify · data-only-human.
-(Do not pile redundant kind tags like `verify · physical`.)
+## Subagents
 
-```markdown
-# B-short-id — Title
-**Status:** open
-**Difficulty:** hard | soft
-**Owner:** human
-**Kind:** design | …
-**Plan:** …
-**Unblocks:** agents/plans/… (or plan#slice)
-**Priority:** P0
-**Created:** YYYY-MM-DD
-**Updated:** YYYY-MM-DD
-
-## Why this is human-only
-(one short sentence)
-
-## What the human must do
-1. …
-1. …
-   - [ ] …
-```
-
-## Handoffs (FIRM)
-
-| Path | Role |
-| --- | --- |
-| `agents/HANDOFF.md` | Cross-session start-here |
-| Plan session notes | Cold-continue for that plan / slice |
-| `agents/PRIORITY.md` | Ordered next work (plan paths / `plan#slice`) |
-
-Functionally complete + unambiguous + succinct. Overwrite, don’t pile. Exploration findings that prevent rescans belong on disk.
+Subagents inherit these rules. A child does not get a looser license to edit human-owned files or to restate architecture in a side note.
 
 ### Orchestrator + taskforces (when plans / priorities)
 
@@ -263,33 +259,26 @@ subagents; do not do large implementation yourself when a taskforce fits.
 | Default shape | **Single-agent** taskforce (one implementer per assignment) |
 | Batching | **MAY** give one agent several related slices when one session is likely cheaper than multiple handoffs |
 | Parallel | **Only when safe** (no shared-file races, no conflicting branch edits, independent acceptance). Otherwise **serial** |
-| A/B (expensive) | **Only when necessary** — major design/architecture, high-stakes decisions, or when a separate verifier is clearly worth the cost. Not the default for ordinary implement slices |
+| A/B (expensive) | **Only when necessary** — major architecture, high-stakes decisions, or when a separate verifier is clearly worth the cost. Not the default for ordinary implement slices |
 | A then B | When A/B is used: implement → verify; **never** parallel A/B |
 | Explore (on demand) | **MAY** use a short-lived read-only explorer for cold/unfamiliar scope. Prefer **explore+implement in one agent** for ordinary slices |
-| Explore output | Write findings only into the **active** plan handoff (entry points, proven vs guessed, traps). **No** standing repo-wide explore digest |
+| Explore output | Write findings only into the **active** plan Session (entry points, proven vs guessed, traps). **No** standing repo-wide explore digest |
 | Fresh agents | New subagent(s) per assignment; no `resume_from` for baggage (unless operator asks) |
 | Branch | **Default master** unless isolation required (see git.md) |
-| Handoff | Overwrite disk notes (complete+succinct); no transcript paste into next prompt |
+| Handoff | Overwrite the plan Session (complete+succinct); no transcript paste into next prompt |
 | Budget | Stop starting new slices ~300K orchestrator tokens |
 | Max A/B rounds | 5 A→B when A/B is in use; then escalate |
-| DESIGN-FLAW | Stop; design discussion; no wrap-up commit |
+| DESIGN-FLAW | Stop; architecture discussion; no wrap-up commit |
 | Model | Grok + high reasoning unless user says otherwise |
-| Eligible | Required ready/next/in-progress plans/slices; not optional/hard-blocked |
+| Eligible | Required active plans; not optional / human-waiting |
 
 **Cost stance (GUIDELINE):** A/B doubles agent work. Prefer one capable implementer +
 orchestrator review of disk notes/diff. Escalate to A/B for big irreversible
 choices or when independent verification is the acceptance path.
 
-**Explore stance (GUIDELINE):** Explorer *passes* yes; explorer *literature* no.
-Skip a separate explore step when the plan already scopes paths, the area is
-recently known, or the implementer will re-walk the same tree anyway. Summaries
-earn tokens only when they block a re-scan for **this** work — overwrite or drop
-them with the plan.
+**Begin** (no plan named): read `priority.md` + the first plan it names.
 
-**Begin** (no plan named): read PRIORITY + blockers → next eligible required work
-→ single-agent (or rare A/B) taskforces until budget/done → report open blockers.
-
-Wrap-up on success: residue → notes → docs as needed → tests → commit/push per git.md.
+Wrap-up on success: residue → plan Session → docs as needed → tests → commit/push per git.md.
 
 ## Agents layout ownership (FIRM)
 
@@ -299,21 +288,24 @@ hand; do not gitignore it (Grok skips gitignored project instructions).
 
 | Path | Role | Who edits |
 | --- | --- | --- |
-| **`AGENTS.md`** | Transpiled index: hard kernel + session/queue pointers + guideline TOC | **Only** `agents build` (CAPS / generated) |
-| **`agents/project.md`** | Project-specific conventions / stack | **User** — only required hand-fill; **never** from catalog |
-| **CAPS under `agents/`** (`HANDOFF.md`, `PRIORITY.md`, `CHANGELOG.md`, …) | Session / priority / history | **Agents** (user may edit; not intended workflow) |
-| **`agents/design.md`** | Guiding-light design | **Agents** (after design meetings); optional until then |
-| **`agents/plans/`**, **`plans/archived/`** | Plans + completed/abandoned archives | Agents + project |
-| **`agents/design/`** | CHANGELOG + optional topic detail | Agents |
+| **`AGENTS.md`** | Transpiled index: hard kernel + session/queue pointers + guideline TOC | **Only** `agents build` |
+| **Repo-root `README.md`** | Product install and usage | **Human** — explicit permission |
+| **`agents/README.md`**, **`project.md`**, **`architecture.md`**, **`acceptance.md`** | Handbook (what / how / done) | **Human** — propose; apply with permission |
+| **`agents/general.md`**, **`documentation.md`**, **`testing.md`** (when present) | Project working / writing / test map | **Human** — propose; apply with permission |
+| **`agents/glossary.md`** | Words | **Agents** |
+| **`agents/priority.md`** | Ordered list of plans | **Agents** |
+| **`agents/conflicts.md`** | Leftover names and contradictions | **Agents** |
+| **`agents/plans/`**, **`plans/archived/`** | Plans + completed/abandoned archives | Shared |
 | **`agents/ideas/`** | Parked ideas | Agents + project |
-| **`agents/blockers/`**, **`archive/`** | Human blockers; other ship summaries | Project (hand) for blockers |
-| **`agents/installed/*`** | Portable guideline bodies from shellrc **agents-catalog** | **Only** `agents install` / `agents update` — **never** hand-edit |
-| **`agents/<same-rel-as-installed>`** | **Extension** (default) — amends installed; **wins on conflict** | Prefer this for project deltas. Fold portable improvements into the catalog. |
+| **`agents/installed/*`** | Portable guideline bodies from the **agents-catalog** | **Only** `agents install` / `agents update` — **never** hand-edit |
+| **`agents/<same-rel-as-installed>`** | **Extension** (default) — amends installed; **wins on conflict with catalog** | Prefer this for project deltas. Handbook files still win over catalog. Fold portable improvements into the catalog. |
 | **`agents/<stem>.extend.md`** | Explicit extension (same rules) | Do **not** also keep same-name or `*.override.md` for that id |
 | **`agents/<stem>.override.md`** | **Override** — replaces installed for that id | Rare durable fork only. Prefer extension or a catalog fix. |
 
 Exactly **one** of the three layer forms may exist per installed file.
 `agents update` **errors** if they are mixed.
+
+On conflict with `agents/installed/`, **handbook files win**.
 
 **Hard kernel** (always-on rows at the top of `AGENTS.md`) lives in catalog
 **`always.md`** → installed as `agents/installed/always.md` → **inlined** by
