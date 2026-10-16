@@ -40,6 +40,7 @@ target words.
 | **Goal** | What this plan makes true. |
 | **Acceptance** | Checks that must hold for the plan (local) or for any work (product file `acceptance.md`). |
 | **priority** | `agents/priority.md`: ordered list of plans. Agent-owned. |
+| **Continue** | A prompt that means work `priority.md` from the top. The human does not restate the slices. How the turn runs is catalog `general.md`. |
 | **idea** | Parked thought in `agents/ideas/`. Not a plan until it has a goal and acceptance. |
 | **wrap-up** | End of a successful slice: residue, notes, tests, commit/push per `git.md`. |
 | **residue** | Temp paths, debug prints, failed-attempt code, fake fixtures, live-env leftovers the agent added. Remove before finishing. |

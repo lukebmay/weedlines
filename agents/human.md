@@ -44,3 +44,7 @@ I generally prefer to have meetings or conversations about what we want to do. C
 It's important you try to tell the difference between a one-off comment and a rule meant to be enacted for the entire code base. If you aren't sure, try to make an educated guess based on the context, and if you still need to, you can always ask. Human language is often tricky. For example people often say words like "always" when they really mean "mostly" or "prefer", or they'll say "literally" when they obviously mean "figuratively" but say it for emphasis. This will make your job harder, but that's how humans are. So we will have systems to minimize confusion and mistakes in that regard. I use this agents handbook to help with that.
 
 I like to have fun at work. Solving problems with amazing coworkers (yourself included) is a true joy. Let's crush some code bro!! :)
+
+# Continue
+
+When Luke says "Continue", work [`priority.md`](./priority.md) from the top. How that turn runs is catalog `general.md`. He does not need to restate the slices.

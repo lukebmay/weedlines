@@ -22,18 +22,40 @@ Rule vocabulary: **FIRM** / **GUIDELINE** / **MAY** (see `general.md`).
 
 ## SSH — never without EXPLICIT (FIRM)
 
-**Default: do not SSH** (or scp/sftp/rsync-over-SSH / remote login) to another machine.
+Do not run `ssh`, `scp`, or `sftp`. Do not log into another machine.
+Do not use git, an API, or any other program as a way to explore or
+operate a machine you were not asked to operate. A hole you find is
+a report to the user. It is not a path through.
 
-Permission is valid **only** if the **current user message** contains a form of **explicit** (explicit / explicitly / EXPLICIT / clear typos of that word).
+The gate is that login and that meddling. A program that uses SSH
+for its own job is not a login. When the user asks for `git push`,
+`git fetch`, or `git pull`, do that. An `ssh://` or `git@host:`
+remote does not turn the git command into `ssh`. The same is true
+of any other tool doing the job the user asked for. The word
+**explicit** is not required for that. It is required before you
+use the tool to open a shell, copy files by hand, wander the
+remote, or do the thing a direct `ssh` or `scp` would do.
 
-| Allows (when also clearly asking to connect) | Does **not** allow |
+**Why:** entering a machine, or slipping onto one through a tool,
+can harm the people who trust that machine.
+
+Permission for a login or for that meddling is valid **only** if
+the **current user message** contains a form of **explicit**
+(explicit / explicitly / EXPLICIT / clear typos of that word) and
+names the connection.
+
+| Allows | Does **not** allow |
 | --- | --- |
 | “You have my **explicit** permission to ssh to hulk” | “ssh into hulk and fix it” |
-| “**Explicitly** allowed: run `ssh hulk '…'`” | “check the remote” / “you can use my servers” |
+| “**Explicitly** allowed: run `ssh hulk '…'`” | “check the remote” / “you can use my servers” as permission to log in |
+| “push” / `git push`, `git fetch`, or `git pull` as asked | using git, or any other program, to get a shell or look around a machine |
 
-If **explicit** is missing: refuse; say the rule; offer local-only alternatives. No implied standing permission.
+If **explicit** is missing for a login or for that meddling: refuse;
+say the rule; offer local-only alternatives. No implied standing
+permission.
 
-Even with **explicit**: do only what was asked; confirm destructive remote steps. Localhost tooling is not “another machine.”
+Even with **explicit**: do only what was asked; confirm destructive
+remote steps. Localhost tooling is not “another machine.”
 
 ## Privilege escalation (sudo/root)
 

@@ -1,23 +1,23 @@
 schema = 1
 tool_version = "0.6.1"
-catalog_version = "0.6.1"
+catalog_version = "0.6.2"
 composer_path = "agents.py"
 installed_at = "2026-09-02T20:34:38+00:00"
-updated_at = "2026-09-21T21:35:44+00:00"
+updated_at = "2026-10-16T23:09:16+00:00"
 
 [[files]]
 id = "always"
 path = "always.md"
-version = "2.0.0"
-sha256 = "cde465adf73e1df5eecfad96cdab004152449d8465b29d7b7356eaa75025a147"
+version = "2.1.0"
+sha256 = "2a97d303f97dd89a8fa3a6e69f5b4551dfaabe61d1be28e69d062fff1e8d23eb"
 title = "Hard kernel (always on)"
 read_when = "Always / kernel — inlined into AGENTS.md before other guidelines"
 
 [[files]]
 id = "ansi-colors"
 path = "ansi-colors.md"
-version = "3.1.0"
-sha256 = "08ee94d5c82f4f429215a943d44c688175b83f7911f697e23d76ef3cf5a98613"
+version = "3.2.0"
+sha256 = "e7fa38e902004a3a2c819e81ab24e93cc86f497621ae0d564292f882936a7a4d"
 title = "ANSI colors"
 read_when = "Adding terminal colors, formatting CLI output, or launching user-visible CLIs from a Grok agent"
 
@@ -32,24 +32,24 @@ read_when = "Adding or editing source comments"
 [[files]]
 id = "documentation"
 path = "documentation.md"
-version = "4.1.0"
-sha256 = "f6d519e15708fab85fe4e97f259d262b36d8eafcabac63e9d67da86940920a40"
+version = "4.3.0"
+sha256 = "84149cb20ec8ed131bfb2c460c96a84c829ab1a479b65f49c64b99505dd5a4f1"
 title = "Documentation"
 read_when = "Writing architecture, user docs, human-facing checklists, or choosing where “why” lives"
 
 [[files]]
 id = "general"
 path = "general.md"
-version = "4.1.0"
-sha256 = "63c036a0b97c657a82855564c632441b162b5da1630bf3b41400f32791659448"
+version = "4.4.0"
+sha256 = "7d49bb6805b5634ddcadfb7498a46ccc8df877a843c6dab5bd00d86ccc972cd9"
 title = "General process"
-read_when = "Always for multi-step work — plans, slices, handoffs, taskforces, orchestrator, subagents, architecture vs patches, canonical APIs"
+read_when = "Always for multi-step work — plans, slices, handoffs, taskforces, orchestrator, subagents, architecture vs patches, canonical APIs — and when the prompt is Continue"
 
 [[files]]
 id = "git"
 path = "git.md"
-version = "2.1.1"
-sha256 = "115bbe8fcefac531b61a551f90ca4c7c12dfac71a9d2b00f1891f347933f79f5"
+version = "2.1.3"
+sha256 = "9f951056a73fb6270e28cdd7709aac8904816f65a57465d4babd353a918bbd93"
 title = "Git"
 read_when = "Before any commit, push, branch, merge, rebase, or release-ladder work"
 
@@ -72,16 +72,16 @@ read_when = "Writing or editing markdown docs, plans, tasks, or README prose"
 [[files]]
 id = "scripting"
 path = "scripting.md"
-version = "2.3.1"
-sha256 = "4fc68ef80cc401a62bb88109da8e76fa5ec55ebfd4f2068a786e6a7646a1acd6"
+version = "2.4.0"
+sha256 = "c01897335da15fc4a741b94e1f8786a9b286fec0f3b46de3fc1a793284f918f7"
 title = "Scripting"
 read_when = "Writing or changing shell/Python scripts, installers, CLI tools, bin entries, or launching user-visible apps from a Grok agent"
 
 [[files]]
 id = "security"
 path = "security.md"
-version = "2.2.0"
-sha256 = "d8c5ab3ec9840b4843c969dbcb08ff09897dddf334b6f07833d15eac52060439"
+version = "2.3.0"
+sha256 = "31f5466e42462dea9441b71bb51784b77c73299fe6c821dc732f1d47ccc97f11"
 title = "Security"
 read_when = "Before SSH, secrets, sudo/root, credentials, or any important live-data mutation"
 

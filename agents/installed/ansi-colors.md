@@ -149,11 +149,7 @@ Do **not** leak job-worker env markers (`FORGE_JOB_WORKER`, job id/dir,
 
 ## Agent tools vs user-facing (FIRM)
 
-Grok agent turns often set `NO_COLOR=1` / `TERM=dumb`. That is for **tool logs**,
-not for apps the human will use. When launching user-visible CLIs, layouts, or
-terminals from an agent, wrap with **`user-env`** (or the env recipe in
-`scripting.md`) so colors and a normal `TERM` are restored. Do not leave
-`NO_COLOR=1` on `forge layout …`, `ghostty`, etc.
+Agent turns often set `NO_COLOR=1` and `TERM=dumb`. That is for tool logs. User-visible launches use `user-env`. The recipe is `scripting.md`.
 
 ## Shared library
 
@@ -178,6 +174,4 @@ Each file exports:
 must set the **same** `ANSI_COLOR_VERSION`. If versions differ, treat as a bug —
 update the lagging copy from shellrc.
 
-New scripts: call the helper; do not open-code `[[ -t 1 ]]` alone.
-Migration of existing scripts: see shellrc task `ansi-color-contract-migrate`
-(when present under `agents/tasks/`).
+New scripts call the helper. Do not open-code `[[ -t 1 ]]` alone.

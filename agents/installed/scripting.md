@@ -57,6 +57,18 @@ When an installer runs as root or via `sudo`:
 
 `sudo` is for system paths (`/usr`, apt, PPA). `$HOME` stays the user’s.
 
+## Elevate only the privileged step (FIRM)
+
+The user runs the command in their normal shell. They do not prefix it with `sudo`, and they do not keep a separate root shell for it.
+
+When a step needs root, the script elevates that step. The rest stays the invoking user, so files under `$HOME` are not created as root.
+
+- Interactive: `sudo` may prompt. Say which step needs it.
+- Non-interactive: do not hang on a password. Use `sudo-nopw` only after a non-interactive proof that it yields uid 0 (`pdsh.md`). Otherwise print the command and exit.
+- Do not re-exec the whole script as root.
+
+An agent still needs the current message to contain **explicit** before it runs `sudo`. That gate is `security.md`. This section is how the script is written, not permission for the agent to elevate.
+
 ## Interactive vs script mode
 
 Detect TTY on stdin+stdout.

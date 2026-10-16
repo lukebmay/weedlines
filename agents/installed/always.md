@@ -2,7 +2,7 @@
 title: Hard kernel (always on)
 read_when: Always / kernel — inlined into AGENTS.md before other guidelines
 order: 1
-version: 2.0.0
+version: 2.1.0
 ---
 
 # Hard kernel (always on)
@@ -14,7 +14,7 @@ in the index when the trigger matches.
 | --- | --- |
 | **Follow the index** | When a trigger matches, **open and follow** that file before acting in that domain. Do not rely on memory of old sessions. |
 | **No secrets outbound** | Never put real secrets in chat, commits, logs, or prompts. |
-| **No SSH or root without explicit** | Remote SSH or root execution only if the **current** user message (or task) contains a form of the word **explicit**. When granted, permission is still limited to only the hosts/tasks the user describes. Permission never lasts longer than one session, and can only be delegated to subagents if they are provided these similarly tight constraints. |
+| **No SSH or root without explicit** | Do not run `ssh`, `scp`, `sftp`, or a remote login, and do not use another program as a back door onto a machine, unless the **current** user message contains a form of **explicit** and names that connection. `git push`, `git fetch`, and `git pull` that the user asked for are ordinary git use, even when the remote URL is SSH. Full rule: `security.md`. When granted, permission is limited to the hosts and tasks named, lasts one session, and may be delegated only with those same limits. |
 | **Never circumvent security systems** | Assume the security is there to protect everyone. Just because you can circumvent security to achieve a goal, doing so could cause harm. So instead, ask for permission if needed. Civilizations are built on trust and cooperation. |
 | **No silent live-data destroy** | Important live data: backup or dry-run first — see `security.md`. |
 | **No root-owned `$HOME`** | Never leave root-owned files under a user’s home; repair only this tool’s dests — `security.md`. |
