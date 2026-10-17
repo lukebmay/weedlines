@@ -84,6 +84,7 @@ Load plan files **on demand** for the current work only. The target architecture
 | `agents/installed/security.md` | Security | Before SSH, secrets, sudo/root, credentials, or any important live-data mutation |
 | `agents/installed/git.md` | Git | Before any commit, push, branch, merge, rebase, or release-ladder work |
 | `agents/installed/scripting.md` | Scripting | Writing or changing shell/Python scripts, installers, CLI tools, bin entries, or launching user-visible apps from a Grok agent |
+| `agents/issues.md` | Issues | Filing a bug, reading a known miss, or about to put a bug story into architecture |
 | `agents/installed/comments.md` | Comments | Adding or editing source comments |
 | `agents/installed/documentation.md` | Documentation | Writing architecture, user docs, human-facing checklists, or choosing where “why” lives |
 | `agents/installed/testing.md` | Testing | Adding tests, changing test strategy, enabling optional features, checking Grok durable --leader mode, or reattaching headless Grok for the human |
