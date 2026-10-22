@@ -66,7 +66,7 @@ If on a side branch: re-merge default regularly; refactor may defer product merg
 | Side branch wrap-up | Yes | Push side; merge→default when gated |
 | User said don’t | No | No |
 | Secrets in diff | No | No |
-| Architecture miss / unfinished taskforce | No wrap-up | No |
+| Architecture miss / unfinished review pair | No wrap-up | No |
 
 User veto always wins.
 

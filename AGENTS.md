@@ -78,7 +78,7 @@ Load plan files **on demand** for the current work only. The target architecture
 | Path | Title | Read when |
 | --- | --- | --- |
 | `agents/human.md` | User | Session start. Who the human is and how to work together. Not product law. |
-| `agents/installed/general.md` | General process | Always for multi-step work — plans, slices, handoffs, taskforces, orchestrator, subagents, architecture vs patches, canonical APIs — and when the prompt is Continue |
+| `agents/installed/general.md` | General process | Always for multi-step work — plans, slices, handoffs, review pairs, orchestrator, subagents, architecture vs patches, canonical APIs — and when the prompt is Continue |
 | `agents/conflicts.md` | Conflicts | Session start; leftover names; when two sources disagree; before adding identifiers |
 | `agents/conflicts-resolved.md` | Conflicts resolved | A leftover name looks new and you need the trail of a retired contradiction. Rows in this file are not rules. Do not open it to learn how the product works, and do not delete this file or the section that says the rows are not rules. |
 | `agents/installed/security.md` | Security | Before SSH, secrets, sudo/root, credentials, or any important live-data mutation |

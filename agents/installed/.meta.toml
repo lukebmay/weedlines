@@ -1,9 +1,9 @@
 schema = 1
 tool_version = "0.6.1"
-catalog_version = "0.6.2"
+catalog_version = "0.6.3"
 composer_path = "agents.py"
 installed_at = "2026-09-02T20:34:38+00:00"
-updated_at = "2026-10-16T23:46:49+00:00"
+updated_at = "2026-10-22T14:13:21+00:00"
 
 [[files]]
 id = "always"
@@ -32,24 +32,24 @@ read_when = "Adding or editing source comments"
 [[files]]
 id = "documentation"
 path = "documentation.md"
-version = "4.3.0"
-sha256 = "84149cb20ec8ed131bfb2c460c96a84c829ab1a479b65f49c64b99505dd5a4f1"
+version = "4.4.0"
+sha256 = "13adc9460706e6a686cc48eb022c0bfca8baaea62f610ad40c6a17a217718067"
 title = "Documentation"
 read_when = "Writing architecture, user docs, human-facing checklists, or choosing where “why” lives"
 
 [[files]]
 id = "general"
 path = "general.md"
-version = "4.4.0"
-sha256 = "7d49bb6805b5634ddcadfb7498a46ccc8df877a843c6dab5bd00d86ccc972cd9"
+version = "4.5.0"
+sha256 = "174da8dc050c682c23b18a72d3e60de08e14403912b51cd4beb252cd6b77f7c7"
 title = "General process"
-read_when = "Always for multi-step work — plans, slices, handoffs, taskforces, orchestrator, subagents, architecture vs patches, canonical APIs — and when the prompt is Continue"
+read_when = "Always for multi-step work — plans, slices, handoffs, review pairs, orchestrator, subagents, architecture vs patches, canonical APIs — and when the prompt is Continue"
 
 [[files]]
 id = "git"
 path = "git.md"
-version = "2.1.3"
-sha256 = "9f951056a73fb6270e28cdd7709aac8904816f65a57465d4babd353a918bbd93"
+version = "2.1.4"
+sha256 = "30f421023b8a30f2d65696e8aa31997e5eef707f1891a614cd70a16080313963"
 title = "Git"
 read_when = "Before any commit, push, branch, merge, rebase, or release-ladder work"
 
@@ -88,7 +88,7 @@ read_when = "Before SSH, secrets, sudo/root, credentials, or any important live-
 [[files]]
 id = "testing"
 path = "testing.md"
-version = "3.0.0"
-sha256 = "b33a6adde6ff036d0a5ac49d5764f0321d9232fc04fd369a84ba6e34e75e9cee"
+version = "3.1.0"
+sha256 = "3273461e1826829326b6ed8d6fad27b282d1f010adbe20df66676a8553146fc4"
 title = "Testing"
 read_when = "Adding tests, changing test strategy, enabling optional features, checking Grok durable --leader mode, or reattaching headless Grok for the human"
