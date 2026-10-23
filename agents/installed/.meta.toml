@@ -1,15 +1,15 @@
 schema = 1
 tool_version = "0.6.1"
-catalog_version = "0.6.3"
+catalog_version = "0.6.4"
 composer_path = "agents.py"
 installed_at = "2026-09-02T20:34:38+00:00"
-updated_at = "2026-10-22T14:13:21+00:00"
+updated_at = "2026-10-23T00:40:35+00:00"
 
 [[files]]
 id = "always"
 path = "always.md"
-version = "2.1.0"
-sha256 = "2a97d303f97dd89a8fa3a6e69f5b4551dfaabe61d1be28e69d062fff1e8d23eb"
+version = "2.2.0"
+sha256 = "9baf07426eaae4af0365fb26269de2476172f12784f043be745d9c2a6b1fb583"
 title = "Hard kernel (always on)"
 read_when = "Always / kernel — inlined into AGENTS.md before other guidelines"
 
@@ -32,16 +32,16 @@ read_when = "Adding or editing source comments"
 [[files]]
 id = "documentation"
 path = "documentation.md"
-version = "4.4.0"
-sha256 = "13adc9460706e6a686cc48eb022c0bfca8baaea62f610ad40c6a17a217718067"
+version = "4.5.0"
+sha256 = "c15c2bfcee6d09da439784188919893ce618a86194292064e200cbfe98d108e3"
 title = "Documentation"
 read_when = "Writing architecture, user docs, human-facing checklists, or choosing where “why” lives"
 
 [[files]]
 id = "general"
 path = "general.md"
-version = "4.5.0"
-sha256 = "174da8dc050c682c23b18a72d3e60de08e14403912b51cd4beb252cd6b77f7c7"
+version = "4.6.0"
+sha256 = "f0be66f0718f16aa7e89d19306ad9446604bcd6a8f03b1bc480f2e307c61ba1f"
 title = "General process"
 read_when = "Always for multi-step work — plans, slices, handoffs, review pairs, orchestrator, subagents, architecture vs patches, canonical APIs — and when the prompt is Continue"
 
@@ -88,7 +88,7 @@ read_when = "Before SSH, secrets, sudo/root, credentials, or any important live-
 [[files]]
 id = "testing"
 path = "testing.md"
-version = "3.1.0"
-sha256 = "3273461e1826829326b6ed8d6fad27b282d1f010adbe20df66676a8553146fc4"
+version = "3.1.1"
+sha256 = "e82c24ee3e97eeca11d9a2b506810d3979ab74361cb4eb61986275a0aaf17f7f"
 title = "Testing"
 read_when = "Adding tests, changing test strategy, enabling optional features, checking Grok durable --leader mode, or reattaching headless Grok for the human"

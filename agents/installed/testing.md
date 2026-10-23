@@ -29,7 +29,7 @@ is when to spend the run, not a license to skip tests after a real edit.
 
 ## Optional features in dev (FIRM)
 
-When implementing/debugging an optional feature: **turn it on** in local/dev for that work. Record the enable command in the plan Session. Prefer tests that force the optional path explicitly.
+When implementing/debugging an optional feature: **turn it on** in local/dev for that work. Record the enable command in the plan handoff. Prefer tests that force the optional path explicitly.
 
 ## Pyramid (GUIDELINE)
 

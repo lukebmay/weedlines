@@ -2,7 +2,7 @@
 title: Hard kernel (always on)
 read_when: Always / kernel — inlined into AGENTS.md before other guidelines
 order: 1
-version: 2.1.0
+version: 2.2.0
 ---
 
 # Hard kernel (always on)
@@ -20,4 +20,4 @@ in the index when the trigger matches.
 | **No root-owned `$HOME`** | Never leave root-owned files under a user’s home; repair only this tool’s dests — `security.md`. |
 | **Git: no force-push published** | No force-push/amend of published history unless the user clearly asks — `git.md`. |
 | **Git: no auto test/prod** | Never auto-promote `test` or `prod` — `git.md`. |
-| **Handoffs** | Agent↔agent notes: functionally detailed, unambiguous, succinct — not padded, not incomplete. Handoffs belong in the plan or task being worked on, not a separate file. |
+| **Handoffs** | The speaking agent summarizes the state so the next agent can continue. The note lives on that one plan. A handoff that covers more than one plan is its own plan, placed ahead of those plans, and it corrects them before they continue. Full rule: `general.md`. |
