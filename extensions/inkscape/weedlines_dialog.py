@@ -64,25 +64,35 @@ class _QueueLogHandler(logging.Handler):
             pass
 
 
-def run_weedlines_dialog(keep_path, defaults=None, platform_lines=None,
-                         quit_app=True):
+def run_weedlines_dialog(records, defaults=None, platform_lines=None,
+                         quit_app=True, width=None, height=None,
+                         view_box=None, ready=None):
     """Show the weedlines UI. Returns ``(weed_path, layer_name)`` or ``(None, None)``.
 
-    *keep_path* is design geometry (QPainterPath). *defaults* may include
-    mode, padding, spacing, collar, layer_name.
+    *records* are the job's per-path records, not a union. Start runs
+    only when the figure check reports no defect. The solver keep path
+    is the subject region. *width*, *height*, and *view_box* are the
+    document size. *defaults* may include mode, padding, spacing, collar,
+    layer_name.
 
     *platform_lines* is an optional deque fed by ``NativeStdioCapture``
     (Qt/OS stderr). Those lines are shown in the log and never reach Inkscape.
 
     *quit_app*: when this call created the QApplication, quit it on return
     (default). Detached host passes False so it can show a follow-up box.
+
+    *ready*, when given, is called with the dialog once the window is shown.
     """
+    from weedlib.figures import classify_figures, subject_weed_regions
     from weedlib.qt import QPainterPath, load_widgets
     from weedlib.progress import WeedCancelled
     from weedlib import generate_weeds
 
     QtCore, QtGui, QtWidgets = load_widgets()
     defaults = dict(defaults or {})
+    check = classify_figures(records)
+    regions = subject_weed_regions(check.figures, swap=False)
+    blocked = bool(check.defects)
 
     app = QtWidgets.QApplication.instance()
     owns_app = False
@@ -92,6 +102,9 @@ def run_weedlines_dialog(keep_path, defaults=None, platform_lines=None,
 
     dialog = QtWidgets.QDialog()
     dialog.setWindowTitle('Weedlines')
+    dialog.doc_width = width
+    dialog.doc_height = height
+    dialog.doc_viewbox = view_box
     dialog.resize(720, 640)
     # WindowModal: don't freeze every Qt window in a multi-app session;
     # when hosted inside Inkscape's process this still blocks that app.
@@ -101,6 +114,7 @@ def run_weedlines_dialog(keep_path, defaults=None, platform_lines=None,
 
     form = QtWidgets.QFormLayout()
     mode_box = QtWidgets.QComboBox()
+    mode_box.setObjectName('mode')
     mode_box.addItem('Frame (box)', 'frame')
     mode_box.addItem('Grid (clipped)', 'grid')
     mode_box.addItem('Island hop', 'island-hop')
@@ -110,10 +124,12 @@ def run_weedlines_dialog(keep_path, defaults=None, platform_lines=None,
             mode_box.setCurrentIndex(i)
             break
     pad_spin = QtWidgets.QDoubleSpinBox()
+    pad_spin.setObjectName('padding')
     pad_spin.setRange(0.0, 200.0)
     pad_spin.setDecimals(2)
     pad_spin.setValue(float(defaults.get('padding', 4.0)))
     space_spin = QtWidgets.QDoubleSpinBox()
+    space_spin.setObjectName('spacing')
     space_spin.setRange(1.0, 200.0)
     space_spin.setDecimals(2)
     space_spin.setValue(float(defaults.get('spacing', 25.0)))
@@ -131,11 +147,13 @@ def run_weedlines_dialog(keep_path, defaults=None, platform_lines=None,
 
     btn_row = QtWidgets.QHBoxLayout()
     start_btn = QtWidgets.QPushButton('Start Algorithm')
+    start_btn.setObjectName('start')
     pause_btn = QtWidgets.QPushButton('Pause')
     pause_btn.hide()
     cancel_btn = QtWidgets.QPushButton('Cancel…')
     cancel_btn.hide()
     apply_btn = QtWidgets.QPushButton('Apply')
+    apply_btn.setObjectName('apply')
     apply_btn.setEnabled(False)
     close_btn = QtWidgets.QPushButton('Close')
     btn_row.addWidget(start_btn)
@@ -179,7 +197,7 @@ def run_weedlines_dialog(keep_path, defaults=None, platform_lines=None,
     weed_pen = QtGui.QPen(QtGui.QColor('#e07020'))
     weed_pen.setWidthF(0.0)
     weed_pen.setCosmetic(True)
-    _add_path_to_scene(scene, keep_path, keep_pen, QtCore)
+    _add_path_to_scene(scene, regions.subject, keep_pen, QtCore)
     view.fitInView(scene.itemsBoundingRect(), QtCore.Qt.KeepAspectRatio)
 
     state = {
@@ -219,7 +237,7 @@ def run_weedlines_dialog(keep_path, defaults=None, platform_lines=None,
         state['busy'] = busy
         state['paused'] = bool(paused) if busy else False
         start_btn.setVisible(not busy)
-        start_btn.setEnabled(not busy)
+        start_btn.setEnabled((not busy) and not blocked)
         pause_btn.setVisible(busy)
         pause_btn.setEnabled(busy and not state['cancel'].is_set())
         if busy and state['paused']:
@@ -252,7 +270,7 @@ def run_weedlines_dialog(keep_path, defaults=None, platform_lines=None,
         state['weed_items'] = []
 
     def on_start():
-        if state['busy']:
+        if state['busy'] or blocked:
             return
         clear_weed_items()
         state['result'] = None
@@ -269,7 +287,7 @@ def run_weedlines_dialog(keep_path, defaults=None, platform_lines=None,
         padding = float(pad_spin.value())
         spacing = float(space_spin.value())
         collar = float(collar_spin.value())
-        keep = keep_path
+        keep = regions.subject
 
         def work():
             from weedlib import progress as weed_progress
@@ -448,11 +466,25 @@ def run_weedlines_dialog(keep_path, defaults=None, platform_lines=None,
     hint.setWordWrap(True)
     root.addWidget(hint)
 
+    set_controls(False)
+    if ready is not None:
+        def _ready():
+            try:
+                ready(dialog)
+            except Exception as exc:
+                state['ready_error'] = exc
+                dialog.reject()
+
+        QtCore.QTimer.singleShot(0, _ready)
+
     result_code = dialog.exec_()
     layer_name = layer_edit.text().strip() or 'Weed lines'
     weed = state['result'] if state['accepted'] and result_code else None
     if owns_app and quit_app:
         app.quit()
+    ready_error = state.pop('ready_error', None)
+    if ready_error is not None:
+        raise ready_error
     if weed is None:
         return None, None
     return weed, layer_name

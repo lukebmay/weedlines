@@ -53,22 +53,23 @@ def main(argv=None):
 
     from weedlines_job import read_job, write_result, result_svg_file
     from weedlines_dialog import run_weedlines_dialog
-    from weedlib.svg_paths import (
-        svg_d_to_qpainterpath, weed_path_to_open_d_list,
-    )
+    from weedlib.svg_paths import weed_path_to_open_d_list
     from weedlib.qt import load_widgets
 
     job = read_job(job_path)
     keep_d = job.get('keep_d') or ''
     defaults = dict(job.get('defaults') or {})
     doc_attrs = dict(job.get('doc_attrs') or {})
-    keep = svg_d_to_qpainterpath(keep_d)
-    if keep.isEmpty():
-        sys.stderr.write('Weedlines host: empty keep geometry in job.\n')
-        return 1
+    records = list(job.get('records') or [])
 
     weed, layer_name = run_weedlines_dialog(
-        keep, defaults=defaults, quit_app=False)
+        records,
+        defaults=defaults,
+        quit_app=False,
+        width=doc_attrs.get('width'),
+        height=doc_attrs.get('height'),
+        view_box=doc_attrs.get('viewBox') or doc_attrs.get('viewbox'),
+    )
     try:
         os.remove(job_path)
     except OSError:

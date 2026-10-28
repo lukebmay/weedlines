@@ -712,6 +712,7 @@ class WeedLinesEffect(object):
                 'and select them.'
             )
 
+        records = _path_records(nodes, inkex, QTransform)
         doc_attrs = doc_root_attrs(self.svg)
         br = keep.boundingRect()
         defaults['keep_bbox'] = [
@@ -724,7 +725,6 @@ class WeedLinesEffect(object):
             '1', 'true', 'yes', 'on')
         if not inline:
             keep_d = qpainterpath_to_svg_d(keep, close_subpaths=True)
-            records = _path_records(nodes, inkex, QTransform)
             job_path = write_job(
                 keep_d, defaults, doc_attrs=doc_attrs, records=records)
             # Keep Inkscape's stderr clean — any chatter becomes the
@@ -764,8 +764,14 @@ class WeedLinesEffect(object):
             sys.stderr = null_err
             with NativeStdioCapture() as capture:
                 weed, layer_name = run_weedlines_dialog(
-                    keep, defaults=defaults,
-                    platform_lines=capture.lines)
+                    records,
+                    defaults=defaults,
+                    platform_lines=capture.lines,
+                    width=doc_attrs.get('width'),
+                    height=doc_attrs.get('height'),
+                    view_box=(
+                        doc_attrs.get('viewBox') or doc_attrs.get('viewbox')),
+                )
         finally:
             sys.stdout, sys.stderr = old_out, old_err
             try:
