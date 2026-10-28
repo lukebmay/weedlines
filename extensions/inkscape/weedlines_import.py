@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Inkscape extension: import last Weedlines result (design + cuts).
+"""Inkscape extension: import the last Weedlines result.
 
-Prefers ``last_result.svg`` so design keep and weed cuts arrive together in
-the same document user units / viewBox as when the job was started.
+Prefers ``last_result.svg`` so a weed-line result keeps the design and
+cuts in the job's user units. A correction result has no design copy;
+its arrow groups go on one new layer above the open document.
 """
 from __future__ import division
 
@@ -40,6 +41,21 @@ def _append_etree_element(parent, el, inkex):
     return node
 
 
+def _append_layer(svg, inkex, label):
+    """Append a layer. A later sibling paints above the open document."""
+    ns_ink = 'http://www.inkscape.org/namespaces/inkscape'
+    layer_cls = getattr(inkex, 'Layer', None)
+    if layer_cls is not None and hasattr(layer_cls, 'new'):
+        layer = svg.add(layer_cls.new(label))
+    elif hasattr(inkex, 'Group') and hasattr(inkex.Group, 'new'):
+        layer = svg.add(inkex.Group.new(label))
+    else:
+        layer = inkex.etree.SubElement(svg, inkex.addNS('g', 'svg'))
+        layer.set('{%s}label' % ns_ink, label)
+    layer.set('{%s}groupmode' % ns_ink, 'layer')
+    return layer
+
+
 class WeedLinesImportEffect(object):
     def add_arguments(self, pars):
         pars.add_argument('--tab', type=str, default='')
@@ -49,7 +65,11 @@ class WeedLinesImportEffect(object):
 
         _ensure_paths()
         from weedlines_job import read_result, result_path, result_svg_file
-        from weedlines_svg import load_result_svg_groups, result_svg_path
+        from weedlines_svg import (
+            load_correction_svg_groups,
+            load_result_svg_groups,
+            result_svg_path,
+        )
         from weedlines import _add_weed_layer_from_d
         from inkex import PathElement
 
@@ -61,7 +81,15 @@ class WeedLinesImportEffect(object):
         layer_name = (payload or {}).get('layer_name') or 'Weed lines'
 
         if os.path.isfile(svg_file):
+            groups = load_correction_svg_groups(svg_file)
             design, cuts = load_result_svg_groups(svg_file)
+            # Arrow groups and no design copy: do not use the weed-line layer.
+            if groups and design is None:
+                layer = _append_layer(self.svg, inkex, 'Weedlines corrections')
+                for group in groups:
+                    _append_etree_element(layer, group, inkex)
+                return
+
             if design is None and cuts is None:
                 raise inkex.AbortExtension(
                     'Weedlines result SVG was empty:\n%s' % svg_file
