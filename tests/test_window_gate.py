@@ -348,7 +348,7 @@ def test_clear_filled_rectangle_cuts(mode):
         holder['done'] = _finish_start(
             dialog, mode, padding=2.0, spacing=20.0)
 
-    weed, _layer = _run(_RECT_RECORDS, drive)
+    weed, _layer, _color = _run(_RECT_RECORDS, drive)
     assert holder['done']['error'] is None, holder['done']['error']
     assert weed is not None and not weed.isEmpty()
 
@@ -381,7 +381,7 @@ def test_host_passes_records_not_the_union(tmp_path, monkeypatch):
             'height': height,
             'view_box': view_box,
         })
-        return None, None
+        return None, None, None
 
     monkeypatch.setattr(weedlines_dialog, 'run_weedlines_dialog', fake)
     job = {
@@ -429,7 +429,7 @@ def test_inline_path_passes_records_not_the_union(monkeypatch):
             'view_box': view_box,
             'platform_lines': platform_lines,
         })
-        return None, None
+        return None, None, None
 
     monkeypatch.setattr(weedlines_dialog, 'run_weedlines_dialog', fake)
     mod = _load_effect()
@@ -462,7 +462,7 @@ def test_detached_spawn_keeps_per_path_records(tmp_path, monkeypatch):
     calls = []
     monkeypatch.setattr(
         weedlines_dialog, 'run_weedlines_dialog',
-        lambda *args, **kwargs: calls.append((args, kwargs)) or (None, None))
+        lambda *args, **kwargs: calls.append((args, kwargs)) or (None, None, None))
     _run_effect(_load_effect(), _design_svg(), monkeypatch)
     assert calls == []
     assert len(spawned) == 1

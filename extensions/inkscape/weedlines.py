@@ -626,7 +626,8 @@ def _path_records(nodes, inkex, QTransform):
     return records
 
 
-def _add_weed_layer_from_d(svg, inkex, PathElement, d_list, layer_label):
+def _add_weed_layer_from_d(svg, inkex, PathElement, d_list, layer_label,
+                           color=None):
     """Write open SVG path `d` strings into a new Weedlines layer."""
     if not d_list:
         raise inkex.AbortExtension('Weed solver produced no cuts.')
@@ -640,10 +641,8 @@ def _add_weed_layer_from_d(svg, inkex, PathElement, d_list, layer_label):
         layer.set('{%s}groupmode' % ns_ink, 'layer')
         layer.set('{%s}label' % ns_ink, layer_label)
 
-    style = (
-        'fill:none;stroke:#c04000;stroke-width:0.25;'
-        'stroke-linecap:round;stroke-linejoin:round'
-    )
+    from weedlines_svg import cut_style
+    style = cut_style(color)
     for i, d in enumerate(d_list):
         el = PathElement()
         el.set('d', d)
@@ -652,11 +651,13 @@ def _add_weed_layer_from_d(svg, inkex, PathElement, d_list, layer_label):
         layer.append(el)
 
 
-def _add_weed_layer(svg, inkex, PathElement, weed_path, layer_label):
+def _add_weed_layer(svg, inkex, PathElement, weed_path, layer_label,
+                    color=None):
     from weedlib.svg_paths import weed_path_to_open_d_list
 
     d_list = weed_path_to_open_d_list(weed_path)
-    _add_weed_layer_from_d(svg, inkex, PathElement, d_list, layer_label)
+    _add_weed_layer_from_d(
+        svg, inkex, PathElement, d_list, layer_label, color)
 
 
 class WeedLinesEffect(object):
@@ -758,12 +759,12 @@ class WeedLinesEffect(object):
         old_out, old_err = sys.stdout, sys.stderr
         null_out = open(os.devnull, 'w')
         null_err = open(os.devnull, 'w')
-        weed, layer_name = None, None
+        weed, layer_name, color = None, None, None
         try:
             sys.stdout = null_out
             sys.stderr = null_err
             with NativeStdioCapture() as capture:
-                weed, layer_name = run_weedlines_dialog(
+                weed, layer_name, color = run_weedlines_dialog(
                     records,
                     defaults=defaults,
                     platform_lines=capture.lines,
@@ -786,7 +787,8 @@ class WeedLinesEffect(object):
         if weed is None:
             return
 
-        _add_weed_layer(self.svg, inkex, PathElement, weed, layer_name)
+        _add_weed_layer(
+            self.svg, inkex, PathElement, weed, layer_name, color)
 
 
 def main():

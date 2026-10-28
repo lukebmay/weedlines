@@ -177,19 +177,20 @@ class _QueueLogHandler(logging.Handler):
 def run_weedlines_dialog(records, defaults=None, platform_lines=None,
                          quit_app=True, width=None, height=None,
                          view_box=None, ready=None):
-    """Show the weedlines UI. Returns ``(weed_path, layer_name)`` or ``(None, None)``.
+    """Show the weedlines UI. Returns ``(weed_path, layer_name, color)``.
 
-    *records* are the job's per-path records, not a union. Start runs
-    only when the figure check reports no defect. The solver keep path
-    is the subject region. Swap exchanges that subject with the weed
-    area. The preview paints the subject, the weed area, and the
-    library's correction arrows. Plugin settings change those preview
-    colors only. When the check reports a defect, the return line and
-    its actions sit under the preview. Return to Inkscape closes
-    without writing. The correction action writes those same arrow
-    paths and leaves the window open. *width*, *height*, and
-    *view_box* are the document size. *defaults* may include mode,
-    padding, spacing, collar, layer_name.
+    ``color`` is the weed-line color when Apply accepts, and None when
+    the window does not. *records* are the job's per-path records, not
+    a union. Start runs only when the figure check reports no defect.
+    The solver keep path is the subject region. Swap exchanges that
+    subject with the weed area. The preview paints the subject, the
+    weed area, and the library's correction arrows. Plugin settings
+    change those preview colors only. When the check reports a defect,
+    the return line and its actions sit under the preview. Return to
+    Inkscape closes without writing. The correction action writes
+    those same arrow paths and leaves the window open. *width*,
+    *height*, and *view_box* are the document size. *defaults* may
+    include mode, padding, spacing, collar, layer_name.
 
     *platform_lines* is an optional deque fed by ``NativeStdioCapture``
     (Qt/OS stderr). Those lines are shown in the log and never reach Inkscape.
@@ -798,5 +799,5 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     if ready_error is not None:
         raise ready_error
     if weed is None:
-        return None, None
-    return weed, layer_name
+        return None, None, None
+    return weed, layer_name, weed_edit.property('color')

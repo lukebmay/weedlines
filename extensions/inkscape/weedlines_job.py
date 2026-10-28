@@ -78,8 +78,11 @@ def read_job(path):
 
 
 def write_result(layer_name, path_d_list, meta=None, keep_d=None,
-                 doc_attrs=None):
-    """Save Apply output: JSON metadata + SVG (design + cuts)."""
+                 doc_attrs=None, weed_line_color=None):
+    """Save Apply output: JSON metadata + SVG (design + cuts).
+
+    *weed_line_color* is stored when the caller passes one.
+    """
     payload = {
         'version': 2,
         'created': time.time(),
@@ -90,6 +93,8 @@ def write_result(layer_name, path_d_list, meta=None, keep_d=None,
         'meta': dict(meta or {}),
         'svg': _RESULT_SVG_NAME,
     }
+    if weed_line_color is not None:
+        payload['weed_line_color'] = weed_line_color
     path = result_path()
     tmp = path + '.tmp'
     with open(tmp, 'w', encoding='utf-8') as fh:
@@ -104,6 +109,7 @@ def write_result(layer_name, path_d_list, meta=None, keep_d=None,
             doc_attrs=doc_attrs,
             layer_name=layer_name,
             path=result_svg_file(),
+            weed_line_color=weed_line_color,
         )
     except Exception:
         # JSON alone still allows cut-only import.

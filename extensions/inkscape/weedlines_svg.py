@@ -63,13 +63,24 @@ def doc_root_attrs(svg):
     return attrs
 
 
+def cut_style(color=None):
+    """Stroke for one weed cut. An omitted color is ``#FF0000``."""
+    if color is None:
+        color = '#FF0000'
+    return (
+        'fill:none;stroke:%s;stroke-width:0.25;'
+        'stroke-linecap:round;stroke-linejoin:round'
+    ) % color
+
+
 def write_result_svg(keep_d, weed_d_list, doc_attrs=None, layer_name=None,
-                     path=None):
+                     path=None, weed_line_color=None):
     """Write a standalone SVG: design keep + weed cuts in document user units.
 
     *doc_attrs* should be the source document's width/height/viewBox so opening
     or importing the file preserves physical size. Path coordinates are already
-    in that user-unit space (composed transforms baked in).
+    in that user-unit space (composed transforms baked in). An omitted
+    *weed_line_color* strokes each cut with ``#FF0000``.
     """
     path = path or result_svg_path()
     doc_attrs = dict(doc_attrs or {})
@@ -113,16 +124,13 @@ def write_result_svg(keep_d, weed_d_list, doc_attrs=None, layer_name=None,
         'id="weedlines-cuts">\n'
         % _xml_escape_attr(layer_name)
     )
-    style = (
-        'fill:none;stroke:#c04000;stroke-width:0.25;'
-        'stroke-linecap:round;stroke-linejoin:round'
-    )
+    style = cut_style(weed_line_color)
     for i, d in enumerate(weed_d_list or ()):
         if not d:
             continue
         parts.append(
             '    <path id="weed-cut-%04d" style="%s" d="%s"/>\n'
-            % (i, style, _xml_escape_attr(d))
+            % (i, _xml_escape_attr(style), _xml_escape_attr(d))
         )
     parts.append('  </g>\n</svg>\n')
 

@@ -62,7 +62,7 @@ def main(argv=None):
     doc_attrs = dict(job.get('doc_attrs') or {})
     records = list(job.get('records') or [])
 
-    weed, layer_name = run_weedlines_dialog(
+    weed, layer_name, color = run_weedlines_dialog(
         records,
         defaults=defaults,
         quit_app=False,
@@ -96,6 +96,7 @@ def main(argv=None):
         },
         keep_d=keep_d,
         doc_attrs=doc_attrs,
+        weed_line_color=color,
     )
 
     svg_path = result_svg_file()

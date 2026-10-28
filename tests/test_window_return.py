@@ -334,7 +334,7 @@ def test_plain_return_writes_nothing_and_closes(tmp_path, monkeypatch):
         assert dialog.isVisible() is False
 
     result = _run(_DEFECTS, drive)
-    assert result == (None, None)
+    assert result == (None, None, None)
     assert list(tmp_path.iterdir()) == []
 
 
@@ -407,7 +407,7 @@ def test_arrow_return_writes_the_preview_paths_and_stays_open(
         height='80',
         view_box='0 0 100 80',
     )
-    assert result == (None, None)
+    assert result == (None, None, None)
     assert written['doc'] == {
         'width': '100',
         'height': '80',

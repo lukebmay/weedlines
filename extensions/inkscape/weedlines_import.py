@@ -124,8 +124,10 @@ class WeedLinesImportEffect(object):
         d_list = [d for d in payload['paths'] if d]
         if not d_list:
             raise inkex.AbortExtension('Weedlines result file had empty paths.')
+        recorded = payload.get('weed_line_color')
+        color = recorded if recorded else '#FF0000'
         _add_weed_layer_from_d(
-            self.svg, inkex, PathElement, d_list, layer_name)
+            self.svg, inkex, PathElement, d_list, layer_name, color)
 
 
 def main():

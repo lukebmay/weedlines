@@ -69,8 +69,8 @@ Do not fork peel logic. Change solvers only under `inkcut/weedlib/`.
 
 - Default output layer label: **`Weed lines`** (override in the dialog).
 - Each open cut is a child `svg:path` with id `weed-cut-NNNN`.
-- Style: **stroke only** (`fill:none`), distinct color (`#c04000`), thin
-  stroke (~0.25 user units) so paths stay editable and clearly not design
+- Style: **stroke only** (`fill:none`), the window color (default `#FF0000`),
+  width 0.25, so paths stay editable and clearly not design
   keep geometry.
 
 ### Units (mm)
