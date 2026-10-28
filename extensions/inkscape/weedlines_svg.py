@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Build / load the Weedlines result SVG (design + cuts, document units)."""
+"""Build / load Weedlines result SVGs (document units)."""
 from __future__ import division
 
 import os
@@ -12,6 +12,13 @@ SOD_NS = 'http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd'
 ET.register_namespace('', SVG_NS)
 ET.register_namespace('inkscape', INK_NS)
 ET.register_namespace('sodipodi', SOD_NS)
+
+# Result groups, in the order the guide names them. An empty kind is omitted.
+_CORRECTION_KINDS = (
+    ('dangling', 'Dangling ends'),
+    ('overlap', 'Figure overlaps'),
+    ('self-overlap', 'Self-overlaps'),
+)
 
 
 def _qn(ns, tag):
@@ -155,3 +162,136 @@ def load_result_svg_groups(path=None):
         elif cid == 'weedlines-cuts' or child.get(_qn(INK_NS, 'groupmode')) == 'layer':
             cuts = child
     return design, cuts
+
+
+def _local_tag(tag):
+    if not isinstance(tag, str):
+        return ''
+    return tag.rsplit('}', 1)[-1]
+
+
+def _correction_rows(arrows):
+    """Kinds that have at least one arrow, in guide order."""
+    if arrows is None:
+        arrows = {}
+    if not isinstance(arrows, dict):
+        raise TypeError(
+            'arrows must map a kind to arrow paths, got: {}'.format(
+                type(arrows).__name__))
+    known = {kind for kind, _label in _CORRECTION_KINDS}
+    unknown = [key for key in arrows if key not in known]
+    if unknown:
+        raise ValueError('unknown arrow kind: {!r}'.format(unknown[0]))
+    rows = []
+    for kind, label in _CORRECTION_KINDS:
+        batch = [
+            arrow for arrow in (arrows.get(kind) or ()) if arrow is not None
+        ]
+        if batch:
+            rows.append((kind, label, batch))
+    return rows
+
+
+def _correction_path_id(kind, role, index):
+    return 'weedlines-correction-%s-%s-%04d' % (kind, role, index)
+
+
+def _shaft_style(color):
+    # Same user-unit width as the weed-line strokes. The guide names none.
+    return 'fill:none;stroke:%s;stroke-width:0.25' % color
+
+
+def _head_style(color):
+    return 'fill:%s;stroke:none' % color
+
+
+def write_correction_svg(arrows, doc_attrs=None, path=None):
+    """Write one group per kind that has an arrow. No design copy.
+
+    *arrows* maps dangling, overlap, or self-overlap to objects with
+    shaft, head, and color. Shaft and head are ``QPainterPath`` values.
+    """
+    from weedlib.svg_paths import qpainterpath_to_svg_d
+
+    path = path or result_svg_path()
+    doc_attrs = dict(doc_attrs or {})
+    width = doc_attrs.get('width') or ''
+    height = doc_attrs.get('height') or ''
+    view_box = doc_attrs.get('viewBox') or doc_attrs.get('viewbox') or ''
+    if not view_box and not width:
+        width = width or '100%'
+        height = height or '100%'
+
+    parts = [
+        "<?xml version='1.0' encoding='utf-8'?>\n",
+        '<svg xmlns="%s" xmlns:inkscape="%s"' % (SVG_NS, INK_NS),
+    ]
+    if width:
+        parts.append(' width="%s"' % _xml_escape_attr(width))
+    if height:
+        parts.append(' height="%s"' % _xml_escape_attr(height))
+    if view_box:
+        parts.append(' viewBox="%s"' % _xml_escape_attr(view_box))
+    parts.append('>\n')
+
+    for kind, label, batch in _correction_rows(arrows):
+        body = []
+        for index, arrow in enumerate(batch):
+            # close_subpaths would add Z and close an open shaft.
+            shaft_d = qpainterpath_to_svg_d(
+                arrow.shaft, close_subpaths=False)
+            head_d = qpainterpath_to_svg_d(arrow.head, close_subpaths=False)
+            color = arrow.color
+            if shaft_d:
+                body.append(
+                    '    <path id="%s" style="%s" d="%s"/>\n' % (
+                        _correction_path_id(kind, 'shaft', index),
+                        _xml_escape_attr(_shaft_style(color)),
+                        _xml_escape_attr(shaft_d),
+                    )
+                )
+            if head_d:
+                body.append(
+                    '    <path id="%s" style="%s" d="%s"/>\n' % (
+                        _correction_path_id(kind, 'head', index),
+                        _xml_escape_attr(_head_style(color)),
+                        _xml_escape_attr(head_d),
+                    )
+                )
+        if not body:
+            continue
+        parts.append(
+            '  <g id="weedlines-correction-%s" inkscape:label="%s">\n'
+            % (kind, _xml_escape_attr(label))
+        )
+        parts.extend(body)
+        parts.append('  </g>\n')
+    parts.append('</svg>\n')
+
+    tmp = path + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as fh:
+        fh.write(''.join(parts))
+    os.replace(tmp, path)
+    return path
+
+
+def load_correction_svg_groups(path=None):
+    """Return correction arrow groups, in document order.
+
+    Each item is the group for one kind that had an arrow. A missing
+    file, or a design-plus-cuts file, returns an empty list.
+    """
+    path = path or result_svg_path()
+    if not os.path.isfile(path):
+        return []
+    labels = {label for _kind, label in _CORRECTION_KINDS}
+    groups = []
+    root = ET.parse(path).getroot()
+    for child in list(root):
+        if _local_tag(child.tag) != 'g':
+            continue
+        label = child.get(_qn(INK_NS, 'label')) or ''
+        cid = child.get('id') or ''
+        if label in labels or cid.startswith('weedlines-correction'):
+            groups.append(child)
+    return groups

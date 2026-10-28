@@ -111,6 +111,33 @@ def write_result(layer_name, path_d_list, meta=None, keep_d=None,
     return path
 
 
+def write_correction_result(arrows, doc_attrs=None, meta=None):
+    """Store a correction result: JSON plus an SVG of arrow groups only.
+
+    *arrows* maps dangling, overlap, or self-overlap to shaft/head
+    paths. Kinds with no arrows are omitted. No design copy.
+    """
+    from weedlines_svg import write_correction_svg
+
+    doc_attrs = dict(doc_attrs or {})
+    write_correction_svg(
+        arrows, doc_attrs=doc_attrs, path=result_svg_file())
+    payload = {
+        'version': 2,
+        'created': time.time(),
+        'result': 'correction',
+        'doc_attrs': doc_attrs,
+        'meta': dict(meta or {}),
+        'svg': _RESULT_SVG_NAME,
+    }
+    path = result_path()
+    tmp = path + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as fh:
+        json.dump(payload, fh, indent=0)
+    os.replace(tmp, path)
+    return path
+
+
 def read_result(path=None):
     path = path or result_path()
     if not os.path.isfile(path):
