@@ -51,16 +51,17 @@ def result_svg_file():
     return os.path.join(cache_dir(), _RESULT_SVG_NAME)
 
 
-def write_job(keep_d, defaults, doc_attrs=None):
-    """Persist keep geometry + dialog defaults; return job file path.
+def write_job(keep_d, defaults, doc_attrs=None, records=None):
+    """Persist keep geometry, path records, and dialog defaults.
 
-    *doc_attrs* (width/height/viewBox) are copied into the result SVG so
-    import keeps the same physical size as the Inkscape document.
+    *doc_attrs* (width/height/viewBox) stay on the job so import can keep
+    the document size. *records* is one dict per path element.
     """
     job = {
         'version': 2,
         'created': time.time(),
         'keep_d': keep_d or '',
+        'records': list(records or []),
         'defaults': dict(defaults or {}),
         'doc_attrs': dict(doc_attrs or {}),
     }
