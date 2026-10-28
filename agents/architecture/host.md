@@ -34,14 +34,26 @@ The detached window stays the way a run opens. The host still
 returns at once so Inkscape stays usable. The inline path
 remains available for the same window.
 
+The menu entry is Extensions → Weedlines → Weedlines from
+selection…. No path geometry aborts and tells the person to
+convert objects to paths. Apply on the detached path writes
+`last_result.json` and `last_result.svg`. Import last result is
+Extensions → Weedlines → Import last result. The on-screen hint
+is weed cuts only. The host does not configure a cutter.
+
 ## Result
 
 The window writes one of two results.
 
-A weed-line result is the result the window writes today after
-Apply: the design copy and the cut paths. Import of that result
-is unchanged. It adds one layer that holds the design group and
-the cuts.
+A weed-line result is the result the window writes after Apply:
+the design copy and the cut paths. Import of that result adds
+one layer that holds the design group and the cuts.
+
+Each cut in that result is stroke only. Fill is none. The stroke
+is the weed-line color from the window, and the width is 0.25.
+The id is `weed-cut-NNNN`. The inline path writes that same
+stroke when it adds the layer itself. The preview paints the
+same color. The person sets it once.
 
 A correction result holds only correction arrows. The library's
 arrow paths are the path data. The window writes one group per

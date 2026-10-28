@@ -20,7 +20,28 @@ call the weed area waste.
 A clear design runs the selected mode the way it does today.
 This part does not change cut geometry, clearance, or ranking.
 The preview color of a weed line is the weed-line color in
-[`preview.md`](./preview.md).
+[`preview.md`](./preview.md). The result file uses that same
+color. [`host.md`](./host.md) is the stroke.
+
+Frame is the default. Island-hop is not the default, and it
+does not become the default until its pictures are accepted.
+`auto` is a deprecated alias of island-hop. An unknown mode
+runs as frame. `region` is grid. Island-hop needs pyclipper.
+Frame and grid do not.
+
+An open stroke is not a keep interior. It fails the figure
+check, so it never reaches a solver from the window.
+
+Frame is a padded box around the keep bounds. Grid is an
+axis-aligned hatch over the weed area, plus a closed surround
+on the padded work rect. Island-hop peels a frame, then ranked
+seals. Hosts call `generate_weeds`. They do not call private
+helpers in `solvers.py`.
+
+The window shows one padding number and copies it to all four
+sides, plus grid spacing, the island-hop collar, and the output
+layer name. A blank layer name is `Weed lines`. Other knobs stay
+at solver defaults. Units are in [`boundary.md`](./boundary.md).
 
 ## Surround and Conquer
 
