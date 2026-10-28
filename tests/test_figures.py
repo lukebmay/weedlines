@@ -9,7 +9,7 @@ try:
 except ImportError:
     pytest.skip("Qt cannot load", allow_module_level=True)
 
-from weedlib.figures import classify_figures
+from weedlib.figures import classify_figures, subject_weed_regions
 from weedlib.qt import QPointF, Qt
 from weedlib.svg_paths import svg_d_to_qpainterpath
 
@@ -283,6 +283,147 @@ def test_same_records_produce_the_same_defects():
     second = classify_figures(records)
     assert len(first.defects) == len(second.defects)
     for left, right in zip(first.defects, second.defects):
+        assert left.kind == right.kind
+        assert left.target.x() == pytest.approx(right.target.x())
+        assert left.target.y() == pytest.approx(right.target.y())
+
+
+_FRAME = "M 0,0 L 80,0 L 80,50 L 0,50 Z"
+_LETTER_A = "M 10,10 L 24,10 L 24,30 L 10,30 Z"
+_LETTER_B = "M 50,12 L 68,12 L 68,32 L 50,32 Z"
+_BAND = (
+    _FRAME + " M 12,12 L 28,12 L 28,28 L 12,28 Z"
+    " M 50,18 L 66,18 L 66,36 L 50,36 Z"
+)
+_LEFT_SQ = "M 0,0 L 10,0 L 10,10 L 0,10 Z"
+_RIGHT_SQ = "M 20,0 L 30,0 L 30,10 L 20,10 Z"
+_OVER_A = "M 40,40 L 50,40 L 50,50 L 40,50 Z"
+_OVER_B = "M 45,40 L 55,40 L 55,50 L 45,50 Z"
+_PAINTED_OPEN = "M 0,20 L 10,20 L 10,30"
+
+
+def _regions(records, swap):
+    return subject_weed_regions(classify_figures(records).figures, swap)
+
+
+def _assert_regions(regions, subject, weed, outside):
+    for x, y in subject:
+        assert regions.subject.contains(QPointF(x, y))
+        assert not regions.weed_area.contains(QPointF(x, y))
+    for x, y in weed:
+        assert regions.weed_area.contains(QPointF(x, y))
+        assert not regions.subject.contains(QPointF(x, y))
+    for x, y in outside:
+        assert not regions.subject.contains(QPointF(x, y))
+        assert not regions.weed_area.contains(QPointF(x, y))
+
+
+def _assert_bounds(bounds, x, y, width, height):
+    assert bounds.x() == pytest.approx(x)
+    assert bounds.y() == pytest.approx(y)
+    assert bounds.width() == pytest.approx(width)
+    assert bounds.height() == pytest.approx(height)
+
+
+def test_painted_interiors_start_as_subject():
+    painted = _regions([
+        {"id": "color", "d": _LEFT_SQ, "closed": [True], "fill": "#ff0000"},
+        {"id": "gradient", "d": _RIGHT_SQ, "closed": [True], "fill": "other"},
+        {"id": "stroke", "d": _CORNER, "closed": [True], "fill": "none"},
+        {"id": "open", "d": _PAINTED_OPEN, "closed": [False], "fill": "#00ff00"},
+        {"id": "over-a", "d": _OVER_A, "closed": [True], "fill": "#ff0000"},
+        {"id": "over-b", "d": _OVER_B, "closed": [True], "fill": "#00ff00"},
+    ], False)
+    _assert_regions(
+        painted,
+        subject=[(5.0, 5.0), (25.0, 5.0), (9.0, 21.0), (47.0, 45.0)],
+        weed=[(15.0, 15.0)],
+        outside=[],
+    )
+
+    bare = _regions([
+        {"id": "color", "d": _LEFT_SQ, "closed": [True], "fill": "none"},
+        {"id": "gradient", "d": _RIGHT_SQ, "closed": [True], "fill": "none"},
+        {"id": "stroke", "d": _CORNER, "closed": [True], "fill": "none"},
+        {"id": "open", "d": _PAINTED_OPEN, "closed": [False], "fill": "none"},
+    ], False)
+    _assert_regions(
+        bare,
+        subject=[(5.0, 5.0), (25.0, 5.0), (15.0, 15.0), (9.0, 21.0)],
+        weed=[(15.0, 5.0)],
+        outside=[],
+    )
+
+
+def test_weed_area_is_the_bounds_minus_the_subject():
+    regions = _regions([
+        {"id": "left", "d": _LEFT_SQ, "closed": [True], "fill": "#112233"},
+        {"id": "right", "d": _RIGHT_SQ, "closed": [True], "fill": "#112233"},
+    ], False)
+    _assert_bounds(regions.bounds, 0.0, 0.0, 30.0, 10.0)
+    _assert_regions(
+        regions,
+        subject=[(5.0, 5.0), (25.0, 5.0)],
+        weed=[(15.0, 5.0)],
+        outside=[(-5.0, 5.0), (40.0, 5.0), (15.0, 20.0)],
+    )
+
+
+def test_swap_exchanges_subject_and_weed_inside_the_bounds():
+    letters = [
+        {"id": "frame", "d": _FRAME, "closed": [True], "fill": "none"},
+        {"id": "a", "d": _LETTER_A, "closed": [True], "fill": "#111111"},
+        {"id": "b", "d": _LETTER_B, "closed": [True], "fill": "other"},
+    ]
+    subject = [(16.0, 20.0), (58.0, 22.0)]
+    weed = [(40.0, 25.0), (2.0, 2.0)]
+    outside = [(-4.0, 10.0), (40.0, 60.0)]
+    first = _regions(letters, False)
+    _assert_bounds(first.bounds, 0.0, 0.0, 80.0, 50.0)
+    _assert_regions(first, subject, weed, outside)
+    swapped = _regions(letters, True)
+    _assert_bounds(swapped.bounds, 0.0, 0.0, 80.0, 50.0)
+    _assert_regions(swapped, weed, subject, outside)
+    restored = _regions(letters, False)
+    _assert_bounds(restored.bounds, 0.0, 0.0, 80.0, 50.0)
+    _assert_regions(restored, subject, weed, outside)
+
+    band = [{
+        "id": "band",
+        "d": _BAND,
+        "closed": [True, True, True],
+        "fill": "#336699",
+    }]
+    band_subject = [(4.0, 25.0), (40.0, 4.0)]
+    holes = [(20.0, 20.0), (58.0, 26.0)]
+    band_outside = [(40.0, -5.0), (90.0, 25.0)]
+    band_first = _regions(band, False)
+    _assert_bounds(band_first.bounds, 0.0, 0.0, 80.0, 50.0)
+    _assert_regions(band_first, band_subject, holes, band_outside)
+    band_swapped = _regions(band, True)
+    _assert_bounds(band_swapped.bounds, 0.0, 0.0, 80.0, 50.0)
+    _assert_regions(band_swapped, holes, band_subject, band_outside)
+    band_restored = _regions(band, False)
+    _assert_bounds(band_restored.bounds, 0.0, 0.0, 80.0, 50.0)
+    _assert_regions(band_restored, band_subject, holes, band_outside)
+
+
+def test_swap_does_not_add_or_remove_defects():
+    records = _combined_records()
+    result = classify_figures(records)
+    before = [(defect.kind, defect.target.x(), defect.target.y())
+              for defect in result.defects]
+    assert {kind for kind, _x, _y in before} == {
+        "dangling", "overlap", "self-overlap",
+    }
+    subject_weed_regions(result.figures, False)
+    subject_weed_regions(result.figures, True)
+    after = [(defect.kind, defect.target.x(), defect.target.y())
+             for defect in result.defects]
+    assert after == before
+    fresh = classify_figures(records)
+    assert len(fresh.defects) == len(result.defects)
+    for left, right in zip(result.defects, fresh.defects):
         assert left.kind == right.kind
         assert left.target.x() == pytest.approx(right.target.x())
         assert left.target.y() == pytest.approx(right.target.y())

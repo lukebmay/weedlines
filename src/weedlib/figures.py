@@ -6,7 +6,7 @@ import math
 from dataclasses import dataclass
 
 from .paths import join_painter_paths, split_painter_path
-from .qt import QPainterPath, QPointF, QTransform, Qt
+from .qt import QPainterPath, QPointF, QRectF, QTransform, Qt
 from .solvers import _dedupe_closed_subpaths, _subpath_is_closed
 from .svg_paths import svg_d_to_qpainterpath
 
@@ -40,6 +40,15 @@ class FigureCheck:
 
     figures: list
     defects: list
+
+
+@dataclass
+class SubjectWeed:
+    """Subject path, weed-area path, and the design bounds around both."""
+
+    subject: QPainterPath
+    weed_area: QPainterPath
+    bounds: QRectF
 
 
 def classify_figures(records):
@@ -81,6 +90,69 @@ def classify_figures(records):
         for right in painted[index + 1:]:
             defects.extend(_overlap_defects(left, right))
     return FigureCheck(figures=figures, defects=defects)
+
+
+def subject_weed_regions(figures, swap):
+    """Subject, weed area, and design bounds for classified figures.
+
+    ``figures`` is the list from ``classify_figures``. A fill is paint
+    when it is a color or ``other``; ``none`` is not. Painted interiors
+    start as subject. When no figure has paint, every interior does.
+    Weed area is the design bounds minus that subject. ``swap``
+    exchanges the two inside those bounds and does not move the bounds.
+    """
+    figures = list(figures or [])
+    any_paint = any(_is_paint(figure.fill) for figure in figures)
+    subject = _union_interiors(figures, any_paint)
+    bounds = _design_bounds(figures)
+    weed_area = _bounds_minus(bounds, subject)
+    if swap:
+        subject, weed_area = weed_area, subject
+    return SubjectWeed(subject=subject, weed_area=weed_area, bounds=bounds)
+
+
+def _is_paint(fill):
+    # Job fill is none, a #rrggbb color, or other (a gradient).
+    if not isinstance(fill, str):
+        return False
+    token = " ".join(fill.split()).lower()
+    return token not in ("", "none", "transparent")
+
+
+def _union_interiors(figures, require_paint):
+    acc = QPainterPath()
+    for figure in figures:
+        if require_paint and not _is_paint(figure.fill):
+            continue
+        # Painted interior, including an open subpath. Not solver keep.
+        interior = _painted_parts(split_painter_path(figure.path))
+        if not _has_area(interior):
+            continue
+        acc = interior if acc.isEmpty() else acc.united(interior)
+    acc.setFillRule(Qt.OddEvenFill)
+    return acc
+
+
+def _design_bounds(figures):
+    box = QRectF()
+    for figure in figures:
+        rect = figure.path.boundingRect()
+        # A null seed is the origin, not a figure. Do not union with it.
+        box = rect if box.isNull() else box.united(rect)
+    return box.normalized()
+
+
+def _bounds_minus(bounds, subject):
+    if not bounds.isValid():
+        return QPainterPath()
+    rect = QPainterPath()
+    rect.addRect(bounds)
+    rect.setFillRule(Qt.OddEvenFill)
+    if not _has_area(subject):
+        return rect
+    weed_area = rect.subtracted(subject)
+    weed_area.setFillRule(Qt.OddEvenFill)
+    return weed_area
 
 
 def _element_id(record):
