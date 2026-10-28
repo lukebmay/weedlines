@@ -19,6 +19,32 @@ from collections import deque
 # Scene units. Short enough that a padding ring shows both tiles.
 _CHECKER_TILE = 8.0
 _ARROW_KINDS = ('dangling', 'overlap', 'self-overlap')
+_KIND_WORDS = (
+    ('dangling', 'dangling ends'),
+    ('overlap', 'figure overlaps'),
+    ('self-overlap', 'self-overlaps'),
+)
+_PROBLEM_SENTENCE = (
+    'Correct the marked problems in Inkscape before weed lines will run.')
+_IMPORT_SENTENCE = (
+    'Run Extensions → Weedlines → Import last result to place the arrows.')
+
+
+def _defect_line(defects):
+    """Name each defect kind that is present. Empty when the check is clear."""
+    present = set()
+    for defect in defects or ():
+        present.add(defect.kind)
+    names = [word for kind, word in _KIND_WORDS if kind in present]
+    if not names:
+        return ''
+    if len(names) == 1:
+        named = names[0]
+    elif len(names) == 2:
+        named = '%s and %s' % (names[0], names[1])
+    else:
+        named = '%s, %s, and %s' % (names[0], names[1], names[2])
+    return '%s %s.' % (_PROBLEM_SENTENCE, named)
 
 
 def _hex_color(text):
@@ -158,9 +184,12 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     is the subject region. Swap exchanges that subject with the weed
     area. The preview paints the subject, the weed area, and the
     library's correction arrows. Plugin settings change those preview
-    colors only. *width*, *height*, and *view_box* are the document
-    size. *defaults* may include mode, padding, spacing, collar,
-    layer_name.
+    colors only. When the check reports a defect, the return line and
+    its actions sit under the preview. Return to Inkscape closes
+    without writing. The correction action writes those same arrow
+    paths and leaves the window open. *width*, *height*, and
+    *view_box* are the document size. *defaults* may include mode,
+    padding, spacing, collar, layer_name.
 
     *platform_lines* is an optional deque fed by ``NativeStdioCapture``
     (Qt/OS stderr). Those lines are shown in the log and never reach Inkscape.
@@ -177,6 +206,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     from weedlib.paths import split_painter_path
     from weedlib.progress import WeedCancelled
     from weedlib.qt import QPainterPath, load_widgets
+    from weedlines_job import write_correction_result
 
     QtCore, QtGui, QtWidgets = load_widgets()
     defaults = dict(defaults or {})
@@ -302,6 +332,26 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     splitter.setSizes([90, 400])
     root.addWidget(splitter, stretch=1)
 
+    return_line = QtWidgets.QLabel()
+    return_line.setObjectName('return-line')
+    return_line.setWordWrap(True)
+    return_line.setTextFormat(QtCore.Qt.PlainText)
+    return_line.setText(_defect_line(check.defects))
+    return_btn = QtWidgets.QPushButton('Return to Inkscape')
+    return_btn.setObjectName('return-inkscape')
+    arrows_btn = None
+    if blocked:
+        arrows_btn = QtWidgets.QPushButton(
+            'Return to Inkscape with correction arrows')
+        arrows_btn.setObjectName('return-arrows')
+    return_row = QtWidgets.QHBoxLayout()
+    return_row.addWidget(return_btn)
+    if arrows_btn is not None:
+        return_row.addWidget(arrows_btn)
+    return_row.addStretch(1)
+    root.addWidget(return_line)
+    root.addLayout(return_row)
+
     state = {
         'busy': False,
         'paused': False,
@@ -313,6 +363,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         'seg_q': deque(),
         'weed_items': [],
         'preview_items': [],
+        'arrows': {},
         'swapped': False,
         'regions': None,
         'work': None,
@@ -429,11 +480,14 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         grouped = {}
         for defect in check.defects:
             grouped.setdefault(defect.kind, []).append(defect.target)
+        arrow_paths = {}
         for kind in _ARROW_KINDS:
             targets = grouped.get(kind)
             if not targets:
                 continue
-            for arrow in build_arrow_paths(kind, targets, regions.bounds):
+            batch = build_arrow_paths(kind, targets, regions.bounds)
+            arrow_paths[kind] = batch
+            for arrow in batch:
                 shaft = scene.addPath(
                     arrow.shaft,
                     _line_pen(QtGui, QtCore, arrow.color),
@@ -446,6 +500,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
                     QtGui.QBrush(QtGui.QColor(arrow.color)))
                 head.setZValue(30)
                 state['preview_items'].append(head)
+        state['arrows'] = arrow_paths
         weed_pen = _line_pen(QtGui, QtCore, weed_color)
         for item in state['weed_items']:
             item.setPen(weed_pen)
@@ -649,6 +704,28 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
                 thread.join(2.0)
         dialog.reject()
 
+    def on_return():
+        on_close()
+
+    def _doc_attrs():
+        doc_attrs = {}
+        if dialog.doc_width:
+            doc_attrs['width'] = dialog.doc_width
+        if dialog.doc_height:
+            doc_attrs['height'] = dialog.doc_height
+        if dialog.doc_viewbox:
+            doc_attrs['viewBox'] = dialog.doc_viewbox
+        return doc_attrs
+
+    def on_return_arrows():
+        if not blocked or state['busy']:
+            return
+        arrows = state.get('arrows') or {}
+        if not arrows:
+            return
+        write_correction_result(arrows, doc_attrs=_doc_attrs())
+        return_line.setText(_IMPORT_SENTENCE)
+
     def _commit_color(edit):
         if state['busy']:
             edit.blockSignals(True)
@@ -679,6 +756,9 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     cancel_btn.clicked.connect(on_cancel)
     apply_btn.clicked.connect(on_apply)
     close_btn.clicked.connect(on_close)
+    return_btn.clicked.connect(on_return)
+    if arrows_btn is not None:
+        arrows_btn.clicked.connect(on_return_arrows)
     swap_btn.clicked.connect(_on_swap)
     for _edit in (light_edit, dark_edit, weed_edit, subject_edit):
         _edit.editingFinished.connect(
