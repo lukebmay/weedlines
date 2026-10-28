@@ -1,44 +1,26 @@
-# Priorities
+# Priority
 
-A prompt of Continue works this list from the top. How that turn runs is catalog `general.md`.
+When to use: The orchestrator is choosing the next plan.
 
-**Updated:** 2026-10-16
+**Owner:** agent. This file is the ordered list of plans.
 
-Ordered next work. There is no open plan file yet.
+Work on `master`. The orchestrator, once assigned, works this
+list from the top. How that turn runs is
+[`roles/orchestrator.md`](roles/orchestrator.md). An agent with
+no role does not open this file.
 
-| Pri | Item | Status | Notes |
-| --- | --- | --- | --- |
-| P0 | Island-hop picture QA | next | Refine algorithms. Do not default island-hop. |
-| P1 | inkcut integration | later | Move `weedlib` into `~/dev/me/inkcut`, then a PR upstream. |
+## Next session
 
-## Session
+(none — the open plan is waiting on the human)
 
-**Updated:** 2026-08-21
-**Branch:** `master`
-**GitHub:** `lukebmay/weedlines`
-**Path:** `~/dev/me/weedlines`
+## Active
 
-### Status
+| Plan | Notes |
+| --- | --- |
+| *(none)* | |
 
-Initial extract landed from `inkcut_luke` archive:
+## Waiting (human)
 
-- `src/weedlib/` — solvers (frame / grid / island-hop), progress, debug
-- `extensions/inkscape/` — Start/Cancel dialog + live preview
-- `weedlines` CLI — `install` / `update`
-- Logging: `WEEDLINES_LOG=0|1|2` (legacy `INKCUT_WEED_DEBUG` alias)
-- Tests: 136 passed, 4 skipped (Job pipeline)
-
-### Next
-
-1. Island-hop picture QA / refine algorithms
-2. Keep adding named algorithms; do not default island-hop
-3. Later: integrate `weedlib` into `~/dev/me/inkcut` → PR to OG
-
-### Installed locally
-
-`weedlines install` → symlinks in `~/.config/inkscape/extensions/`.
-Restart Inkscape after pulls. Pause/Resume is in the dialog (2026-08-21).
-
-### Source archive
-
-`~/dev/me/inkcut_luke` @ `archive/pre-repartner-2026-08-21`
+| Plan | Why |
+| --- | --- |
+| [surround-and-conquer](plans/surround-and-conquer/plan.md) | Preflight is in place. The cut subroutines and parameters are not named. |
