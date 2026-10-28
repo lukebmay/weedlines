@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Figure check: open paths stay open, twins collapse, dangling ends."""
+"""Figure check: open paths, twins, dangling ends, and overlap."""
 from __future__ import division
 
 import pytest
@@ -10,6 +10,7 @@ except ImportError:
     pytest.skip("Qt cannot load", allow_module_level=True)
 
 from weedlib.figures import classify_figures
+from weedlib.qt import QPointF, Qt
 from weedlib.svg_paths import svg_d_to_qpainterpath
 
 _OPEN = "M 5,6 L 15,6 L 15,20"
@@ -111,3 +112,177 @@ def test_correction_id_is_not_a_figure():
     assert [figure.id for figure in result.figures] == ["panel"]
     assert result.figures[0].fill == "other"
     assert result.defects == []
+
+
+_OPEN_TRI = "M 0,0 L 10,0 L 10,10"
+_BLOCK = "M 8,-2 L 14,-2 L 14,4 L 8,4 Z"
+_CROSS = (
+    "M 100,100 L 110,100 L 110,110 L 100,110 Z "
+    "M 105,105 L 115,105 L 115,115 L 105,115 Z"
+)
+_ISLANDS = "M 0,0 L 10,0 L 10,10 L 0,10 Z M 20,0 L 30,0 L 30,10 L 20,10 Z"
+_BAR = "M 0,3 L 30,3 L 30,7 L 0,7 Z"
+_MED = "M 20,10 L 60,10 L 60,40 L 20,40 Z"
+_LENS = "M 0,0 L 10,0 L 10,10 L 0,10 Z M 5,5 L 15,5 L 15,15 L 5,15 Z"
+_THROUGH = "M 4,6 L 16,6 L 16,9 L 4,9 Z"
+_INNER = "M 2,2 L 6,2 L 6,6 L 2,6 Z"
+_CORNER = "M 10,10 L 20,10 L 20,20 L 10,20 Z"
+_SHARE = "M 10,0 L 20,0 L 20,10 L 10,10 Z"
+_BOWTIE = "M 0,0 L 10,10 L 0,10 L 10,0 Z"
+_SQUARE4 = "M 0,0 L 4,0 L 4,4 L 0,4 Z"
+_PAINTED = "M -1,2 L -1,5 L 5,5 L 5,2"
+
+
+def _points(defects):
+    return [(defect.target.x(), defect.target.y()) for defect in defects]
+
+
+def _by_kind(result):
+    found = {}
+    for defect in result.defects:
+        found.setdefault(defect.kind, []).append(
+            (defect.target.x(), defect.target.y()))
+    return found
+
+
+def _fill(d):
+    path = svg_d_to_qpainterpath(d)
+    path.setFillRule(Qt.OddEvenFill)
+    return path
+
+
+def _matches(points, expected):
+    pending = list(points)
+    for ex, ey in expected:
+        found = None
+        for index, (x, y) in enumerate(pending):
+            if x == pytest.approx(ex) and y == pytest.approx(ey):
+                found = index
+                break
+        if found is None:
+            return False
+        pending.pop(found)
+    return not pending
+
+
+def _combined_records():
+    return [
+        {"id": "gap", "d": _OPEN_TRI, "closed": [False], "fill": "none"},
+        {"id": "block", "d": _BLOCK, "closed": [True], "fill": "#336699"},
+        {"id": "cross", "d": _CROSS, "closed": [True, True], "fill": "#222222"},
+    ]
+
+
+def test_one_result_holds_dangling_overlap_and_self_overlap():
+    result = classify_figures(_combined_records())
+    assert [figure.id for figure in result.figures] == ["gap", "block", "cross"]
+    found = _by_kind(result)
+    assert set(found) == {"dangling", "overlap", "self-overlap"}
+    assert found["dangling"] == [(0.0, 0.0), (10.0, 10.0)]
+    assert _matches(found["self-overlap"], [(105.0, 110.0), (110.0, 105.0)])
+    assert len(found["overlap"]) == 1
+    x, y = found["overlap"][0]
+    assert 8.0 < x < 10.0
+    assert 0.0 < y < 4.0
+    assert _fill(_OPEN_TRI).contains(QPointF(x, y))
+    assert _fill(_BLOCK).contains(QPointF(x, y))
+
+
+def test_nesting_point_touch_and_shared_boundary_are_not_overlaps():
+    nested = classify_figures([
+        {"id": "outer", "d": _SQUARE, "closed": [True], "fill": "#336699"},
+        {"id": "inner", "d": _INNER, "closed": [True], "fill": "none"},
+    ])
+    assert [figure.id for figure in nested.figures] == ["outer", "inner"]
+    assert nested.defects == []
+
+    touched = classify_figures([
+        {"id": "left", "d": _SQUARE, "closed": [True], "fill": "none"},
+        {"id": "right", "d": _CORNER, "closed": [True], "fill": "none"},
+    ])
+    assert [figure.id for figure in touched.figures] == ["left", "right"]
+    assert touched.defects == []
+
+    shared = classify_figures([
+        {"id": "left", "d": _SQUARE, "closed": [True], "fill": "none"},
+        {"id": "right", "d": _SHARE, "closed": [True], "fill": "none"},
+    ])
+    assert [figure.id for figure in shared.figures] == ["left", "right"]
+    assert shared.defects == []
+
+
+def test_each_connected_shared_area_is_one_overlap():
+    separate = classify_figures([
+        {"id": "islands", "d": _ISLANDS, "closed": [True, True], "fill": "#336699"},
+        {"id": "bar", "d": _BAR, "closed": [True], "fill": "none"},
+    ])
+    assert [figure.id for figure in separate.figures] == ["islands", "bar"]
+    assert [defect.kind for defect in separate.defects] == ["overlap", "overlap"]
+    boxes = ((0.0, 10.0, 3.0, 7.0), (20.0, 30.0, 3.0, 7.0))
+    seen = [False, False]
+    for x, y in _points(separate.defects):
+        hits = [
+            index for index, (xmin, xmax, ymin, ymax) in enumerate(boxes)
+            if xmin < x < xmax and ymin < y < ymax
+        ]
+        assert hits == [0] or hits == [1]
+        assert seen[hits[0]] is False
+        seen[hits[0]] = True
+    assert seen == [True, True]
+
+    band = classify_figures([
+        {"id": "letter", "d": _CLOSED_LETTER, "closed": [True, True], "fill": "#222222"},
+        {"id": "med", "d": _MED, "closed": [True], "fill": "none"},
+    ])
+    assert [figure.id for figure in band.figures] == ["letter", "med"]
+    assert [defect.kind for defect in band.defects] == ["overlap"]
+    x, y = _points(band.defects)[0]
+    assert _fill(_CLOSED_LETTER).contains(QPointF(x, y))
+    assert _fill(_MED).contains(QPointF(x, y))
+    assert not (25.0 < x < 55.0 and 15.0 < y < 35.0)
+
+    crossed = classify_figures([
+        {"id": "cross", "d": _LENS, "closed": [True, True], "fill": "#336699"},
+        {"id": "through", "d": _THROUGH, "closed": [True], "fill": "none"},
+    ])
+    found = _by_kind(crossed)
+    assert _matches(found["self-overlap"], [(5.0, 10.0), (10.0, 5.0)])
+    assert len(found.get("overlap", [])) == 1
+    x, y = found["overlap"][0]
+    assert 4.0 < x < 15.0 and 6.0 < y < 9.0
+    assert "dangling" not in found
+
+
+def test_one_subpath_bowtie_is_a_self_overlap():
+    result = classify_figures([{
+        "id": "bowtie",
+        "d": _BOWTIE,
+        "closed": [True],
+        "fill": "#336699",
+    }])
+    assert [figure.id for figure in result.figures] == ["bowtie"]
+    found = _by_kind(result)
+    assert set(found) == {"self-overlap"}
+    assert _matches(found["self-overlap"], [(5.0, 5.0)])
+
+
+def test_painted_closing_chord_is_not_a_border():
+    result = classify_figures([{
+        "id": "open",
+        "d": _SQUARE4 + " " + _PAINTED,
+        "closed": [True, False],
+        "fill": "none",
+    }])
+    assert [figure.id for figure in result.figures] == ["open"]
+    assert _dangling(result) == [(-1.0, 2.0), (5.0, 2.0)]
+
+
+def test_same_records_produce_the_same_defects():
+    records = _combined_records()
+    first = classify_figures(records)
+    second = classify_figures(records)
+    assert len(first.defects) == len(second.defects)
+    for left, right in zip(first.defects, second.defects):
+        assert left.kind == right.kind
+        assert left.target.x() == pytest.approx(right.target.x())
+        assert left.target.y() == pytest.approx(right.target.y())
