@@ -2,18 +2,102 @@
 """Interactive Weedlines dialog for the Inkscape extension.
 
 Start / Pause / Resume / Cancel, scrolling stdout+stderr log (keeps
-Inkscape from showing the "additional data" popup), and a live graphics
-view of accepted cuts. Pause is cooperative so you can inspect the
-preview mid-run, then resume.
+Inkscape from showing the "additional data" popup), and a live preview
+of the subject, the weed area, and accepted cuts. Pause is cooperative
+so you can inspect the preview mid-run, then resume.
 """
 from __future__ import division
 
 import logging
+import math
 import os
 import sys
 import threading
 import time
 from collections import deque
+
+# Scene units. Short enough that a padding ring shows both tiles.
+_CHECKER_TILE = 8.0
+_ARROW_KINDS = ('dangling', 'overlap', 'self-overlap')
+
+
+def _hex_color(text):
+    if not isinstance(text, str):
+        return None
+    token = text.strip()
+    if len(token) != 7 or token[0] != '#':
+        return None
+    body = token[1:]
+    for ch in body:
+        if ch not in '0123456789abcdefABCDEF':
+            return None
+    return '#' + body.upper()
+
+
+def _tint_edit(edit, color):
+    luma = (
+        int(color[1:3], 16) * 0.3
+        + int(color[3:5], 16) * 0.59
+        + int(color[5:7], 16) * 0.11)
+    ink = '#000000' if luma > 140 else '#ffffff'
+    edit.setStyleSheet('background-color: %s; color: %s;' % (color, ink))
+
+
+def _line_pen(QtGui, QtCore, color):
+    pen = QtGui.QPen(QtGui.QColor(color))
+    pen.setWidthF(0.0)
+    pen.setCosmetic(True)
+    return pen
+
+
+def _with_work_region(weed_area, work, QPainterPath, Qt):
+    """Weed area, plus the solver work rect once cuts exist."""
+    path = QPainterPath()
+    if weed_area is not None and not weed_area.isEmpty():
+        path = QPainterPath(weed_area)
+    if work is not None and work.isValid():
+        rect = QPainterPath()
+        rect.addRect(work)
+        path = rect if path.isEmpty() else path.united(rect)
+    path.setFillRule(Qt.OddEvenFill)
+    return path
+
+
+def _checker_type(QtWidgets, QtGui, QtCore):
+    class _CheckerItem(QtWidgets.QGraphicsPathItem):
+        def __init__(self, path, light, dark, tile):
+            QtWidgets.QGraphicsPathItem.__init__(self, path)
+            self._light = QtGui.QColor(light)
+            self._dark = QtGui.QColor(dark)
+            self._tile = float(tile)
+            self.setPen(QtGui.QPen(QtCore.Qt.NoPen))
+
+        def paint(self, painter, _option, _widget=None):
+            painter.save()
+            painter.setPen(QtCore.Qt.NoPen)
+            painter.setClipPath(self.path(), QtCore.Qt.IntersectClip)
+            bounds = self.path().boundingRect()
+            tile = self._tile
+            x0 = math.floor(bounds.left() / tile) * tile
+            y0 = math.floor(bounds.top() / tile) * tile
+            y = y0
+            row = 0
+            while y < bounds.bottom() - 1e-9:
+                x = x0
+                col = 0
+                while x < bounds.right() - 1e-9:
+                    if (col + row) % 2 == 0:
+                        painter.setBrush(QtGui.QBrush(self._light))
+                    else:
+                        painter.setBrush(QtGui.QBrush(self._dark))
+                    painter.drawRect(QtCore.QRectF(x, y, tile, tile))
+                    x += tile
+                    col += 1
+                y += tile
+                row += 1
+            painter.restore()
+
+    return _CheckerItem
 
 
 class _StreamToQueue(object):
@@ -71,8 +155,11 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
 
     *records* are the job's per-path records, not a union. Start runs
     only when the figure check reports no defect. The solver keep path
-    is the subject region. *width*, *height*, and *view_box* are the
-    document size. *defaults* may include mode, padding, spacing, collar,
+    is the subject region. Swap exchanges that subject with the weed
+    area. The preview paints the subject, the weed area, and the
+    library's correction arrows. Plugin settings change those preview
+    colors only. *width*, *height*, and *view_box* are the document
+    size. *defaults* may include mode, padding, spacing, collar,
     layer_name.
 
     *platform_lines* is an optional deque fed by ``NativeStdioCapture``
@@ -83,15 +170,17 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
 
     *ready*, when given, is called with the dialog once the window is shown.
     """
-    from weedlib.figures import classify_figures, subject_weed_regions
-    from weedlib.qt import QPainterPath, load_widgets
+    from weedlib import generate_weeds, padded_work_rect
+    from weedlib.arrows import build_arrow_paths
+    from weedlib.figures import (
+        _painted_parts, classify_figures, subject_weed_regions)
+    from weedlib.paths import split_painter_path
     from weedlib.progress import WeedCancelled
-    from weedlib import generate_weeds
+    from weedlib.qt import QPainterPath, load_widgets
 
     QtCore, QtGui, QtWidgets = load_widgets()
     defaults = dict(defaults or {})
     check = classify_figures(records)
-    regions = subject_weed_regions(check.figures, swap=False)
     blocked = bool(check.defects)
 
     app = QtWidgets.QApplication.instance()
@@ -143,6 +232,26 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     form.addRow('Grid spacing (mm)', space_spin)
     form.addRow('Collar (mm, island-hop)', collar_spin)
     form.addRow('Output layer', layer_edit)
+
+    def _color_edit(name, initial):
+        edit = QtWidgets.QLineEdit(initial)
+        edit.setObjectName(name)
+        edit.setMaxLength(7)
+        edit.setProperty('color', initial)
+        _tint_edit(edit, initial)
+        return edit
+
+    swap_btn = QtWidgets.QPushButton('Swap subject and weed area')
+    swap_btn.setObjectName('swap')
+    form.addRow(swap_btn)
+    light_edit = _color_edit('checkerboard-light', '#E6E6E6')
+    dark_edit = _color_edit('checkerboard-dark', '#CFCFCF')
+    weed_edit = _color_edit('weed-line-color', '#FF0000')
+    subject_edit = _color_edit('default-subject-color', '#FFFFFF')
+    form.addRow('Checkerboard light', light_edit)
+    form.addRow('Checkerboard dark', dark_edit)
+    form.addRow('Weed line color', weed_edit)
+    form.addRow('Default subject color', subject_edit)
     root.addLayout(form)
 
     btn_row = QtWidgets.QHBoxLayout()
@@ -180,7 +289,9 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     splitter.addWidget(log_view)
 
     scene = QtWidgets.QGraphicsScene()
+    scene.setBackgroundBrush(QtGui.QBrush(QtCore.Qt.NoBrush))
     view = QtWidgets.QGraphicsView(scene)
+    view.setObjectName('preview')
     view.setRenderHints(
         QtGui.QPainter.Antialiasing | QtGui.QPainter.SmoothPixmapTransform)
     view.setBackgroundBrush(QtGui.QBrush(QtGui.QColor('#1e1e1e')))
@@ -190,15 +301,6 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     splitter.setStretchFactor(1, 1)
     splitter.setSizes([90, 400])
     root.addWidget(splitter, stretch=1)
-
-    keep_pen = QtGui.QPen(QtGui.QColor('#6a9fb5'))
-    keep_pen.setWidthF(0.0)
-    keep_pen.setCosmetic(True)
-    weed_pen = QtGui.QPen(QtGui.QColor('#e07020'))
-    weed_pen.setWidthF(0.0)
-    weed_pen.setCosmetic(True)
-    _add_path_to_scene(scene, regions.subject, keep_pen, QtCore)
-    view.fitInView(scene.itemsBoundingRect(), QtCore.Qt.KeepAspectRatio)
 
     state = {
         'busy': False,
@@ -210,9 +312,16 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         'log_q': deque(),
         'seg_q': deque(),
         'weed_items': [],
+        'preview_items': [],
+        'swapped': False,
+        'regions': None,
+        'work': None,
+        'solved_keep': None,
+        'solved_pad': None,
         'accepted': False,
         'thread': None,
     }
+    CheckerItem = _checker_type(QtWidgets, QtGui, QtCore)
 
     def append_log(text):
         log_view.moveCursor(QtGui.QTextCursor.End)
@@ -262,7 +371,86 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         space_spin.setEnabled(not busy)
         collar_spin.setEnabled(not busy)
         layer_edit.setEnabled(not busy)
+        swap_btn.setEnabled(not busy)
+        light_edit.setEnabled(not busy)
+        dark_edit.setEnabled(not busy)
+        weed_edit.setEnabled(not busy)
+        subject_edit.setEnabled(not busy)
         apply_btn.setEnabled((not busy) and state['result'] is not None)
+
+    def _fit():
+        rect = scene.itemsBoundingRect()
+        if rect.isNull():
+            return
+        view.fitInView(rect, QtCore.Qt.KeepAspectRatio)
+
+    def _fill(path, color, z_value):
+        if path is None or path.isEmpty():
+            return
+        pen = QtGui.QPen(QtCore.Qt.NoPen)
+        item = scene.addPath(path, pen, QtGui.QBrush(QtGui.QColor(color)))
+        item.setZValue(z_value)
+        state['preview_items'].append(item)
+
+    def refresh_preview():
+        for item in state['preview_items']:
+            scene.removeItem(item)
+        state['preview_items'] = []
+        regions = subject_weed_regions(
+            check.figures, swap=state['swapped'])
+        state['regions'] = regions
+        light = light_edit.property('color')
+        dark = dark_edit.property('color')
+        weed_color = weed_edit.property('color')
+        subject_color = subject_edit.property('color')
+        # The work rect covers the subject. Subject paint sits above it.
+        weed_path = _with_work_region(
+            regions.weed_area, state['work'], QPainterPath, QtCore.Qt)
+        if not weed_path.isEmpty():
+            checker = CheckerItem(weed_path, light, dark, _CHECKER_TILE)
+            checker.setZValue(0)
+            scene.addItem(checker)
+            state['preview_items'].append(checker)
+        subject = regions.subject
+        if subject is not None and not subject.isEmpty():
+            painted = QPainterPath(subject)
+            painted.setFillRule(QtCore.Qt.OddEvenFill)
+            _fill(painted, subject_color, 10)
+        for figure in check.figures:
+            solid = _hex_color(figure.fill)
+            if solid is None or subject is None:
+                continue
+            # Painted interior. Odd-even of the whole path drops a crossing lens.
+            interior = _painted_parts(split_painter_path(figure.path))
+            part = interior.intersected(subject)
+            if part.isEmpty():
+                continue
+            _fill(part, solid, 11)
+        grouped = {}
+        for defect in check.defects:
+            grouped.setdefault(defect.kind, []).append(defect.target)
+        for kind in _ARROW_KINDS:
+            targets = grouped.get(kind)
+            if not targets:
+                continue
+            for arrow in build_arrow_paths(kind, targets, regions.bounds):
+                shaft = scene.addPath(
+                    arrow.shaft,
+                    _line_pen(QtGui, QtCore, arrow.color),
+                    QtGui.QBrush(QtCore.Qt.NoBrush))
+                shaft.setZValue(30)
+                state['preview_items'].append(shaft)
+                head = scene.addPath(
+                    arrow.head,
+                    QtGui.QPen(QtCore.Qt.NoPen),
+                    QtGui.QBrush(QtGui.QColor(arrow.color)))
+                head.setZValue(30)
+                state['preview_items'].append(head)
+        weed_pen = _line_pen(QtGui, QtCore, weed_color)
+        for item in state['weed_items']:
+            item.setPen(weed_pen)
+            item.setZValue(20)
+        _fit()
 
     def clear_weed_items():
         for item in state['weed_items']:
@@ -273,6 +461,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         if state['busy'] or blocked:
             return
         clear_weed_items()
+        state['work'] = None
         state['result'] = None
         state['error'] = None
         state['cancel'].clear()
@@ -282,12 +471,15 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         log_view.clear()
         append_log('Starting %s…\n' % mode_box.currentData())
         set_controls(True, paused=False)
+        refresh_preview()
 
         mode = mode_box.currentData()
         padding = float(pad_spin.value())
         spacing = float(space_spin.value())
         collar = float(collar_spin.value())
-        keep = regions.subject
+        keep = QPainterPath(state['regions'].subject)
+        state['solved_keep'] = keep
+        state['solved_pad'] = [padding, padding, padding, padding]
 
         def work():
             from weedlib import progress as weed_progress
@@ -371,6 +563,12 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
             while state['log_q']:
                 append_log(state['log_q'].popleft())
             added = False
+            if (state['seg_q'] and state['work'] is None
+                    and state['solved_keep'] is not None):
+                state['work'] = padded_work_rect(
+                    state['solved_keep'], state['solved_pad'])
+                refresh_preview()
+            weed_pen = _line_pen(QtGui, QtCore, weed_edit.property('color'))
             for _ in range(200):
                 if not state['seg_q']:
                     break
@@ -380,6 +578,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
                 except Exception:
                     continue
                 item = scene.addLine(x0, y0, x1, y1, weed_pen)
+                item.setZValue(20)
                 state['weed_items'].append(item)
                 added = True
             if added and (time.time() - last_fit[0]) > 0.4:
@@ -450,11 +649,40 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
                 thread.join(2.0)
         dialog.reject()
 
+    def _commit_color(edit):
+        if state['busy']:
+            edit.blockSignals(True)
+            edit.setText(edit.property('color'))
+            edit.blockSignals(False)
+            return
+        color = _hex_color(edit.text())
+        if color is None or color == edit.property('color'):
+            edit.blockSignals(True)
+            edit.setText(edit.property('color'))
+            edit.blockSignals(False)
+            return
+        edit.blockSignals(True)
+        edit.setText(color)
+        edit.setProperty('color', color)
+        edit.blockSignals(False)
+        _tint_edit(edit, color)
+        refresh_preview()
+
+    def _on_swap():
+        if state['busy']:
+            return
+        state['swapped'] = not state['swapped']
+        refresh_preview()
+
     start_btn.clicked.connect(on_start)
     pause_btn.clicked.connect(on_pause_toggle)
     cancel_btn.clicked.connect(on_cancel)
     apply_btn.clicked.connect(on_apply)
     close_btn.clicked.connect(on_close)
+    swap_btn.clicked.connect(_on_swap)
+    for _edit in (light_edit, dark_edit, weed_edit, subject_edit):
+        _edit.editingFinished.connect(
+            lambda edit=_edit: _commit_color(edit))
 
     hint = QtWidgets.QLabel(
         'Builds weed cuts only (no cutter travel planning). '
@@ -466,16 +694,20 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     hint.setWordWrap(True)
     root.addWidget(hint)
 
+    refresh_preview()
     set_controls(False)
-    if ready is not None:
-        def _ready():
-            try:
-                ready(dialog)
-            except Exception as exc:
-                state['ready_error'] = exc
-                dialog.reject()
 
-        QtCore.QTimer.singleShot(0, _ready)
+    def _shown():
+        _fit()
+        if ready is None:
+            return
+        try:
+            ready(dialog)
+        except Exception as exc:
+            state['ready_error'] = exc
+            dialog.reject()
+
+    QtCore.QTimer.singleShot(0, _shown)
 
     result_code = dialog.exec_()
     layer_name = layer_edit.text().strip() or 'Weed lines'
@@ -488,10 +720,3 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     if weed is None:
         return None, None
     return weed, layer_name
-
-
-def _add_path_to_scene(scene, path, pen, QtCore):
-    if path is None or path.isEmpty():
-        return
-    item = scene.addPath(path, pen)
-    return item
