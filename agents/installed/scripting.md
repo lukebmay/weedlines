@@ -42,7 +42,10 @@ Install path preference: (1) shellrc `install-<tool>` / `user-install-<tool>`, (
 | Mode | Behavior |
 | --- | --- |
 | Interactive TTY | Ask to install (default yes for user-scoped; no for sudo/system) |
-| Non-interactive / CI | Never auto-install; print command; exit 127 |
+| Non-interactive / CI | Do not auto-install; print the command; exit 127 |
+
+This table is how the script behaves when a tool is missing. It is not a
+ban on an install the current message asks the agent to run.
 
 ## User dests and root (FIRM)
 
@@ -78,7 +81,10 @@ Detect TTY on stdin+stdout.
 | Interactive | Confirm (prefer exact `yes` for high risk) |
 | Script/CI | **Refuse** unless `--force` (or equally explicit flag) |
 
-Never assume “yes” non-interactively for delete/overwrite/wipe/foreign-host apply.
+Do not assume “yes” when the script is non-interactive, for a delete,
+overwrite, wipe, or foreign-host apply. This is the script. A delete,
+overwrite, or wipe the current message already names does not need a
+second ask. Foreign-host apply still follows `security.md`.
 
 ## User-facing launches from Grok (FIRM)
 

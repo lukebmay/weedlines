@@ -1,57 +1,56 @@
 schema = 1
-tool_version = "0.6.1"
-catalog_version = "0.6.4"
-composer_path = "agents.py"
-installed_at = "2026-09-02T20:34:38+00:00"
-updated_at = "2026-10-23T00:40:35+00:00"
+tool_version = "0.7.0"
+catalog_version = "0.8.0"
+installed_at = "2026-10-27T21:08:00+00:00"
+updated_at = "2026-10-27T21:08:40+00:00"
 
 [[files]]
 id = "always"
 path = "always.md"
-version = "2.2.0"
-sha256 = "9baf07426eaae4af0365fb26269de2476172f12784f043be745d9c2a6b1fb583"
+version = "3.2.0"
+sha256 = "56a602dd9ab37f0fa2e8c7fd719e0ebd1cec454fbd587d4bc0aa11f12874daba"
 title = "Hard kernel (always on)"
-read_when = "Always / kernel — inlined into AGENTS.md before other guidelines"
+read_when = "Security kernel — secrets, SSH, live data, git publish, handoffs"
 
 [[files]]
 id = "ansi-colors"
 path = "ansi-colors.md"
-version = "3.2.0"
-sha256 = "e7fa38e902004a3a2c819e81ab24e93cc86f497621ae0d564292f882936a7a4d"
+version = "3.2.1"
+sha256 = "28b6e823cf080c3e18129ef44e6cee2e82b37b9a94e03777fde24bd01c3cba3f"
 title = "ANSI colors"
 read_when = "Adding terminal colors, formatting CLI output, or launching user-visible CLIs from a Grok agent"
 
 [[files]]
 id = "comments"
 path = "comments.md"
-version = "2.3.1"
-sha256 = "3e880764aaa81769e965674de25c169e26d7c27b7b157b9df81cac710eec3054"
+version = "2.3.2"
+sha256 = "778d953059ebec42aabf3729293473568a88ab8be7830d76690e7740bef4bf8b"
 title = "Comments"
 read_when = "Adding or editing source comments"
 
 [[files]]
 id = "documentation"
 path = "documentation.md"
-version = "4.5.0"
-sha256 = "c15c2bfcee6d09da439784188919893ce618a86194292064e200cbfe98d108e3"
+version = "4.9.0"
+sha256 = "140214117497aeb27342d46a45b80e1b504b191a6c2113fd41fabf2c2eb6e158"
 title = "Documentation"
 read_when = "Writing architecture, user docs, human-facing checklists, or choosing where “why” lives"
 
 [[files]]
-id = "general"
-path = "general.md"
-version = "4.6.0"
-sha256 = "f0be66f0718f16aa7e89d19306ad9446604bcd6a8f03b1bc480f2e307c61ba1f"
-title = "General process"
-read_when = "Always for multi-step work — plans, slices, handoffs, review pairs, orchestrator, subagents, architecture vs patches, canonical APIs — and when the prompt is Continue"
-
-[[files]]
 id = "git"
 path = "git.md"
-version = "2.1.4"
-sha256 = "30f421023b8a30f2d65696e8aa31997e5eef707f1891a614cd70a16080313963"
+version = "2.1.7"
+sha256 = "59f88f0006f131ba08a5e18e9388b9df2832e372bf812c66fdbfbb0ebde14437"
 title = "Git"
 read_when = "Before any commit, push, branch, merge, rebase, or release-ladder work"
+
+[[files]]
+id = "bash"
+path = "languages/bash.md"
+version = "1.1.0"
+sha256 = "bb860988e7fbac880c740ea485cbb2dba73ca11a5e1360ff8945274d6d849a14"
+title = "Bash"
+read_when = "Writing or reviewing Bash scripts"
 
 [[files]]
 id = "python"
@@ -72,23 +71,23 @@ read_when = "Writing or editing markdown docs, plans, tasks, or README prose"
 [[files]]
 id = "scripting"
 path = "scripting.md"
-version = "2.4.0"
-sha256 = "c01897335da15fc4a741b94e1f8786a9b286fec0f3b46de3fc1a793284f918f7"
+version = "2.4.1"
+sha256 = "5282ed02aed1ec35728cc60dc9ad0ab803923ac473610aa117e49034dfbef9c3"
 title = "Scripting"
 read_when = "Writing or changing shell/Python scripts, installers, CLI tools, bin entries, or launching user-visible apps from a Grok agent"
 
 [[files]]
 id = "security"
 path = "security.md"
-version = "2.3.0"
-sha256 = "31f5466e42462dea9441b71bb51784b77c73299fe6c821dc732f1d47ccc97f11"
+version = "2.3.2"
+sha256 = "82487cd610069f5b8e08c3184d86aa9e0a020ce8ad823e269eaddbbe1340f6a7"
 title = "Security"
 read_when = "Before SSH, secrets, sudo/root, credentials, or any important live-data mutation"
 
 [[files]]
 id = "testing"
 path = "testing.md"
-version = "3.1.1"
-sha256 = "e82c24ee3e97eeca11d9a2b506810d3979ab74361cb4eb61986275a0aaf17f7f"
+version = "3.1.3"
+sha256 = "b651ae5dfe0dbc94f85a4ad173481460870b6b0a26785126075f60237edf71c0"
 title = "Testing"
 read_when = "Adding tests, changing test strategy, enabling optional features, checking Grok durable --leader mode, or reattaching headless Grok for the human"

@@ -83,7 +83,7 @@ Green `✓` only for step ticks — not overall success lines.
 | Levels, files, sessions, searchable logs | **plog** (+ dual-tape / `plog-query`) when there is no real logger, or logging is `print`/`console.log` soup | `plog` |
 | Project already standardized | **Keep that system** — do not dual-stack | — |
 
-Install `pansi` / `plog` into a repo with `agents install` only when that repo
+Install `pansi` / `plog` into a repo with `agent-handbook install` only when that repo
 uses (or is adopting) them. Do **not** force them into unrelated projects.
 
 Hunt logs with **query** (`plog-query` / `app log --grep …`), never raw `tail`

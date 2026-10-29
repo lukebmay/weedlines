@@ -6,7 +6,7 @@ order: 70
 
 # Testing
 
-Rule vocabulary: **FIRM** / **GUIDELINE** / **MAY** (see `general.md`).
+Rule vocabulary: **FIRM** / **GUIDELINE** / **MAY**. The words are in the project's `agents/glossary.md`.
 
 ## Goal
 
@@ -29,7 +29,7 @@ is when to spend the run, not a license to skip tests after a real edit.
 
 ## Optional features in dev (FIRM)
 
-When implementing/debugging an optional feature: **turn it on** in local/dev for that work. Record the enable command in the plan handoff. Prefer tests that force the optional path explicitly.
+When implementing/debugging an optional feature: **turn it on** in local/dev for that work. Record the enable command in the note on `task.md`. Prefer tests that force the optional path explicitly.
 
 ## Pyramid (GUIDELINE)
 
@@ -98,8 +98,8 @@ Organize E2E as a **tree of stories**, not a flat bag of scripts.
 - **Release candidate:** run the **full tree**. A green trunk is not an RC
   bill of health.
 
-Name stories in **user sequence** language (open, split, close, apply),
-never helper names.
+Name stories in **user sequence** language (open, split, close, apply).
+Do not name them after internal helpers.
 
 ## In-progress features (GUIDELINE)
 

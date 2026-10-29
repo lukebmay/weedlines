@@ -1,8 +1,11 @@
-# Acceptance Criteria
+# Product checks
 
 **Owner:** human. Agents may propose edits; apply only with explicit permission.
 
-**This file contains the acceptance criteria in order to consider any work complete.**
+This file is an incomplete list of what the product should do, written
+so a test can confirm it. The handbook calls it acceptance: the checks
+that must hold before work is done. It is not the design. Bugs live in
+[`issues.md`](./issues.md).
 
 When a plan ships and gets archived, ask human for approval if you believe any of the plan acceptance criteria stay durable and should be promoted into this document.
 

@@ -1,0 +1,23 @@
+---
+title: Hard kernel (always on)
+read_when: Always / kernel — inlined into AGENTS.md before other guidelines
+order: 1
+version: 2.2.0
+---
+
+# Hard kernel (always on)
+
+These apply even before other files are opened. **Full** rules: open the file
+in the index when the trigger matches.
+
+| Rule | Detail |
+| --- | --- |
+| **Follow the index** | When a trigger matches, **open and follow** that file before acting in that domain. Do not rely on memory of old sessions. |
+| **No secrets outbound** | Never put real secrets in chat, commits, logs, or prompts. |
+| **No SSH or root without explicit** | Do not run `ssh`, `scp`, `sftp`, or a remote login, and do not use another program as a back door onto a machine, unless the **current** user message contains a form of **explicit** and names that connection. `git push`, `git fetch`, and `git pull` that the user asked for are ordinary git use, even when the remote URL is SSH. Full rule: `security.md`. When granted, permission is limited to the hosts and tasks named, lasts one session, and may be delegated only with those same limits. |
+| **Never circumvent security systems** | Assume the security is there to protect everyone. Just because you can circumvent security to achieve a goal, doing so could cause harm. So instead, ask for permission if needed. Civilizations are built on trust and cooperation. |
+| **No silent live-data destroy** | Important live data: backup or dry-run first — see `security.md`. |
+| **No root-owned `$HOME`** | Never leave root-owned files under a user’s home; repair only this tool’s dests — `security.md`. |
+| **Git: no force-push published** | No force-push/amend of published history unless the user clearly asks — `git.md`. |
+| **Git: no auto test/prod** | Never auto-promote `test` or `prod` — `git.md`. |
+| **Handoffs** | The speaking agent summarizes the state so the next agent can continue. The note lives on that one plan. A handoff that covers more than one plan is its own plan, placed ahead of those plans, and it corrects them before they continue. Full rule: `general.md`. |

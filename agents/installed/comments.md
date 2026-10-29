@@ -2,7 +2,7 @@
 title: Comments
 read_when: Adding or editing source comments
 order: 50
-version: 2.3.1
+version: 2.3.2
 ---
 
 # Comments
@@ -13,8 +13,8 @@ Keep comments **short and non-specific**.
 
 - Prefer one short line or end-of-line
 - Explain *why* only when non-obvious
-- **Never** restate *what* the next lines clearly do
-- **Never** embed volatile detail (history, review chat, long purpose essays)
+- Do not restate what the next lines already make obvious
+- Do not embed a history, a review chat, or a long purpose essay
 
 Good: `# Grok` · `# Update check (quiet on no-op)`  
 Bad: long banners, “expensive: …” essays

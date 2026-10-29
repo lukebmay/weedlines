@@ -1,18 +1,22 @@
 ---
 title: Hard kernel (always on)
-read_when: Always / kernel — inlined into AGENTS.md before other guidelines
+read_when: Security kernel — secrets, SSH, live data, git publish, handoffs
 order: 1
-version: 2.2.0
+version: 3.2.0
 ---
 
 # Hard kernel (always on)
 
-These apply even before other files are opened. **Full** rules: open the file
-in the index when the trigger matches.
+When to use: Every turn. The project `AGENTS.md` is the kernel.
+This file repeats it. It is not an index of the handbook.
+
+These apply before other files are opened. Find other rules by a line
+that starts with `When to use:`. The procedure is the project's
+`agents/handbook.md`. Open the part the task needs.
 
 | Rule | Detail |
 | --- | --- |
-| **Follow the index** | When a trigger matches, **open and follow** that file before acting in that domain. Do not rely on memory of old sessions. |
+| **Kernel** | The project's `AGENTS.md` is the kernel. This file repeats it. It is not a generated index. |
 | **No secrets outbound** | Never put real secrets in chat, commits, logs, or prompts. |
 | **No SSH or root without explicit** | Do not run `ssh`, `scp`, `sftp`, or a remote login, and do not use another program as a back door onto a machine, unless the **current** user message contains a form of **explicit** and names that connection. `git push`, `git fetch`, and `git pull` that the user asked for are ordinary git use, even when the remote URL is SSH. Full rule: `security.md`. When granted, permission is limited to the hosts and tasks named, lasts one session, and may be delegated only with those same limits. |
 | **Never circumvent security systems** | Assume the security is there to protect everyone. Just because you can circumvent security to achieve a goal, doing so could cause harm. So instead, ask for permission if needed. Civilizations are built on trust and cooperation. |
@@ -20,4 +24,4 @@ in the index when the trigger matches.
 | **No root-owned `$HOME`** | Never leave root-owned files under a user’s home; repair only this tool’s dests — `security.md`. |
 | **Git: no force-push published** | No force-push/amend of published history unless the user clearly asks — `git.md`. |
 | **Git: no auto test/prod** | Never auto-promote `test` or `prod` — `git.md`. |
-| **Handoffs** | The speaking agent summarizes the state so the next agent can continue. The note lives on that one plan. A handoff that covers more than one plan is its own plan, placed ahead of those plans, and it corrects them before they continue. Full rule: `general.md`. |
+| **Handoffs** | The note for the next agent lives on that task. The shape is `agents/plans/README.md`. A handoff does not become a new plan. |

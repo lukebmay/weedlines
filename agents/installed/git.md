@@ -6,7 +6,7 @@ order: 30
 
 # Git
 
-Rule vocabulary: **FIRM** / **GUIDELINE** / **MAY** (see `general.md`).
+Rule vocabulary: **FIRM** / **GUIDELINE** / **MAY**. The words are in the project's `agents/glossary.md`.
 
 ## Words
 
@@ -51,7 +51,7 @@ Agents **never** auto-merge/push `test` or `prod` unless user **explicitly** ask
 | Master by default | Implement on default; do not auto-create `plan/*` |
 | User/plan override | Honor “use a branch” / isolate flags |
 | Pull before work | Ensure default is current when origin exists |
-| Queue on default | `agents/{priority.md,plans,ideas,conflicts.md,conflicts-resolved.md,human.md}` always on default |
+| Queue on default | `agents/{priority.md,plans,ideas,conflicts.md,conflicts-resolved.md,handbook.md}` always on default |
 
 **Side branch only when:** user asks; high-risk multi-day break of daily-driver; parallel incompatible experiments; external PR/review.
 
@@ -62,11 +62,11 @@ If on a side branch: re-merge default regularly; refactor may defer product merg
 | Situation | Commit? | Push? |
 | --- | --- | --- |
 | Successful wrap-up on default | Yes | Yes if origin |
-| Solid slice during Continue | Yes | Same as a wrap-up, unless a project git file says not to push yet |
+| Solid slice of the work in progress | Yes | Same as a wrap-up, unless a project git file says not to push yet |
 | Side branch wrap-up | Yes | Push side; merge→default when gated |
 | User said don’t | No | No |
 | Secrets in diff | No | No |
-| Architecture miss / unfinished review pair | No wrap-up | No |
+| Architecture miss / code review not approved | No wrap-up | No |
 
 User veto always wins.
 
