@@ -20,4 +20,6 @@ paper the architecture with the story.
 
 ## Open
 
-None.
+| Seen | What happened | Rule |
+| --- | --- | --- |
+| 2026-10-29, `src/weedlib/figures.py`, Qt 5.15.18 | A radius-10 ellipse with a triangular hole whose vertex sits between the curve and a chord (about radius 9.85) returns two self-overlaps. The hole is contained, the outlines do not cross, and the counter is dropped from the subject. The same triangle at radius 9.0 is a counter with no defect. | [Self-overlap](./architecture/preflight.md). [_bugs](./plans/_bugs/plan.md). |

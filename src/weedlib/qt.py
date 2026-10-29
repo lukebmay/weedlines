@@ -6,17 +6,23 @@ from __future__ import division
 def _load():
     try:
         from enaml.qt.QtCore import QPointF, QRectF, Qt
-        from enaml.qt.QtGui import QPainterPath, QTransform
-        return QPointF, QRectF, Qt, QPainterPath, QTransform, 'enaml'
+        from enaml.qt.QtGui import QPainterPath, QPainterPathStroker, QTransform
+        return (
+            QPointF, QRectF, Qt, QPainterPath, QPainterPathStroker,
+            QTransform, 'enaml',
+        )
     except ImportError:
         pass
     for pkg in ('PyQt5', 'PySide2', 'PyQt6', 'PySide6'):
         try:
             core = __import__(pkg + '.QtCore', fromlist=['QPointF', 'QRectF', 'Qt'])
-            gui = __import__(pkg + '.QtGui', fromlist=['QPainterPath', 'QTransform'])
+            gui = __import__(
+                pkg + '.QtGui',
+                fromlist=['QPainterPath', 'QPainterPathStroker', 'QTransform'],
+            )
             return (
                 core.QPointF, core.QRectF, core.Qt,
-                gui.QPainterPath, gui.QTransform, pkg,
+                gui.QPainterPath, gui.QPainterPathStroker, gui.QTransform, pkg,
             )
         except ImportError:
             continue
@@ -25,7 +31,7 @@ def _load():
     )
 
 
-QPointF, QRectF, Qt, QPainterPath, QTransform, QT_BINDING = _load()
+QPointF, QRectF, Qt, QPainterPath, QPainterPathStroker, QTransform, QT_BINDING = _load()
 
 
 def load_widgets():
@@ -40,6 +46,6 @@ def load_widgets():
 
 
 __all__ = [
-    'QPointF', 'QRectF', 'Qt', 'QPainterPath', 'QTransform',
-    'QT_BINDING', 'load_widgets',
+    'QPointF', 'QRectF', 'Qt', 'QPainterPath', 'QPainterPathStroker',
+    'QTransform', 'QT_BINDING', 'load_widgets',
 ]

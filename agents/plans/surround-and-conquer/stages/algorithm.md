@@ -1,16 +1,15 @@
 # Algorithm
 
-A later stage. `plan.md` does not name this file as the current
-stage, so it has no tasks.
-
 ## This stage
 
-Give Surround and Conquer its cut subroutines and parameters,
-once the human names them. It then becomes a runnable mode on
-the same figure check, subject, weed area, preview, and import
-path.
+The surround, its live preview, and the approval that stops the
+mode from continuing. The window opens on Surround and Conquer.
+
+User-visible steps for this stage belong in `docs/user/`. The
+root README states the default mode, so that sentence changes
+with this stage. It does not gain a longer guide.
 
 ## Not yet
 
-Nothing past the cuts themselves. The figure check is the
-preflight stage.
+Conquer. A second surround inside a cluster. A smoothing
+control. Those are later stages and have no tasks.

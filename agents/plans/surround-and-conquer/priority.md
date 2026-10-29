@@ -3,4 +3,11 @@
 The order of active tasks for surround-and-conquer. A path, then
 the reason only when the order would otherwise be a guess.
 
-(none — preflight tasks are done)
+1. [window-surround](tasks/active/window-surround/task.md) —
+   calls that result; the job task uses this mode value
+1. [job-mode](tasks/active/job-mode/task.md) — writes the mode
+   value the window shows
+1. [user-surround](tasks/active/user-surround/task.md) — the
+   steps name those window controls
+1. [readme-default](tasks/active/readme-default/task.md) — the
+   default sentence, after the job names that mode

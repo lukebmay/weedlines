@@ -66,14 +66,13 @@ classifies the design and emits weed lines. One layer does not do
 another layer's job.
 
 Every algorithm waits on the same figure check. Surround and
-Conquer is one of those algorithms. Its cut subroutines are not
-specified yet. The check, the preview, and the way correction
-arrows go back to Inkscape are specified, and they apply to every
-algorithm.
+Conquer is the mode the window opens on. Its first step is the
+surround. Conquer is not specified yet. The check, the preview,
+and the way correction arrows go back to Inkscape are specified,
+and they apply to every algorithm.
 
-Frame stays the default mode. Island-hop does not become the
-default until its pictures are accepted. This repo stays the
-home of the solvers.
+Island-hop does not become the default until its pictures are
+accepted. This repo stays the home of the solvers.
 
 ## How the parts fit
 
@@ -85,10 +84,11 @@ A run moves in this order.
    check, the subject, and the weed area.
 3. The window paints the preview. When the check finds a defect,
    the window offers the two return actions under the preview.
-4. When the check is clear, the person can start frame, grid, or
-   island-hop. The library emits weed lines. The window paints
-   them in the weed-line color. Surround and Conquer is not a
-   choice until its subroutines exist.
+4. When the check is clear, the person can run frame, grid, or
+   island-hop, or approve the surround. The library emits the
+   weed lines for the mode that cuts, and the surround for
+   Surround and Conquer. The window paints them in the weed-line
+   color. Conquer does not run.
 5. Import reads the result file. A weed-line result brings in a
    copy of the design and the cuts. A correction-arrow result
    brings in only the arrow groups, above the open document.
@@ -98,7 +98,7 @@ A run moves in this order.
 | Host | The selection, the job, the result files, and import into the document | Figure classification, weed-line geometry |
 | Window | The preview, the plugin settings, swap, and the start and return actions | Path topology, solver cuts |
 | Library | Figures, subject and weed area, the figure check, arrow paths, and the algorithms | The Inkscape document, widgets |
-| Surround and Conquer | Its cut subroutines, once they are specified | The figure check and the other modes |
+| Surround and Conquer | The surround | The figure check, conquer, and the other modes |
 
 ## Which file
 

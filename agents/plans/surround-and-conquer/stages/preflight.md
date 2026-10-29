@@ -19,5 +19,5 @@ Window tests run offscreen when Qt is available.
 
 ## Not yet
 
-Surround and Conquer's subroutines and parameters. The human has
-not named them. Do not add tasks for those cuts.
+This stage is finished. The surround step is the algorithm
+stage. This file does not add tasks.

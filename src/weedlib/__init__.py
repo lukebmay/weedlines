@@ -38,6 +38,7 @@ from .solvers import (  # noqa: F401
     weed_path_stats,
     weed_sample_stats,
 )
+from .surround import build_surrounds  # noqa: F401
 from .svg_paths import (  # noqa: F401
     keep_fill_to_svg_d,
     qpainterpath_to_svg_d,
@@ -80,4 +81,5 @@ __all__ = [
     'qpainterpath_to_svg_d',
     'keep_fill_to_svg_d',
     'weed_path_to_open_d_list',
+    'build_surrounds',
 ]

@@ -1,25 +1,19 @@
 # Cut subroutines
 
-**Status:** waiting
-
-**Blocker:** The human has not named the subroutines and parameters.
+**Status:** parked
 
 ## Goal
 
-Surround and Conquer stays off the mode list until that naming
-exists.
+This is not the work. Drop it. Do not archive it.
 
 ## Do
 
-Do not invent the subroutines. Do not invent the parameters. Do
-not add the mode.
-
-## Checks
-
-- The subroutines and parameters are the ones the human named.
-- No mode was added before that naming.
+Do not resume this task. Do not copy its old fence into a new
+task. The human has named the surround step. The line that said
+not to add the mode is stale.
 
 ## Note
 
-Preflight is met. This stays waiting until the human names the
-subroutines and parameters. The algorithm stage file has no tasks.
+The blocker is gone. The plan no longer wants this task. It
+stays in `tasks/inactive/` until it is dropped. It is not on
+`priority.md`.

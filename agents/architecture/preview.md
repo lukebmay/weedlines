@@ -58,6 +58,29 @@ lines in the weed-line color, on top of the checkerboard. The
 weed area then also includes the work region that algorithm
 cuts, and that region is checkerboard too.
 
+## Surround preview
+
+When the mode is Surround and Conquer and the figure check
+reports no defect, the window paints each surround in the
+weed-line color, on top of the checkerboard. It asks the
+library again when the surround distance changes, when the
+person swaps, or when the mode becomes Surround and Conquer.
+It paints no surround while a defect exists.
+
+The form shows the surround distance only in this mode. The
+label is "Surround distance". The window keeps the value the
+person set while the window is open. Until they set one, the
+value is the five percent from [`algorithms.md`](./algorithms.md).
+
+The surround on screen is a preview until the person approves
+it. Start Algorithm approves the surround that is showing. That
+approval does not start a solver and does not write a result.
+After approval the window leaves the lines up and disables the
+surround distance. A control labeled "Change surround" clears
+the approval, enables the distance, and the preview follows the
+distance again. Swap, and a change to another mode, also clear
+an approval.
+
 The plugin settings are four controls in the form above the
 preview. They change paint only. They do not change the figure
 check. Their initial values are:

@@ -21,13 +21,13 @@ A waiting plan stays under its rank. The notes say why. Skip it.
 
 | Plan | Notes |
 | --- | --- |
-| *(none yet)* | |
+| [_bugs](plans/_bugs/plan.md) | A curved hole is reported as a self-overlap. |
 
 ## 3 medium
 
 | Plan | Notes |
 | --- | --- |
-| [surround-and-conquer](plans/surround-and-conquer/plan.md) | Waiting. Preflight is in place. The cut subroutines and parameters are not named. |
+| [surround-and-conquer](plans/surround-and-conquer/plan.md) | Surround stage. Conquer is later. |
 
 ## 2 low
 

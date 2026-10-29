@@ -29,4 +29,8 @@ in [`../glossary.md`](../glossary.md).
 | **overlap arrow** | The correction arrow for a separate-figure overlap. [`preview.md`](./preview.md) |
 | **self-overlap arrow** | The correction arrow for a self-overlap. [`preview.md`](./preview.md) |
 | **weed line** | A cut an algorithm emits in the weed area. [`algorithms.md`](./algorithms.md) |
-| **Surround and Conquer** | A weed-line algorithm. Its cut subroutines are not specified. [`algorithms.md`](./algorithms.md) |
+| **Surround and Conquer** | The weed-line algorithm the window opens on. Its first step is the surround. [`algorithms.md`](./algorithms.md) |
+| **surround distance** | The clearance between the subject and a surround. [`algorithms.md`](./algorithms.md) |
+| **surround** | The outer weed line around one cluster. [`algorithms.md`](./algorithms.md) |
+| **cluster** | The subject one surround encloses. [`algorithms.md`](./algorithms.md) |
+| **connector** | The line that joins two smoothed surrounds at a hard angle. [`algorithms.md`](./algorithms.md) |
