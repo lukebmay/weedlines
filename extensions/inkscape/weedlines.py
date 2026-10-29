@@ -660,12 +660,21 @@ def _add_weed_layer(svg, inkex, PathElement, weed_path, layer_label,
         svg, inkex, PathElement, d_list, layer_label, color)
 
 
+_UNCHOSEN_MODE = 'Surround and Conquer'
+
+
+def _mode_on_job(raw):
+    """Mode on the job. Missing or blank is not lowercased."""
+    text = raw.strip() if isinstance(raw, str) else ''
+    return text or _UNCHOSEN_MODE
+
+
 class WeedLinesEffect(object):
     """inkex.EffectExtension body (mixed into a subclass of EffectExtension)."""
 
     def add_arguments(self, pars):
         pars.add_argument('--tab', type=str, default='')
-        pars.add_argument('--mode', type=str, default='frame')
+        pars.add_argument('--mode', type=str, default=_UNCHOSEN_MODE)
         pars.add_argument('--padding', type=float, default=4.0)
         pars.add_argument('--spacing', type=float, default=25.0)
         pars.add_argument('--collar', type=float, default=4.0)
@@ -686,7 +695,7 @@ class WeedLinesEffect(object):
 
         opts = self.options
         defaults = {
-            'mode': (getattr(opts, 'mode', None) or 'frame').strip().lower(),
+            'mode': _mode_on_job(getattr(opts, 'mode', None)),
             'padding': float(getattr(opts, 'padding', 4.0) or 4.0),
             'spacing': float(getattr(opts, 'spacing', 25.0) or 25.0),
             'collar': float(getattr(opts, 'collar', 4.0) or 4.0),
