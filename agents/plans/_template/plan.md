@@ -1,5 +1,7 @@
 # <name>
 
+**Rank:** 3
+
 **Stage:** <stage>
 
 Delete the Stage line when `stages/<stage>.md` does not

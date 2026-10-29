@@ -22,8 +22,9 @@ generated index. `agent-handbook update` refreshes `agents/installed/`
 from the catalog. It does not rewrite `AGENTS.md` and it does not
 restore `agents.py`. Do not hand-edit `agents/installed/`.
 
-The procedure is this file, [`roles/`](roles/), and
-[`plans/README.md`](plans/README.md). There is no `general.md`.
+The procedure is this file, [`roles/`](roles/),
+[`plans/README.md`](plans/README.md), and
+[`versions.md`](versions.md). There is no `general.md`.
 
 ## Finding a rule
 
@@ -83,7 +84,10 @@ you create, file, or prioritize a plan or a task. Copy
 [`plans/_template/`](plans/_template/) when you create a plan.
 
 [`priority.md`](priority.md) lists which plans come next. A plan's
-own `priority.md` lists that plan's tasks.
+own `priority.md` lists that plan's tasks. A plan has a rank.
+The numbers are [`plans/README.md`](plans/README.md). A move
+from one handbook version group to the next is
+[`versions.md`](versions.md).
 
 ## Your role
 

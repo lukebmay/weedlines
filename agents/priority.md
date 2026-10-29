@@ -4,23 +4,39 @@ When to use: The orchestrator is choosing the next plan.
 
 **Owner:** agent. This file is the ordered list of plans.
 
-Work on `master`. The orchestrator, once assigned, works this
-list from the top. How that turn runs is
-[`roles/orchestrator.md`](roles/orchestrator.md). An agent with
-no role does not open this file.
+Work on `master`. The next plan is chosen as
+[`plans/README.md`](plans/README.md) Rank says. How that turn
+runs is [`roles/orchestrator.md`](roles/orchestrator.md). An
+agent with no role does not open this file.
 
-## Next session
+A waiting plan stays under its rank. The notes say why. Skip it.
 
-(none — the open plan is waiting on the human)
-
-## Active
+## 5 top
 
 | Plan | Notes |
 | --- | --- |
-| *(none)* | |
+| *(none yet)* | |
 
-## Waiting (human)
+## 4 high
 
-| Plan | Why |
+| Plan | Notes |
 | --- | --- |
-| [surround-and-conquer](plans/surround-and-conquer/plan.md) | Preflight is in place. The cut subroutines and parameters are not named. |
+| *(none yet)* | |
+
+## 3 medium
+
+| Plan | Notes |
+| --- | --- |
+| [surround-and-conquer](plans/surround-and-conquer/plan.md) | Waiting. Preflight is in place. The cut subroutines and parameters are not named. |
+
+## 2 low
+
+| Plan | Notes |
+| --- | --- |
+| *(none yet)* | |
+
+## 1 optional
+
+| Plan | Notes |
+| --- | --- |
+| *(none yet)* | |

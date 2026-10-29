@@ -46,7 +46,9 @@ the law for the target words.
 | **Approach** | How this plan is built. Do not restate global architecture here. |
 | **Goal** | What this plan makes true. |
 | **Acceptance** | Checks that must hold for the plan (local) or for any work (product file `acceptance.md`). |
-| **priority** | `agents/priority.md`: ordered list of plans. A plan's own `priority.md` lists that plan's tasks. Agent-owned. |
+| **priority** | `agents/priority.md`: the queue of plans, ordered by rank. A plan's own `priority.md` lists that plan's tasks. Agent-owned. |
+| **rank** | A plan's priority number. 5 is top, 4 is high, 3 is medium, 2 is low, and 1 is optional. Who may set each number is `agents/plans/README.md`. |
+| **version group** | A range of tool versions that share one handbook shape. The ranges and the migration from one group to the next are `agents/versions.md`. |
 | **orchestrator** | The role Orchestrate assigns. Speaking does not assign it. It reads the whole architecture. It does not choose the solution. It accepts a delegate's unit of work, or it says why and sends that agent back or assigns another delegate. The procedure is `agents/roles/orchestrator.md`. |
 | **delegate** | An agent the orchestrator starts. The prompt says so. It reads the files the brief names. It does not start other agents. |
 | **role** | The kind of work. The prompt assigns it. A file cannot assign a role to the agent who merely opened it. The roles with a process are orchestrator, delegate, developer, code reviewer, architect, and maid. |

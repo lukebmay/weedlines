@@ -30,11 +30,50 @@ say-so.
 `plans/<name>/priority.md` is the order of that plan's active
 tasks. It is a list of paths. It is not a diary.
 
-[`../priority.md`](../priority.md) is the order of plans. It is not
+[`../priority.md`](../priority.md) is the queue of plans. It is not
 the task list. A directory that file does not list is not the
-queue. A "do not" there applies to the plan it names.
+queue. A "do not" there applies to the plan it names. The order
+is [Rank](#rank).
 
 A plan has no status line. Do not put `Status:` on `plan.md`.
+It does have a rank line, `**Rank:** N`.
+
+## Rank
+
+Every plan has a rank. The queue lists higher ranks first.
+Within one rank, the order in [`../priority.md`](../priority.md)
+is the order of work. A plan with no rank line is 3 until a
+ranking sets it.
+
+| Rank | Name |
+| --- | --- |
+| 5 | top |
+| 4 | high |
+| 3 | medium |
+| 2 | low |
+| 1 | optional |
+
+An agent who is asked to prioritize chooses 3 or 4.
+
+Choose 2 or 1 only when the human specifically says that rank,
+or specifically says low or optional.
+
+Choose 5 when the human says that rank, or says top. Also
+choose 5 when the human is telling you, in this chat, to fix
+something or to plan a fix, and is not asking you to file that
+work into the normal queue.
+
+Before a rank 5 plan starts, read the other plans. If a task
+already in one of them has to finish first so this plan can be
+done correctly and efficiently, name that task on the rank 5
+plan. Do that task first. The other plan keeps its rank. Do
+not start the rank 5 plan until that task is done, or the
+human says to go ahead without it.
+
+A waiting plan stays under its rank. The notes say why. The
+orchestrator skips it and takes the next plan. When the queue
+is still one list, the next plan is the highest rank that is
+not waiting. Within one rank, the list order stands.
 
 ## Perpetual plans
 

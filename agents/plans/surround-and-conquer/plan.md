@@ -1,5 +1,7 @@
 # Surround and Conquer
 
+**Rank:** 3
+
 **Stage:** preflight
 
 ## Goal

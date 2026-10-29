@@ -11,13 +11,12 @@ The user message that assigned you chooses the work.
 - "This task": do the task named in that message. Do not start
   the work queue.
 - "The prioritized work", or `/orchestrate` with no task named:
-  read [`../priority.md`](../priority.md) from the top and take
-  the first plan that is not waiting on the human. A "do not" in
-  that file applies to the plan it names. Open that plan's
-  `plan.md` and its `priority.md`. The next task is the first
-  path in that `priority.md`, and that path is under
-  `tasks/active/`. The shape is
-  [`../plans/README.md`](../plans/README.md).
+  read [`../priority.md`](../priority.md) and take the next plan
+  as [`../plans/README.md`](../plans/README.md) Rank says. A
+  "do not" in that file applies to the plan it names. Open that
+  plan's `plan.md` and its `priority.md`. The next task is the
+  first path in that `priority.md`, and that path is under
+  `tasks/active/`.
 
 Read [`../architecture.md`](../architecture.md) and every part
 file under [`../architecture/`](../architecture/). That is how
@@ -61,6 +60,8 @@ finder's note alone.
 A verified bug becomes a task under `plans/_bugs/`. Create that
 perpetual plan on the first one. Verified debt becomes its own plan.
 List the plan on [`../priority.md`](../priority.md) in the same turn.
+Give it a rank. The ranks are
+[`../plans/README.md`](../plans/README.md).
 Do not drop it because the current task did not own it, because it was
 already failing, or because it is fixture debt.
 
