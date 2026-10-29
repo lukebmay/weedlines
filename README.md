@@ -16,7 +16,7 @@ the algorithms are solid, then optionally integrate back into
 | `grid` | Axis-aligned grid over waste |
 | `island-hop` | Peel-frame + ranked seals / island merge (needs `pyclipper`) |
 
-Default mode is `frame`. Do not treat `island-hop` as production-default
+Default mode is Surround and Conquer. Do not treat `island-hop` as production-default
 until picture QA is accepted.
 
 ## Install

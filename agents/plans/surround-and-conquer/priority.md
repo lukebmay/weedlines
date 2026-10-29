@@ -9,5 +9,3 @@ the reason only when the order would otherwise be a guess.
    value the window shows
 1. [user-surround](tasks/active/user-surround/task.md) — the
    steps name those window controls
-1. [readme-default](tasks/active/readme-default/task.md) — the
-   default sentence, after the job names that mode
