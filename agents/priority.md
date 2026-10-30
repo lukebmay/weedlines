@@ -27,7 +27,7 @@ A waiting plan stays under its rank. The notes say why. Skip it.
 
 | Plan | Notes |
 | --- | --- |
-| [surround-and-conquer](plans/surround-and-conquer/plan.md) | Surround stage. Conquer is later. |
+| [surround-and-conquer](plans/surround-and-conquer/plan.md) | Waiting. The surround is in. Conquer starts when the human asks. |
 
 ## 2 low
 
