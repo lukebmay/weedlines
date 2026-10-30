@@ -286,11 +286,14 @@ def test_clear_design_enables_start_for_frame_grid_and_island_hop():
         box = _mode_box(dialog)
         labels = [box.itemText(index) for index in range(box.count())]
         data = [box.itemData(index) for index in range(box.count())]
-        assert data == ['frame', 'grid', 'island-hop']
-        for label in labels:
-            lowered = label.lower()
-            assert 'surround' not in lowered
-            assert 'conquer' not in lowered
+        assert labels == [
+            'Surround and Conquer',
+            'Frame (box)',
+            'Grid (clipped)',
+            'Island hop',
+        ]
+        assert data == [
+            'Surround and Conquer', 'frame', 'grid', 'island-hop']
         start = _button(dialog, 'start')
         for index in range(box.count()):
             box.setCurrentIndex(index)

@@ -91,6 +91,16 @@ def _button(dialog, name):
     return widget
 
 
+def _set_mode(dialog, mode):
+    box = dialog.findChild(QtWidgets.QComboBox, 'mode')
+    assert box is not None
+    for index in range(box.count()):
+        if box.itemData(index) == mode:
+            box.setCurrentIndex(index)
+            return box
+    raise AssertionError('missing mode %s' % mode)
+
+
 def _edit(dialog, name):
     widget = dialog.findChild(QtWidgets.QLineEdit, name)
     assert widget is not None, name
@@ -356,6 +366,7 @@ def test_weed_lines_use_the_weed_line_color_on_the_work_region():
         assert pad is not None
         pad.setValue(4.0)
         assert _button(dialog, 'start').isEnabled()
+        _set_mode(dialog, 'frame')
         _button(dialog, 'start').click()
 
         def sample():
@@ -483,6 +494,7 @@ def test_swap_and_color_controls_change_paint_only():
 
         assert at(solid) == '#112233'
         assert start.isEnabled()
+        _set_mode(dialog, 'frame')
         pad = dialog.findChild(QtWidgets.QDoubleSpinBox, 'padding')
         assert pad is not None
         pad.setValue(4.0)

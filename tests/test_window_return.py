@@ -107,6 +107,15 @@ def _mode_box(dialog):
     return widget
 
 
+def _set_mode(dialog, mode):
+    box = _mode_box(dialog)
+    for index in range(box.count()):
+        if box.itemData(index) == mode:
+            box.setCurrentIndex(index)
+            return box
+    raise AssertionError('missing mode %s' % mode)
+
+
 def _rect(dialog, widget):
     origin = widget.mapTo(dialog, QtCore.QPoint(0, 0))
     return QtCore.QRect(origin, widget.size())
@@ -295,7 +304,7 @@ def test_clear_check_has_an_empty_line_and_start_works(monkeypatch):
         for index in range(box.count()):
             box.setCurrentIndex(index)
             assert start.isEnabled() is True
-        box.setCurrentIndex(0)
+        _set_mode(dialog, 'frame')
         apply_btn = _button(dialog, 'apply')
         start.click()
         ticks = {'n': 0}
