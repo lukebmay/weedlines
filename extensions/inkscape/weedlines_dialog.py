@@ -227,7 +227,10 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     *quit_app*: when this call created the QApplication, quit it on return
     (default). Detached host passes False so it can show a follow-up box.
 
-    *ready*, when given, is called with the dialog once the window is shown.
+    *ready*, when given, is called with the dialog once the window is
+    shown. The figure check, the subject and weed area, any arrow
+    paths, and the surround preview finish after the window is visible
+    and before that call.
     """
     from weedlib import build_surrounds, generate_weeds, padded_work_rect
     from weedlib.arrows import build_arrow_paths
@@ -240,10 +243,9 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
 
     QtCore, QtGui, QtWidgets = load_widgets()
     defaults = dict(defaults or {})
-    check = classify_figures(records)
-    blocked = bool(check.defects)
-    opening_bounds = subject_weed_regions(check.figures, swap=False).bounds
-    initial_distance = _surround_distance(opening_bounds)
+    # Filled once the window is visible, before ready.
+    check = None
+    blocked = True
 
     app = QtWidgets.QApplication.instance()
     owns_app = False
@@ -280,8 +282,8 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     distance_spin.setObjectName('surround-distance')
     distance_spin.setDecimals(4)
     distance_spin.setSingleStep(0.1)
-    distance_spin.setRange(0.0, max(1000000.0, initial_distance))
-    distance_spin.setValue(initial_distance)
+    distance_spin.setRange(0.0, 1000000.0)
+    distance_spin.setValue(0.0)
     change_btn = QtWidgets.QPushButton('Change surround')
     change_btn.setObjectName('change-surround')
     pad_spin = QtWidgets.QDoubleSpinBox()
@@ -331,6 +333,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     btn_row = QtWidgets.QHBoxLayout()
     start_btn = QtWidgets.QPushButton('Start Algorithm')
     start_btn.setObjectName('start')
+    start_btn.setEnabled(False)
     pause_btn = QtWidgets.QPushButton('Pause')
     pause_btn.hide()
     cancel_btn = QtWidgets.QPushButton('Cancel…')
@@ -380,18 +383,11 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     return_line.setObjectName('return-line')
     return_line.setWordWrap(True)
     return_line.setTextFormat(QtCore.Qt.PlainText)
-    return_line.setText(_defect_line(check.defects))
+    return_line.setText('')
     return_btn = QtWidgets.QPushButton('Return to Inkscape')
     return_btn.setObjectName('return-inkscape')
-    arrows_btn = None
-    if blocked:
-        arrows_btn = QtWidgets.QPushButton(
-            'Return to Inkscape with correction arrows')
-        arrows_btn.setObjectName('return-arrows')
     return_row = QtWidgets.QHBoxLayout()
     return_row.addWidget(return_btn)
-    if arrows_btn is not None:
-        return_row.addWidget(arrows_btn)
     return_row.addStretch(1)
     root.addWidget(return_line)
     root.addLayout(return_row)
@@ -417,6 +413,8 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         'thread': None,
         'surround_approved': False,
         'surround_paths': [],
+        'regions_swap': None,
+        'asked': False,
     }
     CheckerItem = _checker_type(QtWidgets, QtGui, QtCore)
 
@@ -490,13 +488,22 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         item.setZValue(z_value)
         state['preview_items'].append(item)
 
+    def _ensure_regions():
+        # One subject_weed_regions per swap. The open asks share it.
+        if (state['regions'] is not None
+                and state['regions_swap'] == state['swapped']):
+            return state['regions']
+        regions = subject_weed_regions(
+            check.figures, swap=state['swapped'])
+        state['regions'] = regions
+        state['regions_swap'] = state['swapped']
+        return regions
+
     def refresh_preview():
         for item in state['preview_items']:
             scene.removeItem(item)
         state['preview_items'] = []
-        regions = subject_weed_regions(
-            check.figures, swap=state['swapped'])
-        state['regions'] = regions
+        regions = _ensure_regions()
         light = light_edit.property('color')
         dark = dark_edit.property('color')
         weed_color = weed_edit.property('color')
@@ -586,8 +593,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         if blocked or not _in_surround():
             state['surround_paths'] = []
             return
-        regions = subject_weed_regions(
-            check.figures, swap=state['swapped'])
+        regions = _ensure_regions()
         distance = float(distance_spin.value())
         if distance < 0.0:
             distance = 0.0
@@ -880,8 +886,6 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     apply_btn.clicked.connect(on_apply)
     close_btn.clicked.connect(on_close)
     return_btn.clicked.connect(on_return)
-    if arrows_btn is not None:
-        arrows_btn.clicked.connect(on_return_arrows)
     swap_btn.clicked.connect(_on_swap)
     mode_box.currentIndexChanged.connect(_on_mode)
     distance_spin.valueChanged.connect(_on_distance)
@@ -901,16 +905,40 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     root.addWidget(hint)
 
     _show_surround_controls()
-    _ask_surrounds()
-    refresh_preview()
-    set_controls(False)
 
     def _shown():
-        _fit()
-        if ready is None:
+        # exec_ has shown the dialog. Ask once, then ready.
+        nonlocal check, blocked
+        if state['asked']:
             return
+        state['asked'] = True
         try:
-            ready(dialog)
+            check = classify_figures(records)
+            blocked = bool(check.defects)
+            return_line.setText(_defect_line(check.defects))
+            if blocked:
+                arrows_btn = QtWidgets.QPushButton(
+                    'Return to Inkscape with correction arrows')
+                arrows_btn.setObjectName('return-arrows')
+                return_row.insertWidget(1, arrows_btn)
+                arrows_btn.clicked.connect(on_return_arrows)
+                # setParent from the layout hides a widget added after show.
+                arrows_btn.show()
+            regions = _ensure_regions()
+            initial_distance = _surround_distance(regions.bounds)
+            distance_spin.blockSignals(True)
+            distance_spin.setRange(
+                0.0, max(1000000.0, initial_distance))
+            distance_spin.setValue(initial_distance)
+            distance_spin.blockSignals(False)
+            _ask_surrounds()
+            refresh_preview()
+            set_controls(False)
+            root.invalidate()
+            root.activate()
+            _fit()
+            if ready is not None:
+                ready(dialog)
         except Exception as exc:
             state['ready_error'] = exc
             dialog.reject()

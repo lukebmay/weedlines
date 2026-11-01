@@ -1,6 +1,6 @@
 # Surround and Conquer
 
-**Rank:** 3
+**Rank:** 4
 
 **Stage:** algorithm
 
@@ -31,3 +31,5 @@ Conquer is a later stage. Frame, grid, and island-hop still cut.
 - Frame, grid, and island-hop still cut a clean design.
 - Geometry tests do not need Inkscape. Window tests run
   offscreen when Qt is available.
+- The window is on screen before the figure check and before
+  the surround build. The host still writes the job first.

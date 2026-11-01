@@ -33,7 +33,9 @@ closed table in this file.
 
 ## Active
 
-None.
+| Fight | Read as | Status | Plan |
+| --- | --- | --- | --- |
+| A clear check paints the surround before the person approves it, and a crossing is a smoothed corner plus one connector. The asked run waits for the person before the surround, unions every overlap, smooths that whole outline, and joins surrounds that miss by a small gap. The gap length was not given. | [`architecture/algorithms.md`](architecture/algorithms.md), [`architecture/preview.md`](architecture/preview.md) | open | [surround-and-conquer](plans/surround-and-conquer/plan.md) |
 
 ## Leftovers
 
