@@ -19,7 +19,8 @@ start a multi-session rewrite. Stop and tell the orchestrator.
 
 A debt or a bug that is not this task is reported to the orchestrator.
 Name the failure, the file, and the check. It is not fixed in this task,
-and it is not left only in the note.
+and it is not left only in the note. The orchestrator files a bug from
+that report before the work ends.
 
 Use the project's existing API for a job. Do not hand-roll a
 parallel path. If that API is insufficient, extend it and convert

@@ -80,8 +80,9 @@ not waiting. Within one rank, the list order stands.
 A directory whose name starts with `_` stays open. It is not
 archived. `_bugs` and `_inbox` are part of the shape.
 
-- `_bugs` holds bug reports and fixes. A verified bug is enough
-  to create `_bugs`. The first one creates that perpetual plan.
+- `_bugs` holds bug reports and fixes. A reported bug is enough
+  to create `_bugs`. The first step verifies it. An unconfirmed
+  report is closed. The first one creates that perpetual plan.
   The plan does not replace the issues row. An issues row still
   records the bug ([`../issues.md`](../issues.md)).
 - `_inbox` holds small work that was asked for and does not need

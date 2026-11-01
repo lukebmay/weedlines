@@ -53,20 +53,28 @@ first. Do not do that survey yourself.
 
 ## Debt and bugs
 
-When a delegate reports a debt or a bug, assign a different agent to
+When a delegate reports a bug, file it in that turn. If the work
+is ending, file it before you stop. An issues row records it, and
+a task under `plans/_bugs/` is the plan. Create that perpetual
+plan on the first one. List it on
+[`../priority.md`](../priority.md) in the same turn. Give it a
+rank. The ranks are [`../plans/README.md`](../plans/README.md).
+The first step is to investigate and verify. A different agent
+does that. Do not verify it yourself. If it cannot be confirmed,
+close the task and the issue row. If it is confirmed, that task
+continues to the fix. Do not drop it because the current task did
+not own it, because it was already failing, or because it is
+fixture debt. The plan does not replace the issues row
+([`../issues.md`](../issues.md)).
+
+When a delegate reports a debt, assign a different agent to
 verify it. Do not verify it yourself, and do not file it from the
-finder's note alone.
-
-A verified bug becomes a task under `plans/_bugs/`. Create that
-perpetual plan on the first one. Verified debt becomes its own plan.
-List the plan on [`../priority.md`](../priority.md) in the same turn.
+finder's note alone. Verified debt becomes its own plan. List
+the plan on [`../priority.md`](../priority.md) in the same turn.
 Give it a rank. The ranks are
-[`../plans/README.md`](../plans/README.md).
-Do not drop it because the current task did not own it, because it was
-already failing, or because it is fixture debt.
-
-An issues row still records the bug. The plan does not replace that
-row ([`../issues.md`](../issues.md)).
+[`../plans/README.md`](../plans/README.md). Do not drop it
+because the current task did not own it, because it was already
+failing, or because it is fixture debt.
 
 ## Delegating
 

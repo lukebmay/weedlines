@@ -14,8 +14,9 @@ yourself unless the brief tells you to fix a named defect.
 When a review finds a debt or a bug outside the change, make the
 same report. Name the failure, the file, and the check, and send
 them to the orchestrator. It is not fixed in this review, and it
-is not left only in the note. A preference with no broken check
-stays a note.
+is not left only in the note. The orchestrator files a bug from
+that report before the work ends. A preference with no broken
+check stays a note.
 
 Re-run the named checks. If the brief names a product check and
 that check has no test, say so.
