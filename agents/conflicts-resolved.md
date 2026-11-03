@@ -41,3 +41,4 @@ old decision as it was. Append a new live contradiction to
 | Leftover | Decision then | Plan |
 | --- | --- | --- |
 | Active: surround start and overlap | The asked run was picked. The guide waits for the person, unions overlaps, smooths the whole outline, and joins within the join gap. | surround-and-conquer |
+| The window paints a surround before the person starts, and a crossing is still a connector. | The window waits for Start, and a crossing is the smoothed union. | surround-and-conquer |

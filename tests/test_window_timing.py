@@ -155,10 +155,10 @@ def _watch(monkeypatch):
         arrows.append(batch)
         return batch
 
-    def surrounds_wrap(subject, distance):
+    def surrounds_wrap(subject, distance, join_gap=0.0):
         see('surrounds')
-        paths = real_surrounds(subject, distance)
-        surrounds.append((float(distance), paths))
+        paths = real_surrounds(subject, distance, join_gap)
+        surrounds.append((float(distance), float(join_gap), paths))
         return paths
 
     def refuse_solver(*_args, **_kwargs):
@@ -182,22 +182,43 @@ def _assert_same_dialog(events, dialog):
         assert seen is dialog
 
 
-def test_clear_surround_asks_once_after_the_window_is_visible(monkeypatch):
+def test_clear_surround_waits_until_start(monkeypatch):
     events, swaps, surrounds, arrows = _watch(monkeypatch)
 
     def drive(dialog):
         assert dialog.isVisible() is True
-        assert _names(events) == ['classify', 'subject', 'surrounds']
+        assert _names(events) == ['classify', 'subject']
         _assert_same_dialog(events, dialog)
         assert swaps == [False]
         assert arrows == []
-        assert len(surrounds) == 1
-        distance, paths = surrounds[0]
+        assert surrounds == []
+        for item in _path_items(dialog):
+            assert _pen_hex(item) != _WEED
         spin = dialog.findChild(
             QtWidgets.QDoubleSpinBox, 'surround-distance')
-        assert spin is not None
+        join = dialog.findChild(QtWidgets.QDoubleSpinBox, 'join-gap')
+        assert spin is not None and join is not None
+        assert spin.value() == pytest.approx(2.5)
+        assert join.value() == pytest.approx(6.35)
+        start = dialog.findChild(QtWidgets.QPushButton, 'start')
+        assert start is not None and start.isEnabled() is True
+        line = dialog.findChild(QtWidgets.QLabel, 'return-line')
+        assert line is not None and line.text() == ''
+        correction = [
+            button for button in dialog.findChildren(QtWidgets.QPushButton)
+            if button.text() == _ARROW
+        ]
+        assert correction == []
+        start.click()
+        assert _names(events) == ['classify', 'subject', 'surrounds']
+        _assert_same_dialog(events, dialog)
+        assert dialog.isVisible() is True
+        assert len(surrounds) == 1
+        distance, join_gap, paths = surrounds[0]
         assert distance == pytest.approx(spin.value())
+        assert join_gap == pytest.approx(join.value())
         assert distance == pytest.approx(2.5)
+        assert join_gap == pytest.approx(6.35)
         assert paths
         items = _path_items(dialog)
         for path in paths:
@@ -208,20 +229,8 @@ def test_clear_surround_asks_once_after_the_window_is_visible(monkeypatch):
             assert len(matched) == 1
             assert _pen_hex(matched[0]) == _WEED
             assert _brush_hex(matched[0]) is None
-        start = dialog.findChild(QtWidgets.QPushButton, 'start')
-        assert start is not None and start.isEnabled() is True
-        asked = list(events)
-        start.click()
-        assert events == asked
-        assert dialog.isVisible() is True
-        assert spin.isEnabled() is False
-        line = dialog.findChild(QtWidgets.QLabel, 'return-line')
-        assert line is not None and line.text() == ''
-        correction = [
-            button for button in dialog.findChildren(QtWidgets.QPushButton)
-            if button.text() == _ARROW
-        ]
-        assert correction == []
+        assert spin.isEnabled() is True
+        assert join.isEnabled() is True
         dialog.reject()
 
     _run(_CLEAR, drive)

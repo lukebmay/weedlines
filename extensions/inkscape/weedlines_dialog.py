@@ -30,6 +30,8 @@ _IMPORT_SENTENCE = (
     'Run Extensions → Weedlines → Import last result to place the arrows.')
 _SURROUND_MODE = 'Surround and Conquer'
 _CUT_MODES = ('frame', 'grid', 'island-hop')
+# Quarter-inch baseline, passed through as document user units.
+_JOIN_GAP = 6.35
 
 
 def _defect_line(defects):
@@ -219,7 +221,8 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     *height*, and *view_box* are the document size. *defaults* may
     include mode, padding, spacing, collar, layer_name. Missing or
     blank mode opens on Surround and Conquer. Start in that mode
-    approves the surround preview and does not run a solver.
+    asks for the surround and paints it. It does not run a solver.
+    Until that start, the window does not ask for a surround.
 
     *platform_lines* is an optional deque fed by ``NativeStdioCapture``
     (Qt/OS stderr). Those lines are shown in the log and never reach Inkscape.
@@ -228,9 +231,9 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     (default). Detached host passes False so it can show a follow-up box.
 
     *ready*, when given, is called with the dialog once the window is
-    shown. The figure check, the subject and weed area, any arrow
-    paths, and the surround preview finish after the window is visible
-    and before that call.
+    shown. The figure check, the subject and weed area, and any arrow
+    paths finish after the window is visible and before that call.
+    The surround is not asked until Start Algorithm.
     """
     from weedlib import build_surrounds, generate_weeds, padded_work_rect
     from weedlib.arrows import build_arrow_paths
@@ -284,6 +287,13 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     distance_spin.setSingleStep(0.1)
     distance_spin.setRange(0.0, 1000000.0)
     distance_spin.setValue(0.0)
+    join_label = QtWidgets.QLabel('Join gap (mm)')
+    join_spin = QtWidgets.QDoubleSpinBox()
+    join_spin.setObjectName('join-gap')
+    join_spin.setDecimals(4)
+    join_spin.setSingleStep(0.1)
+    join_spin.setRange(0.0, 1000000.0)
+    join_spin.setValue(_JOIN_GAP)
     change_btn = QtWidgets.QPushButton('Change surround')
     change_btn.setObjectName('change-surround')
     pad_spin = QtWidgets.QDoubleSpinBox()
@@ -303,6 +313,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     layer_edit = QtWidgets.QLineEdit(str(defaults.get('layer_name', 'Weed lines')))
     form.addRow('Mode', mode_box)
     form.addRow(distance_label, distance_spin)
+    form.addRow(join_label, join_spin)
     form.addRow(change_btn)
     form.addRow('Padding (mm)', pad_spin)
     form.addRow('Grid spacing (mm)', space_spin)
@@ -411,7 +422,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         'solved_pad': None,
         'accepted': False,
         'thread': None,
-        'surround_approved': False,
+        'surround_started': False,
         'surround_paths': [],
         'regions_swap': None,
         'asked': False,
@@ -472,7 +483,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         weed_edit.setEnabled(not busy)
         subject_edit.setEnabled(not busy)
         apply_btn.setEnabled((not busy) and state['result'] is not None)
-        _arm_distance()
+        _arm_surround_controls()
 
     def _fit():
         rect = scene.itemsBoundingRect()
@@ -555,7 +566,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
                 head.setZValue(30)
                 state['preview_items'].append(head)
         state['arrows'] = arrow_paths
-        if not blocked and _in_surround():
+        if not blocked and state['surround_started'] and _in_surround():
             surround_pen = _line_pen(QtGui, QtCore, weed_color)
             bare = QtGui.QBrush(QtCore.Qt.NoBrush)
             for path in state['surround_paths']:
@@ -582,31 +593,38 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         show = _in_surround()
         distance_label.setVisible(show)
         distance_spin.setVisible(show)
+        join_label.setVisible(show)
+        join_spin.setVisible(show)
         change_btn.setVisible(show)
 
-    def _arm_distance():
-        distance_spin.setEnabled(
-            (not state['busy']) and (not state['surround_approved']))
-        change_btn.setEnabled(not state['busy'])
+    def _arm_surround_controls():
+        live = not state['busy']
+        distance_spin.setEnabled(live)
+        join_spin.setEnabled(live)
+        change_btn.setEnabled(live)
 
     def _ask_surrounds():
-        if blocked or not _in_surround():
-            state['surround_paths'] = []
+        # Callers set surround_started. Setting a spin is not an ask.
+        if blocked or not state['surround_started'] or not _in_surround():
             return
         regions = _ensure_regions()
         distance = float(distance_spin.value())
+        join_gap = float(join_spin.value())
         if distance < 0.0:
             distance = 0.0
+        if join_gap < 0.0:
+            join_gap = 0.0
         state['surround_paths'] = list(
-            build_surrounds(regions.subject, distance))
+            build_surrounds(regions.subject, distance, join_gap))
 
     def on_start():
         if state['busy'] or blocked:
             return
         if _in_surround():
-            # Approval keeps the lines. It does not run a solver.
-            state['surround_approved'] = True
-            _arm_distance()
+            # Start asks for the surround. It does not run a solver.
+            state['surround_started'] = True
+            _ask_surrounds()
+            refresh_preview()
             return
         clear_weed_items()
         state['work'] = None
@@ -842,32 +860,30 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         if state['busy']:
             return
         state['swapped'] = not state['swapped']
-        state['surround_approved'] = False
-        _arm_distance()
-        _ask_surrounds()
+        if state['surround_started'] and not blocked and _in_surround():
+            _ask_surrounds()
         refresh_preview()
 
     def _on_mode(_index=None):
         if state['busy']:
             return
         had_surrounds = bool(state['surround_paths'])
-        state['surround_approved'] = False
         _show_surround_controls()
-        _arm_distance()
-        show = _in_surround()
-        if show and not blocked:
+        _arm_surround_controls()
+        if state['surround_started'] and not blocked and _in_surround():
             _ask_surrounds()
-        else:
-            state['surround_paths'] = []
+            refresh_preview()
+            return
+        state['surround_paths'] = []
         # Cut-mode changes do not rebuild arrows or the checkerboard.
-        if had_surrounds or (show and not blocked):
+        if had_surrounds:
             refresh_preview()
 
-    def _on_distance(value=None):
+    def _on_surround_length(value=None):
         if isinstance(value, str):
             return
-        if (state['busy'] or state['surround_approved']
-                or blocked or not _in_surround()):
+        if (state['busy'] or blocked or not state['surround_started']
+                or not _in_surround()):
             return
         _ask_surrounds()
         refresh_preview()
@@ -875,9 +891,9 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     def _on_change_surround():
         if state['busy'] or not _in_surround():
             return
-        state['surround_approved'] = False
-        _arm_distance()
-        _ask_surrounds()
+        state['surround_started'] = False
+        state['surround_paths'] = []
+        _arm_surround_controls()
         refresh_preview()
 
     start_btn.clicked.connect(on_start)
@@ -888,7 +904,8 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     return_btn.clicked.connect(on_return)
     swap_btn.clicked.connect(_on_swap)
     mode_box.currentIndexChanged.connect(_on_mode)
-    distance_spin.valueChanged.connect(_on_distance)
+    distance_spin.valueChanged.connect(_on_surround_length)
+    join_spin.valueChanged.connect(_on_surround_length)
     change_btn.clicked.connect(_on_change_surround)
     for _edit in (light_edit, dark_edit, weed_edit, subject_edit):
         _edit.editingFinished.connect(
@@ -907,7 +924,8 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     _show_surround_controls()
 
     def _shown():
-        # exec_ has shown the dialog. Ask once, then ready.
+        # exec_ has shown the dialog. Classify, then ready.
+        # Setting the spins here is not a surround ask.
         nonlocal check, blocked
         if state['asked']:
             return
@@ -931,7 +949,6 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
                 0.0, max(1000000.0, initial_distance))
             distance_spin.setValue(initial_distance)
             distance_spin.blockSignals(False)
-            _ask_surrounds()
             refresh_preview()
             set_controls(False)
             root.invalidate()

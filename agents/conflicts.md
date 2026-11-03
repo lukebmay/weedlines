@@ -37,6 +37,4 @@ None.
 
 ## Leftovers
 
-| Leftover | Read as | Status | Plan |
-| --- | --- | --- | --- |
-| The window paints a surround before the person starts, and a crossing is still a connector. | [`architecture/algorithms.md`](architecture/algorithms.md), [`architecture/preview.md`](architecture/preview.md) | resolving | [surround-and-conquer](plans/surround-and-conquer/plan.md) |
+None.

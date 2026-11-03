@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Window surround: preview, distance, and approval. No Inkscape."""
+"""Window surround: preview, distance, and join gap. No Inkscape."""
 from __future__ import division
 
 import os
@@ -80,6 +80,19 @@ def _distance_spin(dialog):
     return widget
 
 
+def _join_label(dialog):
+    found = [
+        label for label in dialog.findChildren(QtWidgets.QLabel)
+        if label.text() == 'Join gap (mm)'
+    ]
+    assert len(found) == 1
+    return found[0]
+
+
+def _join_spin(dialog):
+    return _named_spin(dialog, 'join-gap')
+
+
 def _named_spin(dialog, name):
     widget = dialog.findChild(QtWidgets.QDoubleSpinBox, name)
     assert widget is not None, name
@@ -90,7 +103,7 @@ def _collar(dialog):
     spins = [
         spin for spin in dialog.findChildren(QtWidgets.QDoubleSpinBox)
         if spin.objectName() not in (
-            'padding', 'spacing', 'surround-distance')
+            'padding', 'spacing', 'surround-distance', 'join-gap')
     ]
     assert len(spins) == 1
     return spins[0]
@@ -223,9 +236,10 @@ def _watch(monkeypatch):
     real = weedlib.build_surrounds
     calls = []
 
-    def wrapped(subject, distance):
-        paths = real(subject, distance)
-        calls.append((subject, float(distance), paths))
+    def wrapped(subject, distance, join_gap=0.0):
+        paths = real(subject, distance, join_gap)
+        calls.append((
+            subject, float(distance), float(join_gap), paths))
         return paths
 
     monkeypatch.setattr(weedlib, 'build_surrounds', wrapped)
@@ -263,7 +277,15 @@ def test_window_opens_on_the_named_mode(defaults, expected):
 
 
 def test_clear_design_strokes_surrounds_and_follows_distance(monkeypatch):
+    import weedlib
     calls = _watch(monkeypatch)
+    cuts = []
+
+    def refuse(*_args, **_kwargs):
+        cuts.append('cut')
+        raise AssertionError('generate_weeds ran')
+
+    monkeypatch.setattr(weedlib, 'generate_weeds', refuse)
     subject = _regions(_CLEAR, swap=False).subject
     view_rect = QtCore.QRectF(-4, -4, 40, 40)
     stroke = (17.0, 7.5)
@@ -271,54 +293,94 @@ def test_clear_design_strokes_surrounds_and_follows_distance(monkeypatch):
     letter = (17.0, 20.0)
 
     def drive(dialog):
-        assert calls
-        assert _same_path(calls[0][0], subject)
-        assert calls[0][1] == pytest.approx(_FIVE_PERCENT)
+        assert calls == []
         spin = _distance_spin(dialog)
+        join = _join_spin(dialog)
         label = _distance_label(dialog)
+        join_label = _join_label(dialog)
         change = _button(dialog, 'change-surround')
         assert label.text() == 'Surround distance'
+        assert join_label.text() == 'Join gap (mm)'
         assert label.isVisible() and spin.isVisible() and change.isVisible()
+        assert join_label.isVisible() and join.isVisible()
         assert change.text() == 'Change surround'
         assert spin.value() == pytest.approx(_FIVE_PERCENT)
         assert spin.minimum() == 0.0
         assert spin.value() != pytest.approx(0.05 * 80.0)
-        _assert_strokes(dialog, calls[-1][2], _WEED)
+        assert join.value() == pytest.approx(6.35)
+        assert join.minimum() == 0.0
+        assert _WEED not in _pen_colors(dialog)
+
+        spin.setValue(6.0)
+        join.setValue(3.0)
+        assert calls == []
+        assert _WEED not in _pen_colors(dialog)
+        spin.setValue(_FIVE_PERCENT)
+        join.setValue(6.35)
+        _button(dialog, 'swap').click()
+        _button(dialog, 'swap').click()
+        assert calls == []
+        assert _WEED not in _pen_colors(dialog)
+
+        for mode in ('frame', 'grid', 'island-hop'):
+            _set_mode(dialog, mode)
+            assert calls == []
+            assert label.isVisible() is False
+            assert spin.isVisible() is False
+            assert join_label.isVisible() is False
+            assert join.isVisible() is False
+            assert change.isVisible() is False
+            assert spin.value() == pytest.approx(_FIVE_PERCENT)
+            assert join.value() == pytest.approx(6.35)
+        _set_mode(dialog, _SURROUND)
+        assert calls == []
+        assert label.isVisible() and join_label.isVisible() and change.isVisible()
+
+        _named_spin(dialog, 'padding').setValue(9.0)
+        _named_spin(dialog, 'spacing').setValue(12.0)
+        _collar(dialog).setValue(1.5)
+        assert calls == []
+
+        _button(dialog, 'start').click()
+        assert len(calls) == 1
+        assert _same_path(calls[0][0], subject)
+        assert calls[0][1] == pytest.approx(_FIVE_PERCENT)
+        assert calls[0][2] == pytest.approx(6.35)
+        assert spin.isEnabled() is True
+        assert join.isEnabled() is True
+        assert _button(dialog, 'apply').isEnabled() is False
+        _assert_strokes(dialog, calls[-1][3], _WEED)
         view = _view(dialog)
         assert _at(view, view_rect, stroke[0], stroke[1]) == _WEED
         assert _at(view, view_rect, band[0], band[1]) in (_LIGHT, _DARK)
         assert _at(view, view_rect, letter[0], letter[1]) == '#112233'
 
         asked = len(calls)
-        paths = calls[-1][2]
-        _named_spin(dialog, 'padding').setValue(9.0)
-        _named_spin(dialog, 'spacing').setValue(12.0)
-        _collar(dialog).setValue(1.5)
+        paths = calls[-1][3]
+        _named_spin(dialog, 'padding').setValue(8.0)
+        _named_spin(dialog, 'spacing').setValue(11.0)
+        _collar(dialog).setValue(2.0)
         assert len(calls) == asked
         _assert_strokes(dialog, paths, _WEED)
 
         spin.setValue(6.0)
-        assert len(calls) > asked
+        assert len(calls) == asked + 1
         assert calls[-1][1] == pytest.approx(6.0)
+        assert calls[-1][2] == pytest.approx(6.35)
         assert spin.value() == pytest.approx(6.0)
-        _assert_strokes(dialog, calls[-1][2], _WEED)
-        assert not _same_path(calls[-1][2][0], paths[0])
+        _assert_strokes(dialog, calls[-1][3], _WEED)
+        assert not _same_path(calls[-1][3][0], paths[0])
 
         asked = len(calls)
-        _set_mode(dialog, 'frame')
-        assert len(calls) == asked
-        assert label.isVisible() is False
-        assert spin.isVisible() is False
-        assert change.isVisible() is False
-        assert _WEED not in _pen_colors(dialog)
-        assert spin.value() == pytest.approx(6.0)
-
-        _set_mode(dialog, _SURROUND)
-        assert len(calls) > asked
+        join.setValue(9.0)
+        assert len(calls) == asked + 1
         assert calls[-1][1] == pytest.approx(6.0)
-        assert spin.value() == pytest.approx(6.0)
-        assert label.isVisible() and spin.isVisible() and change.isVisible()
-        _assert_strokes(dialog, calls[-1][2], _WEED)
+        assert calls[-1][2] == pytest.approx(9.0)
+
+        join.setValue(-1.0)
+        assert join.value() == pytest.approx(0.0)
+        assert calls[-1][2] == pytest.approx(0.0)
+        assert calls[-1][2] >= 0.0
 
         spin.setValue(-3.0)
         assert spin.value() == pytest.approx(0.0)
@@ -328,10 +390,61 @@ def test_clear_design_strokes_surrounds_and_follows_distance(monkeypatch):
         swapped = _regions(_CLEAR, swap=True).subject
         asked = len(calls)
         _button(dialog, 'swap').click()
-        assert len(calls) > asked
+        assert len(calls) == asked + 1
         assert _same_path(calls[-1][0], swapped)
         assert calls[-1][1] == pytest.approx(0.0)
-        _assert_strokes(dialog, calls[-1][2], _WEED)
+        assert calls[-1][2] == pytest.approx(0.0)
+        _assert_strokes(dialog, calls[-1][3], _WEED)
+
+        asked = len(calls)
+        _set_mode(dialog, 'frame')
+        assert len(calls) == asked
+        assert label.isVisible() is False
+        assert spin.isVisible() is False
+        assert join_label.isVisible() is False
+        assert join.isVisible() is False
+        assert change.isVisible() is False
+        assert _WEED not in _pen_colors(dialog)
+        assert spin.value() == pytest.approx(0.0)
+        assert join.value() == pytest.approx(0.0)
+
+        _set_mode(dialog, _SURROUND)
+        assert len(calls) == asked + 1
+        assert calls[-1][1] == pytest.approx(0.0)
+        assert calls[-1][2] == pytest.approx(0.0)
+        assert spin.value() == pytest.approx(0.0)
+        assert join.value() == pytest.approx(0.0)
+        assert label.isVisible() and spin.isVisible() and change.isVisible()
+        assert join_label.isVisible() and join.isVisible()
+        _assert_strokes(dialog, calls[-1][3], _WEED)
+
+        asked = len(calls)
+        change.click()
+        assert len(calls) == asked
+        assert spin.value() == pytest.approx(0.0)
+        assert join.value() == pytest.approx(0.0)
+        assert spin.isEnabled() is True
+        assert join.isEnabled() is True
+        assert _WEED not in _pen_colors(dialog)
+
+        spin.setValue(4.0)
+        join.setValue(2.0)
+        assert len(calls) == asked
+        assert spin.value() == pytest.approx(4.0)
+        assert join.value() == pytest.approx(2.0)
+        _set_mode(dialog, 'grid')
+        _set_mode(dialog, _SURROUND)
+        assert len(calls) == asked
+        assert spin.value() == pytest.approx(4.0)
+        assert join.value() == pytest.approx(2.0)
+
+        _button(dialog, 'start').click()
+        assert len(calls) == asked + 1
+        assert calls[-1][1] == pytest.approx(4.0)
+        assert calls[-1][2] == pytest.approx(2.0)
+        _assert_strokes(dialog, calls[-1][3], _WEED)
+        assert _button(dialog, 'apply').isEnabled() is False
+        assert cuts == []
         dialog.reject()
 
     _run(
@@ -341,6 +454,7 @@ def test_clear_design_strokes_surrounds_and_follows_distance(monkeypatch):
         height='9mm',
         view_box='0 0 1000 9',
     )
+    assert cuts == []
 
 
 def _pen_colors(dialog):
@@ -357,8 +471,8 @@ def test_defect_paints_no_surround_and_disables_start(monkeypatch):
     calls = []
     cuts = []
 
-    def wrapped(subject, distance):
-        calls.append((subject, distance))
+    def wrapped(subject, distance, join_gap=0.0):
+        calls.append((subject, distance, join_gap))
         raise AssertionError('build_surrounds while a defect exists')
 
     def fake(*_args, **_kwargs):
@@ -375,14 +489,29 @@ def test_defect_paints_no_surround_and_disables_start(monkeypatch):
         assert _WEED not in _pen_colors(dialog)
         label = _distance_label(dialog)
         spin = _distance_spin(dialog)
+        join_label = _join_label(dialog)
+        join = _join_spin(dialog)
         assert label.isVisible() and spin.isVisible()
+        assert join_label.isVisible() and join.isVisible()
+        assert join_label.text() == 'Join gap (mm)'
+        assert join.value() == pytest.approx(6.35)
+        assert join.minimum() == 0.0
         start = _button(dialog, 'start')
         box = _mode_box(dialog)
         for index in range(box.count()):
             box.setCurrentIndex(index)
             assert start.isEnabled() is False
+            surround = box.currentData() == _SURROUND
+            assert label.isVisible() is surround
+            assert spin.isVisible() is surround
+            assert join_label.isVisible() is surround
+            assert join.isVisible() is surround
         _set_mode(dialog, _SURROUND)
         spin.setValue(3.0)
+        join.setValue(1.25)
+        join.setValue(-4.0)
+        assert spin.value() == pytest.approx(3.0)
+        assert join.value() == pytest.approx(0.0)
         _button(dialog, 'swap').click()
         _button(dialog, 'change-surround').click()
         start.click()
@@ -396,7 +525,7 @@ def test_defect_paints_no_surround_and_disables_start(monkeypatch):
     _run(_OPEN, drive)
 
 
-def test_start_approves_the_showing_surrounds(monkeypatch, tmp_path):
+def test_start_paints_without_a_solver_or_a_result(monkeypatch, tmp_path):
     import weedlib
     import weedlines_job as JOB
     calls = _watch(monkeypatch)
@@ -420,19 +549,26 @@ def test_start_approves_the_showing_surrounds(monkeypatch, tmp_path):
 
     def drive(dialog):
         spin = _distance_spin(dialog)
+        join = _join_spin(dialog)
         change = _button(dialog, 'change-surround')
         apply_btn = _button(dialog, 'apply')
+        assert calls == []
         assert apply_btn.isEnabled() is False
-        shown = calls[-1][2]
-        asked = len(calls)
+        subject = _regions(_CLEAR, swap=False).subject
         _button(dialog, 'start').click()
         assert dialog.isVisible() is True
+        assert len(calls) == 1
+        assert _same_path(calls[0][0], subject)
+        assert calls[0][1] == pytest.approx(spin.value())
+        assert calls[0][2] == pytest.approx(join.value())
+        assert calls[0][2] == pytest.approx(6.35)
         assert cuts == []
         assert writes == []
         assert apply_btn.isEnabled() is False
-        assert spin.isEnabled() is False
+        assert spin.isEnabled() is True
+        assert join.isEnabled() is True
         assert change.isEnabled() is True
-        assert len(calls) == asked
+        shown = calls[-1][3]
         _assert_strokes(dialog, shown, _WEED)
         apply_btn.click()
         assert dialog.isVisible() is True
@@ -441,46 +577,19 @@ def test_start_approves_the_showing_surrounds(monkeypatch, tmp_path):
         assert edit is not None
         edit.setText('#123456')
         edit.editingFinished.emit()
-        assert spin.isEnabled() is False
-        assert len(calls) == asked
+        assert len(calls) == 1
+        assert spin.isEnabled() is True
+        assert join.isEnabled() is True
         _assert_strokes(dialog, shown, '#123456')
 
+        kept_distance = spin.value()
+        kept_join = join.value()
         change.click()
+        assert len(calls) == 1
+        assert spin.value() == pytest.approx(kept_distance)
+        assert join.value() == pytest.approx(kept_join)
         assert spin.isEnabled() is True
-        assert len(calls) > asked
-        assert calls[-1][1] == pytest.approx(spin.value())
-        _assert_strokes(dialog, calls[-1][2], '#123456')
-
-        spin.setValue(8.0)
-        assert calls[-1][1] == pytest.approx(8.0)
-        _assert_strokes(dialog, calls[-1][2], '#123456')
-        assert cuts == []
-        asked = len(calls)
-        _button(dialog, 'start').click()
-        assert spin.isEnabled() is False
-        assert apply_btn.isEnabled() is False
-        assert cuts == []
-        assert len(calls) == asked
-
-        swapped = _regions(_CLEAR, swap=True).subject
-        asked = len(calls)
-        _button(dialog, 'swap').click()
-        assert spin.isEnabled() is True
-        assert len(calls) > asked
-        assert _same_path(calls[-1][0], swapped)
-        assert cuts == []
-
-        _button(dialog, 'start').click()
-        assert spin.isEnabled() is False
-        asked = len(calls)
-        _set_mode(dialog, 'frame')
-        assert spin.isEnabled() is True
-        assert spin.isVisible() is False
-        assert len(calls) == asked
         assert '#123456' not in _pen_colors(dialog)
-        _set_mode(dialog, _SURROUND)
-        assert spin.isEnabled() is True
-        assert len(calls) > asked
         assert cuts == []
         assert writes == []
         assert apply_btn.isEnabled() is False

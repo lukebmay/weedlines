@@ -1,6 +1,6 @@
 # Window start
 
-**Status:** ready
+**Status:** done
 
 ## Goal
 
@@ -92,6 +92,74 @@ paints none.
 
 ## Note
 
-The developer writes what changed, why, and how it was checked.
-The reviewer then writes the summary, the context worth keeping,
-and the result.
+The window waits. On a clear Surround and Conquer design,
+`build_surrounds` is not called while the spins are set, while
+the mode changes, or while the person swaps, until Start
+Algorithm. Start calls `build_surrounds(subject, distance,
+join_gap)` and strokes those paths in the weed-line color with
+no fill. It does not call `generate_weeds`, write a result, or
+enable Apply. After that, a distance change, a join gap change,
+a swap, and entering this mode again each call it. Change
+surround clears the strokes, keeps both spin values, and does
+not call again until the next Start. Leaving the mode clears
+the strokes and keeps the values. A weed-line color change
+repaints and does not clear the lines. The join gap control is
+`join-gap`, labeled `Join gap (mm)`, shown only in this mode,
+starting at 6.35, and it does not go below zero. The distance
+label is still `Surround distance`. A defect still skips
+`build_surrounds` and leaves Start disabled for every mode.
+Frame, grid, and island-hop still cut. `docs/user/surround.md`
+follows the wait, the two lengths, Start, and Change surround,
+and it does not call Start an approval.
+
+Why: the window was painting a surround before the person
+started that step, and the call did not pass the join gap.
+
+Checked with `pytest tests/test_surround.py`: 24 passed, no
+Inkscape. `QT_QPA_PLATFORM=offscreen pytest
+tests/test_window_timing.py tests/test_window_surround.py
+tests/test_window_gate.py tests/test_window_return.py
+tests/test_window_preview.py`: 35 passed. Qt loaded. Nothing
+skipped. There is no live Inkscape window. The gate, return,
+and preview tests were not edited; they do not look at a
+surround before Start, and their checks still pass.
+`src/weedlib/surround.py`, `README.md`, and
+`docs/user/correction-arrows.md` were not edited. Status left
+`in-progress`.
+
+Summary: No defects. The window does not ask for a surround
+until Start Algorithm. Start calls `build_surrounds(subject,
+distance, join_gap)` and strokes those paths. It does not run a
+solver, write a result, or enable Apply.
+
+Context worth keeping: `surround_started` stays false until
+Start in Surround and Conquer. `_ask_surrounds` returns unless
+that flag is set, the check is clear, and the mode is still
+Surround and Conquer. Setting either spin is not an ask.
+`refresh_preview` strokes `surround_paths` only under that same
+condition, with the weed-line pen and no brush, at z 20. The
+checkerboard is z 0. Start sets the flag, asks, and returns
+before `generate_weeds`, so `state['result']` stays empty and
+Apply stays off. A distance change, a join gap change, and a
+swap ask only when the flag is set. Leaving the mode clears
+`surround_paths` and keeps the flag, so coming back asks again.
+Change surround clears the flag and the paths, so a later mode
+round trip does not ask until the next Start. Both spins stay
+enabled and keep their values. The join control is `join-gap`,
+labeled `Join gap (mm)`, range floor 0, initial `_JOIN_GAP`
+6.35, shown only in this mode. The distance label is still
+`Surround distance`. `blocked` is `bool(check.defects)`, and
+Start stays disabled in every mode while it is set. The figure
+check still runs from the zero-timer after `exec_` has shown
+the window. Frame, grid, and island-hop still pass
+`state['regions'].subject` to `generate_weeds`. Island-hop ran.
+pyclipper is installed. `src/weedlib/surround.py`, `README.md`,
+and `docs/user/correction-arrows.md` have no diff. The pass is
+`cr-01.md`.
+
+Result: No defects remain. The named checks passed.
+`pytest tests/test_surround.py`: 24 passed. No Inkscape.
+`QT_QPA_PLATFORM=offscreen pytest tests/test_window_timing.py
+tests/test_window_surround.py tests/test_window_gate.py
+tests/test_window_return.py tests/test_window_preview.py`: 35
+passed, no skips. Qt loaded. The tests do not start Inkscape.
