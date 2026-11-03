@@ -63,28 +63,28 @@ the subject. Units stay as [`boundary.md`](./boundary.md)
 describes. The other mode knobs do not change the surround.
 
 The library keeps the surround at least the surround distance
-from the subject, except for the connector below. A straight
-edge of the subject becomes a straight line on the surround,
-offset by that distance. A turn on that outline leaves those
-lines in their own direction, and its radius is at least the
-surround distance, so the turn is no tighter than the
-clearance. A circular arc is allowed and is not required. That
-outline has no sharp corner, including at an inner corner. A
-loop that only follows a hole in the subject is not a surround.
+from the subject. A straight edge of the subject becomes a
+straight line on the surround, offset by that distance. A turn
+is no tighter than the surround distance. A circular arc is
+allowed and is not required. The outline has no sharp corner,
+including at an inner corner. A loop that only follows a hole
+in the subject is not a surround.
 
 Subject pieces whose gap is less than twice that distance share
-one surround. Those pieces are one cluster. Where two surrounds
-cross, the library smooths each intersection corner, then draws
-one connector between those two points. It does not draw a
-separate connector at each crossing. The connector may come
-closer to the subject than the surround distance. That is the
-overlap exception. The connector meets each smoothed surround
-at a hard angle. The angle between the connector and that
-surround is from 45 degrees through 135 degrees. The connector
-does not blend into the surround.
+one surround. Those pieces are one cluster. The library unions
+every surround that overlaps, then smooths that whole outline.
+The outline is as smooth as the clearance allows, and it does
+not come closer to the subject than the surround distance.
 
-One length is both the clearance and how tight a turn may be,
-so this step has no smoothing control.
+The join gap is a length in document user units. The window
+supplies it. [`boundary.md`](./boundary.md) is the baseline.
+Zero joins only surrounds that meet or overlap. Surrounds that
+do not meet, but whose separation is at most the join gap, are
+unioned and smoothed as if they overlapped. Close cut lines
+waste a pass and can lift the vinyl or mark the backing.
+
+There is no smoothing control. The surround distance is the
+clearance. The join gap is the only other length.
 
 The step does not run again inside a cluster. It does not draw
 weed lines from the surround to the subject edges.

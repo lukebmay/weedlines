@@ -5,9 +5,9 @@ tasks.
 
 ## This stage
 
-After an approved surround, add the minimum weed lines from that
+After the surround step, add the minimum weed lines from that
 surround to the subject edges so the waste peels as one piece
-without holes.
+without holes. The surround step is not an approval.
 
 ## Not yet
 

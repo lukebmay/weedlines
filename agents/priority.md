@@ -21,7 +21,7 @@ A waiting plan stays under its rank. The notes say why. Skip it.
 
 | Plan | Notes |
 | --- | --- |
-| [surround-and-conquer](plans/surround-and-conquer/plan.md) | Waiting. The window is up before the check. The surround shape in [`conflicts.md`](conflicts.md) is open: do not implement either side. Conquer starts when the human asks. |
+| [surround-and-conquer](plans/surround-and-conquer/plan.md) | The surround step in the guide. Conquer starts when the human asks. |
 | [_bugs](plans/_bugs/plan.md) | A curved hole is reported as a self-overlap. |
 
 ## 3 medium

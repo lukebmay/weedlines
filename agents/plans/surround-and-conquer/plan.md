@@ -7,9 +7,9 @@
 ## Goal
 
 The window opens on Surround and Conquer. On a clear design the
-surround follows the surround distance in the preview, and the
-mode does not continue until the person approves that surround.
-Conquer is a later stage. Frame, grid, and island-hop still cut.
+person starts the surround, and that surround matches the
+algorithms and preview parts. Conquer is a later stage. Frame,
+grid, and island-hop still cut.
 
 ## Guide
 
@@ -24,8 +24,8 @@ Conquer is a later stage. Frame, grid, and island-hop still cut.
 
 - The figure check gates every mode, including the surround
   preview. See preflight.
-- The surround, the surround distance, and the approval match
-  the algorithms and preview parts.
+- The surround, when it starts, and the join gap match the
+  algorithms, preview, and boundary parts.
 - The job names Surround and Conquer when the person has not
   chosen a mode. See the algorithms part.
 - Frame, grid, and island-hop still cut a clean design.

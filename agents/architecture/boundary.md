@@ -15,8 +15,10 @@ that needs a true arc converts it before this step.
 
 `weedlib.qt` loads one binding, in this order: `enaml.qt`,
 PyQt5, PySide2, PyQt6, PySide6. Coordinates stay in the caller's
-user units. The window labels padding, spacing, and collar as
-millimetres. The solvers do not convert units.
+user units. The window labels padding, spacing, collar, and
+the join gap as millimetres. The join gap baseline is a
+quarter of an inch. The window passes that as 6.35 document
+user units. The solvers do not convert units.
 
 `weedlib.paths` only splits and joins `QPainterPath` subpaths
 for the solvers. Tests and other library callers import

@@ -13,6 +13,7 @@ except ImportError:
 
 from weedlib import build_surrounds
 from weedlib.qt import QPainterPath, QPointF, QTransform, Qt
+from weedlib.surround import _bridge_clears
 
 # Chord error of the round join stays under this. A miter misses by more.
 _ROUNDING = 0.01
@@ -261,6 +262,17 @@ def _triangle_in_chord_gap(ellipse):
     return QPointF(vx, vy), triangle, ring
 
 
+def test_zero_distance_unions_an_overlap():
+    # Half of the second square sits on the first. Distance 0 is the
+    # outer boundary of that union, not two outlines.
+    subject = _two_squares(_SIDE * 0.5, 0.0)
+    surrounds = build_surrounds(subject, 0, 0)
+    assert len(surrounds) == 1
+    assert _moves(surrounds[0]) == 1
+    union = _rect(0.0, 0.0, _SIDE * 1.5, _SIDE)
+    assert _symmetric_area(surrounds[0], union) == pytest.approx(0.0, abs=1e-4)
+
+
 def test_zero_distance_omits_a_hole_in_the_chord_gap():
     radius = 10.0
     ellipse = QPainterPath()
@@ -309,80 +321,28 @@ def _turn_angle(before, point, after):
     return math.degrees(math.acos(dot))
 
 
-def _connector_ends(points):
-    """Straight runs whose both ends meet the outline at a hard angle.
-
-    A round-join step is a few degrees, so those chords are not runs.
-    A blended crossing is one sharp vertex, not a run with two hard ends.
-    One connector stroked twice is two runs on the same segment.
-    """
-    count = len(points)
-    angles = []
-    directions = []
-    for index in range(count):
-        previous = points[(index - 1) % count]
-        point = points[index]
-        nxt = points[(index + 1) % count]
-        angles.append(_turn_angle(previous, point, nxt))
-        dx = nxt[0] - point[0]
-        dy = nxt[1] - point[1]
-        length = math.hypot(dx, dy)
-        directions.append((dx / length, dy / length))
-    limit = math.cos(math.radians(2.0))
-
-    def colinear(index):
-        before = directions[(index - 1) % count]
-        here = directions[index]
-        return before[0] * here[0] + before[1] * here[1] >= limit
-
-    breaks = [index for index in range(count) if not colinear(index)]
-    found = []
-    for position, start in enumerate(breaks):
-        end = breaks[(position + 1) % len(breaks)]
-        if (
-            45.0 <= angles[start] <= 135.0
-            and 45.0 <= angles[end] <= 135.0
-        ):
-            found.append((points[start], points[end], angles[start], angles[end]))
-    return found, angles
+def _angles(path):
+    points = _ring_points(path)
+    return [
+        _turn_angle(
+            points[index - 1],
+            points[index],
+            points[(index + 1) % len(points)],
+        )
+        for index in range(len(points))
+    ]
 
 
-def _same_segment(one, two):
-    start, end = one[0], one[1]
-    other_start, other_end = two[0], two[1]
-
-    def near(left, right):
-        return math.hypot(left[0] - right[0], left[1] - right[1]) <= 1e-4
-
-    return (
-        near(start, other_start) and near(end, other_end)
-        or near(start, other_end) and near(end, other_start)
-    )
-
-
-def _unique_connectors(runs):
-    unique = []
-    for run in runs:
-        if any(_same_segment(run, kept) for kept in unique):
-            continue
-        unique.append(run)
-    return unique
-
-
-def _segment_position(px, py, ax, ay, bx, by):
-    dx = bx - ax
-    dy = by - ay
-    length_sq = dx * dx + dy * dy
-    if length_sq <= 1e-18:
-        return math.hypot(px - ax, py - ay), 0.0
-    t = ((px - ax) * dx + (py - ay) * dy) / length_sq
-    clamped = t
-    if clamped < 0.0:
-        clamped = 0.0
-    elif clamped > 1.0:
-        clamped = 1.0
-    dist = math.hypot(px - (ax + clamped * dx), py - (ay + clamped * dy))
-    return dist, t
+def _assert_one_smooth_outline(subject, distance, clearance_at, join_gap=0.0):
+    surrounds = build_surrounds(subject, distance, join_gap)
+    assert len(surrounds) == 1
+    path = surrounds[0]
+    assert _moves(path) == 1
+    # A connector meets the outline at a hard angle and enters the gap.
+    assert min(_angles(path)) > 150.0
+    for x, y in _boundary_samples(path):
+        assert clearance_at(x, y) >= distance - _ROUNDING
+    return path
 
 
 def _segment_intersection(a, b, c, d):
@@ -452,59 +412,11 @@ def _separate_surround(bounds, distance):
     return build_surrounds(_rect(left, bottom, right - left, top - bottom), distance)[0]
 
 
-def _assert_merged_on_connectors(subject, rects, distance):
-    surrounds = build_surrounds(subject, distance)
-    assert len(surrounds) == 1
-    path = surrounds[0]
-    assert _moves(path) == 1
-    points = _ring_points(path)
-    runs, angles = _connector_ends(points)
-    connectors = _unique_connectors(runs)
-    # One pair of crossings is one connector, even though the stroke
-    # traverses it twice. Two local bridges stay two segments.
-    assert len(connectors) == 1
-    start, end, angle_start, angle_end = connectors[0]
-    assert 45.0 <= angle_start <= 135.0
-    assert 45.0 <= angle_end <= 135.0
-    assert min(angles) >= 45.0
-    # The hard angles are the connector ends. The rest of the outline is smooth.
-    assert len([angle for angle in angles if angle < 150.0]) == 4
-    crossings = _boundary_crossings(
-        _separate_surround(rects[0], distance),
-        _separate_surround(rects[1], distance),
-    )
-    assert len(crossings) == 2
-    for x, y in crossings:
-        dist, _t = _segment_position(x, y, start[0], start[1], end[0], end[1])
-        assert dist <= distance
-    mid_x = 0.5 * (start[0] + end[0])
-    mid_y = 0.5 * (start[1] + end[1])
-    mid_clearance = min(
-        _distance_to_rect(mid_x, mid_y, left, bottom, right, top)
-        for left, bottom, right, top in rects
-    )
-    # The connector is the overlap exception: it enters the gap.
-    assert mid_clearance < distance - _ROUNDING
-    for x, y in _boundary_samples(path):
-        dist, t = _segment_position(x, y, start[0], start[1], end[0], end[1])
-        if dist <= 0.05 and 0.02 < t < 0.98:
-            continue
-        clearance = min(
-            _distance_to_rect(x, y, left, bottom, right, top)
-            for left, bottom, right, top in rects
-        )
-        assert clearance >= distance - _ROUNDING
-    assert _distance_to_path(_SIDE * 0.5, -distance, path) <= _ROUNDING
-    assert _distance_to_path(-distance, _SIDE * 0.5, path) <= _ROUNDING
-
-
-def test_crossed_surrounds_join_on_a_connector():
+def test_crossed_surrounds_are_one_smooth_outline():
     distance = 2.0
     side = _SIDE
-    # Edge gap 3 is inside twice the distance. The raw union corner is a
-    # blend; the spike at 3.9 is sharper than 45 degrees. The diagonal
-    # pair crosses off the axis. Each case is one connector between the
-    # two crossings, not a bridge at each crossing.
+    # Edge gap 3 blends. Gap 3.9 spikes. The diagonal pair crosses off
+    # the axis. Each pair is one outline, not a connector.
     cases = (
         (
             _two_squares(side + 3.0, 0.0),
@@ -529,7 +441,15 @@ def test_crossed_surrounds_join_on_a_connector():
         ),
     )
     for subject, rects in cases:
-        _assert_merged_on_connectors(subject, rects, distance)
+        path = _assert_one_smooth_outline(
+            subject, distance, _clearance_to_rects(rects))
+        crossings = _boundary_crossings(
+            _separate_surround(rects[0], distance),
+            _separate_surround(rects[1], distance),
+        )
+        assert len(crossings) == 2
+        assert _distance_to_path(side * 0.5, -distance, path) <= _ROUNDING
+        assert _distance_to_path(-distance, side * 0.5, path) <= _ROUNDING
 
 
 def _subject_distance(x, y, subject):
@@ -593,32 +513,6 @@ def test_inner_corner_is_not_sharp():
         assert _subject_distance(x, y, subject) >= distance - _ROUNDING
 
 
-def _assert_one_connector(path, distance, clearance_at, crossings):
-    assert _moves(path) == 1
-    points = _ring_points(path)
-    runs, angles = _connector_ends(points)
-    connectors = _unique_connectors(runs)
-    assert len(connectors) == 1
-    start, end, angle_start, angle_end = connectors[0]
-    assert 45.0 <= angle_start <= 135.0
-    assert 45.0 <= angle_end <= 135.0
-    assert min(angles) >= 45.0
-    # Hard angles are the connector ends. The rest of the outline is smooth.
-    assert len([angle for angle in angles if angle < 150.0]) == 4
-    for x, y in crossings:
-        dist, _t = _segment_position(x, y, start[0], start[1], end[0], end[1])
-        assert dist <= distance
-    mid_x = 0.5 * (start[0] + end[0])
-    mid_y = 0.5 * (start[1] + end[1])
-    # The connector is the overlap exception: it may enter the gap.
-    assert clearance_at(mid_x, mid_y) < distance - _ROUNDING
-    for x, y in _boundary_samples(path):
-        dist, t = _segment_position(x, y, start[0], start[1], end[0], end[1])
-        if dist <= 0.05 and 0.02 < t < 0.98:
-            continue
-        assert clearance_at(x, y) >= distance - _ROUNDING
-
-
 def _clearance_to_rects(rects):
     def clearance(x, y):
         return min(
@@ -628,11 +522,11 @@ def _clearance_to_rects(rects):
     return clearance
 
 
-def test_shallow_and_unequal_crossings_join_on_a_connector():
+def test_shallow_and_unequal_crossings_are_one_smooth_outline():
     distance = 2.0
     side = _SIDE
-    # Gap 0.5 turns about 13 degrees, under the old sharp cutoff.
-    # The 10 by 4 meets the square on one fillet and misses the other.
+    # Gap 0.5 is a shallow dent. The 10 by 4 meets the square on
+    # unequal fillets. Neither outline is a connector.
     cases = (
         (
             _two_squares(side + 0.5, 0.0),
@@ -650,18 +544,15 @@ def test_shallow_and_unequal_crossings_join_on_a_connector():
         ),
     )
     for subject, rects in cases:
-        surrounds = build_surrounds(subject, distance)
-        assert len(surrounds) == 1
+        path = _assert_one_smooth_outline(
+            subject, distance, _clearance_to_rects(rects))
         crossings = _boundary_crossings(
             _separate_surround(rects[0], distance),
             _separate_surround(rects[1], distance),
         )
         assert len(crossings) == 2
-        _assert_one_connector(
-            surrounds[0], distance, _clearance_to_rects(rects), crossings)
-        # Straight offset of the first square survives the fillets.
-        assert _distance_to_path(side * 0.5, -distance, surrounds[0]) <= _ROUNDING
-        assert _distance_to_path(-distance, side * 0.5, surrounds[0]) <= _ROUNDING
+        assert _distance_to_path(side * 0.5, -distance, path) <= _ROUNDING
+        assert _distance_to_path(-distance, side * 0.5, path) <= _ROUNDING
 
 
 def _rect_beside(width, height, x):
@@ -671,14 +562,12 @@ def _rect_beside(width, height, x):
     return path
 
 
-def test_square_beside_a_circle_joins_on_a_connector():
+def test_square_beside_a_circle_is_one_smooth_outline():
     distance = 2.0
-    # Circle diameter 10, left side at x = 12. Both fillets used to miss.
+    # Circle diameter 10, left side at x = 12.
     subject = QPainterPath()
     subject.addRect(0, 0, _SIDE, _SIDE)
     subject.addEllipse(12, 0, _SIDE, _SIDE)
-    surrounds = build_surrounds(subject, distance)
-    assert len(surrounds) == 1
     circle = build_surrounds(_circle_at(12, 0, _SIDE), distance)[0]
     square = _separate_surround((0.0, 0.0, _SIDE, _SIDE), distance)
     crossings = _boundary_crossings(square, circle)
@@ -690,7 +579,7 @@ def test_square_beside_a_circle_joins_on_a_connector():
             radial = 0.0
         return min(radial, _distance_to_rect(x, y, 0.0, 0.0, _SIDE, _SIDE))
 
-    _assert_one_connector(surrounds[0], distance, clearance, crossings)
+    _assert_one_smooth_outline(subject, distance, clearance)
 
 
 def _circle_at(x, y, diameter):
@@ -763,3 +652,416 @@ def test_close_reflex_corners_become_one_turn():
     # Outer straight edges stay put. The cap does not replace them.
     assert _distance_to_path(15.0, -distance, path) <= _ROUNDING
     assert _distance_to_path(-distance, 10.0, path) <= _ROUNDING
+
+
+def test_join_keeps_a_step_beside_a_near_square():
+    # The stepped union meets a square across a 0.05 gap. The bridge
+    # is that strip. A hull edge would drop the step.
+    subject = QPainterPath()
+    subject.addRect(0, 0, 10, 10)
+    subject.addRect(5, 5, 10, 10)
+    subject.addRect(-10.05, 0, 10, 10)
+    surrounds = build_surrounds(subject, 0, 0.1)
+    assert len(surrounds) == 1
+    assert _moves(surrounds[0]) == 1
+    assert _polygon_area(surrounds[0]) == pytest.approx(275.5, abs=1e-4)
+    assert not surrounds[0].contains(QPointF(2.0, 12.0))
+
+
+def test_join_keeps_an_l_notch():
+    # The upright offset is x = 12. The square joins across the base.
+    distance = 2.0
+    subject = QPainterPath()
+    subject.moveTo(0, 0)
+    subject.lineTo(20, 0)
+    subject.lineTo(20, 10)
+    subject.lineTo(10, 10)
+    subject.lineTo(10, 20)
+    subject.lineTo(0, 20)
+    subject.closeSubpath()
+    subject.addRect(25, 0, 10, 10)
+    surrounds = build_surrounds(subject, distance, 1.0)
+    assert len(surrounds) == 1
+    path = surrounds[0]
+    assert _moves(path) == 1
+    assert _distance_to_path(12.0, 15.0, path) <= _ROUNDING
+    assert not path.contains(QPointF(15.0, 15.0))
+    for x, y in _boundary_samples(path):
+        assert _subject_distance(x, y, subject) >= distance - _ROUNDING
+
+
+def test_join_keeps_the_step_above_a_wide_square():
+    # The upper square covers part of the wide top. The bridge is the
+    # 0.05 strip. A tangent from the free corner fills the pocket.
+    subject = QPainterPath()
+    subject.addRect(0, 0, 20, 10)
+    subject.addRect(0, 10.05, 10, 10)
+    surrounds = build_surrounds(subject, 0, 0.1)
+    assert len(surrounds) == 1
+    path = surrounds[0]
+    assert _moves(path) == 1
+    assert _polygon_area(path) == pytest.approx(300.5, abs=1e-4)
+    assert _distance_to_path(15.0, 10.0, path) <= 1e-4
+    assert not path.contains(QPointF(12.0, 12.0))
+    assert not path.contains(QPointF(15.0, 15.0))
+
+    distance = 2.0
+    offset = QPainterPath()
+    offset.addRect(0, 0, 30, 10)
+    offset.addRect(0, 15, 10, 10)
+    joined = build_surrounds(offset, distance, 1.0)
+    assert len(joined) == 1
+    outline = joined[0]
+    assert _moves(outline) == 1
+    assert _distance_to_path(20.0, 12.0, outline) <= _ROUNDING
+    assert not outline.contains(QPointF(20.0, 18.0))
+    for x, y in _boundary_samples(outline):
+        assert _subject_distance(x, y, offset) >= distance - _ROUNDING
+
+
+def test_join_keeps_a_short_side_beside_a_wide_top():
+    # The free end past the overlap is shorter than the sample step,
+    # and the upper side is shorter than 1. The hull fills that corner.
+    subject = QPainterPath()
+    subject.addRect(0, 0, 30, 10)
+    subject.addRect(0, 10.05, 29.2, 0.9)
+    surrounds = build_surrounds(subject, 0, 0.1)
+    assert len(surrounds) == 1
+    path = surrounds[0]
+    assert _moves(path) == 1
+    assert _polygon_area(path) == pytest.approx(327.74, abs=1e-4)
+    assert not path.contains(QPointF(29.6, 10.3))
+
+    distance = 2.0
+    offset = QPainterPath()
+    offset.addRect(0, 0, 30, 10)
+    offset.addRect(0, 15, 29.2, 0.5)
+    joined = build_surrounds(offset, distance, 1.0)
+    assert len(joined) == 1
+    outline = joined[0]
+    assert _moves(outline) == 1
+    assert not outline.contains(QPointF(29.6, 12.5))
+    for x, y in _boundary_samples(outline):
+        assert _subject_distance(x, y, offset) >= distance - _ROUNDING
+
+
+def test_join_bridges_a_colinear_run():
+    # The two lower tops meet across 0.05 and stay one line. The
+    # overlap with the upper square runs from x = 4 to x = 14.
+    subject = QPainterPath()
+    subject.addRect(0, 0, 10, 10)
+    subject.addRect(10.05, 0, 10, 10)
+    subject.addRect(4, 10.05, 10, 10)
+    surrounds = build_surrounds(subject, 0, 0.1)
+    assert len(surrounds) == 1
+    path = surrounds[0]
+    assert _moves(path) == 1
+    assert _polygon_area(path) == pytest.approx(301.0, abs=1e-4)
+    assert path.contains(QPointF(12.0, 10.02))
+
+
+def test_join_keeps_both_steps_on_a_wide_top():
+    # The second square meets a concave outline. One walk stops on
+    # the same vertex, and that tangent would drop the wide square.
+    subject = QPainterPath()
+    subject.addRect(0, 0, 30, 10)
+    subject.addRect(0, 10.05, 10, 10)
+    subject.addRect(20, 10.05, 10, 10)
+    surrounds = build_surrounds(subject, 0, 0.1)
+    assert len(surrounds) == 1
+    path = surrounds[0]
+    assert _moves(path) == 1
+    assert _polygon_area(path) == pytest.approx(501.0, abs=1e-4)
+    assert _distance_to_path(15.0, 10.0, path) <= 1e-4
+    assert not path.contains(QPointF(15.0, 15.0))
+    assert path.contains(QPointF(5.0, 5.0))
+
+
+def test_colinear_offsets_cross_the_gaps_in_one_line():
+    # Each top sits on y = 12. The line across a gap stays clear, so
+    # the outline keeps it. The outer corner stays the round join.
+    distance = 2.0
+    subject = QPainterPath()
+    for origin in (0.0, 13.0, 26.0, 39.0, 52.0):
+        subject.addRect(origin, 0.0, _SIDE, _SIDE)
+    surrounds = build_surrounds(subject, distance)
+    assert len(surrounds) == 1
+    path = surrounds[0]
+    assert _moves(path) == 1
+    assert _distance_to_path(11.5, _SIDE + distance, path) <= _ROUNDING
+    arc = (
+        -distance / math.sqrt(2.0),
+        _SIDE + distance / math.sqrt(2.0),
+    )
+    assert _distance_to_path(arc[0], arc[1], path) <= _ROUNDING
+    for x, y in _boundary_samples(path):
+        assert _subject_distance(x, y, subject) >= distance - _ROUNDING
+
+    wider = QPainterPath()
+    wider.addRect(0.0, 0.0, _SIDE, _SIDE)
+    wider.addRect(_SIDE + 3.9, 0.0, _SIDE, _SIDE)
+    joined = build_surrounds(wider, distance)
+    assert len(joined) == 1
+    mid = _SIDE + 1.95
+    assert _distance_to_path(mid, _SIDE + distance, joined[0]) <= _ROUNDING
+
+    # A dent of 0.015 still sits under the line. The line stays clear.
+    close = QPainterPath()
+    close.addRect(0.0, 0.0, _SIDE, _SIDE)
+    close.addRect(_SIDE + 0.5, 0.0, _SIDE, _SIDE)
+    near = build_surrounds(close, distance)
+    assert len(near) == 1
+    assert _distance_to_path(
+        _SIDE + 0.25, _SIDE + distance, near[0]) <= _ROUNDING
+
+    # Tops shorter than 1 still anchor the same line. The corner arc stays.
+    narrow = QPainterPath()
+    narrow.addRect(0.0, 0.0, 0.9, _SIDE)
+    narrow.addRect(1.4, 0.0, 0.9, _SIDE)
+    thin = build_surrounds(narrow, distance)
+    assert len(thin) == 1
+    assert _distance_to_path(1.15, _SIDE + distance, thin[0]) <= _ROUNDING
+    arc = (
+        -distance / math.sqrt(2.0),
+        _SIDE + distance / math.sqrt(2.0),
+    )
+    assert _distance_to_path(arc[0], arc[1], thin[0]) <= _ROUNDING
+    for x, y in _boundary_samples(thin[0]):
+        assert _subject_distance(x, y, narrow) >= distance - _ROUNDING
+
+
+def test_zero_distance_join_keeps_a_concave_overlap():
+    # Corner overlap. The union steps in. A hull would cut that off.
+    subject = _two_squares(5.0, 5.0)
+    surrounds = build_surrounds(subject, 0, 0.1)
+    assert len(surrounds) == 1
+    assert _moves(surrounds[0]) == 1
+    assert _polygon_area(surrounds[0]) == pytest.approx(175.0, abs=1e-4)
+    assert surrounds[0].contains(QPointF(7.0, 2.0))
+    assert not surrounds[0].contains(QPointF(12.0, 2.0))
+    assert not surrounds[0].contains(QPointF(2.0, 12.0))
+
+
+def test_join_gap_unions_a_near_miss():
+    distance = 2.0
+    # Edge gap 5. The surrounds are 1 apart. 0.02 short of that stays two.
+    near = _two_squares(_SIDE + 5.0, 0.0)
+    assert len(build_surrounds(near, distance)) == 2
+    assert len(build_surrounds(near, distance, 1.0 - 0.02)) == 2
+    # The piece in the hole stays 3 from the hole surround.
+    assert len(build_surrounds(_island(), distance, 1.0)) == 2
+
+    def clearance(x, y):
+        return min(
+            _distance_to_rect(x, y, 0.0, 0.0, _SIDE, _SIDE),
+            _distance_to_rect(
+                x, y, _SIDE + 5.0, 0.0, _SIDE + 5.0 + _SIDE, _SIDE),
+        )
+
+    path = _assert_one_smooth_outline(near, distance, clearance, 1.0)
+    assert path.contains(QPointF(5.0, 5.0))
+    assert path.contains(QPointF(_SIDE + 7.5, 5.0))
+    assert path.contains(QPointF(_SIDE + 2.5, 5.0))
+    assert _distance_to_path(_SIDE * 0.5, -distance, path) <= _ROUNDING
+
+    gap = 5.0
+    separation = math.hypot(gap, gap) - 2.0 * distance
+    diagonal = _two_squares(_SIDE + gap, _SIDE + gap)
+    assert len(build_surrounds(diagonal, distance, separation - 0.02)) == 2
+    joined = build_surrounds(diagonal, distance, separation)
+    assert len(joined) == 1
+    assert min(_angles(joined[0])) > 150.0
+    for x, y in _boundary_samples(joined[0]):
+        assert min(
+            _distance_to_rect(x, y, 0.0, 0.0, _SIDE, _SIDE),
+            _distance_to_rect(
+                x, y, _SIDE + gap, _SIDE + gap,
+                _SIDE + gap + _SIDE, _SIDE + gap + _SIDE),
+        ) >= distance - _ROUNDING
+
+
+def test_join_keeps_a_piece_inside_the_frame():
+    # The piece is 7 from the hole wall and sits inside the frame
+    # outline. A span from that ring to y = -2 cuts the frame. The
+    # square beside the frame still joins.
+    distance = 2.0
+    subject = _island()
+    assert len(build_surrounds(subject, distance, 2.99)) == 2
+    apart = build_surrounds(subject, distance, 3.0)
+    assert len(apart) == 2
+    frame = max(apart, key=_polygon_area)
+    piece = min(apart, key=_polygon_area)
+    assert _distance_to_path(20.0, -distance, frame) <= _ROUNDING
+    assert _distance_to_path(23.0, 6.5, frame) > 1.0
+    assert piece.contains(QPointF(20.0, 20.0))
+    for path in apart:
+        for x, y in _boundary_samples(path):
+            assert _subject_distance(x, y, subject) >= distance - _ROUNDING
+
+    assert len(build_surrounds(subject, 0, 6.35)) == 2
+    raw = build_surrounds(subject, 0, 7.0)
+    assert len(raw) == 2
+    outer = max(raw, key=_polygon_area)
+    inner = min(raw, key=_polygon_area)
+    assert _distance_to_path(20.0, 0.0, outer) <= 1e-4
+    assert outer.contains(QPointF(5.0, 5.0))
+    assert inner.contains(QPointF(20.0, 20.0))
+
+    beside = _island()
+    beside.addRect(45, 0, 10, 10)
+    joined = build_surrounds(beside, distance, 6.35)
+    assert len(joined) == 2
+    outline = max(joined, key=_polygon_area)
+    island = min(joined, key=_polygon_area)
+    assert outline.contains(QPointF(50.0, 5.0))
+    assert outline.contains(QPointF(5.0, 5.0))
+    assert island.contains(QPointF(20.0, 20.0))
+    assert _distance_to_path(20.0, -distance, outline) <= _ROUNDING
+    assert _distance_to_path(23.0, 6.5, outline) > 1.0
+    for path in joined:
+        for x, y in _boundary_samples(path):
+            assert _subject_distance(x, y, beside) >= distance - _ROUNDING
+
+
+def _frame_with_pieces(outer, hole, pieces):
+    path = QPainterPath()
+    path.setFillRule(Qt.OddEvenFill)
+    path.addRect(*outer)
+    path.addRect(*hole)
+    for piece in pieces:
+        path.addRect(*piece)
+    return path
+
+
+def test_join_bridges_pieces_inside_one_frame():
+    # Two pieces sit outside each other inside the frame ring. The
+    # bridge across the gap stays clear. A wall, or a gap past the
+    # join gap, stays split.
+    distance = 2.0
+    close = _frame_with_pieces(
+        (0, 0, 80, 80),
+        (10, 10, 60, 60),
+        ((17, 17, 4, 4), (25.5, 17, 4, 4)),
+    )
+    for join_gap in (0.5, 6.35):
+        surrounds = build_surrounds(close, distance, join_gap)
+        assert len(surrounds) == 2
+        piece = min(surrounds, key=_polygon_area)
+        assert _polygon_area(piece) == pytest.approx(128.5686, abs=1e-3)
+        assert piece.contains(QPointF(23.25, 19.0))
+        for path in surrounds:
+            for x, y in _boundary_samples(path):
+                assert _subject_distance(x, y, close) >= distance - _ROUNDING
+
+    raw = _frame_with_pieces(
+        (0, 0, 40, 40),
+        (10, 10, 20, 20),
+        ((17, 17, 2.95, 2.95), (20.05, 17, 2.95, 2.95)),
+    )
+    for join_gap in (6.35, 7.0):
+        areas = sorted(
+            _polygon_area(path) for path in build_surrounds(raw, 0, join_gap))
+        assert areas == pytest.approx([17.7, 1600.0], abs=1e-3)
+
+    apart = _frame_with_pieces(
+        (0, 0, 80, 80),
+        (10, 10, 60, 60),
+        ((17, 17, 4, 4), (41, 17, 4, 4)),
+    )
+    assert len(build_surrounds(apart, distance, 6.35)) == 3
+
+    # Wall thickness 1 between two holes. The straight bridge cuts it.
+    walled = _frame_with_pieces(
+        (0, 0, 50, 40),
+        (5, 5, 15, 20),
+        (),
+    )
+    walled.addRect(21, 5, 15, 20)
+    walled.addRect(12.9, 12, 3, 4)
+    walled.addRect(25.1, 12, 3, 4)
+    walled_out = build_surrounds(walled, distance, 6.35)
+    assert len(walled_out) == 3
+    for path in walled_out:
+        for x, y in _boundary_samples(path):
+            assert _subject_distance(x, y, walled) >= distance - _ROUNDING
+
+
+def _frame_with_finger(outer, hole, finger, pieces):
+    # The finger reaches the hole's far side, so it stays frame.
+    path = QPainterPath()
+    path.setFillRule(Qt.OddEvenFill)
+    path.addRect(*outer)
+    hx, hy, hw, hh = hole
+    fx, fy, fw, fh = finger
+    top = hy + hh
+    right = hx + hw
+    notch = QPainterPath()
+    notch.moveTo(hx, hy)
+    notch.lineTo(right, hy)
+    notch.lineTo(right, top)
+    notch.lineTo(fx + fw, top)
+    notch.lineTo(fx + fw, fy)
+    notch.lineTo(fx, fy)
+    notch.lineTo(fx, top)
+    notch.lineTo(hx, top)
+    notch.closeSubpath()
+    path.addPath(notch)
+    for piece in pieces:
+        path.addRect(*piece)
+    return path
+
+
+def test_join_rejects_a_bridge_through_a_finger():
+    # The whole edge is the test. A finger between the old probes
+    # still cuts the bridge, and the pieces stay apart.
+    raw = _frame_with_finger(
+        (-10, -10, 50, 40),
+        (-5, -5, 40, 25),
+        (12.05, 8, 1, 12),
+        ((0, 0, 10, 10), (16.35, 0, 10, 10)),
+    )
+    for join_gap in (6.34, 6.35):
+        surrounds = build_surrounds(raw, 0, join_gap)
+        assert len(surrounds) == 3
+        assert any(path.contains(QPointF(5.0, 5.0)) for path in surrounds)
+        assert any(path.contains(QPointF(21.35, 5.0)) for path in surrounds)
+        for path in surrounds:
+            assert _distance_to_path(12.5, 10.0, path) > 1.0
+
+    apart = _frame_with_finger(
+        (-15, -15, 90, 60),
+        (-5, -5, 60, 35),
+        (20, 11, 1, 19),
+        ((0, 0, 10, 10), (40, 0, 10, 10)),
+    )
+    distance = 2.0
+    for join_gap in (25.9, 26.0):
+        surrounds = build_surrounds(apart, distance, join_gap)
+        assert len(surrounds) == 3
+        assert any(path.contains(QPointF(5.0, 5.0)) for path in surrounds)
+        assert any(path.contains(QPointF(45.0, 5.0)) for path in surrounds)
+        for path in surrounds:
+            assert _distance_to_path(20.5, 12.0, path) > 1.0
+            for x, y in _boundary_samples(path):
+                assert _subject_distance(x, y, apart) >= distance - _ROUNDING
+
+
+def test_bridge_gap_uses_the_subject_curve():
+    # The chord gap is 2.048. The circle itself is 1.848 away, inside
+    # the limit distance - 0.01. An edge a full 2 away still clears.
+    circle = QPainterPath()
+    circle.addEllipse(-10, -10, 20, 20)
+    start = (13.197260, -5.488972)
+    end = (10.030895, 10.194590)
+    ring = [(0.0, 0.0), (1.0, 0.0), (0.0, 1.0)]
+    near = [start, end, (40.0, 12.0), (40.0, -8.0)]
+    assert _bridge_clears(near, ring, ring, circle, 2.0) is False
+    axial = [(12.0, -8.0), (12.0, 8.0), (40.0, 8.0), (40.0, -8.0)]
+    assert _bridge_clears(axial, ring, ring, circle, 2.0) is True
+
+
+def test_negative_join_gap_is_rejected():
+    with pytest.raises(ValueError):
+        build_surrounds(_square(), 1.0, -0.1)
+    with pytest.raises(ValueError):
+        build_surrounds(_square(), -0.1)

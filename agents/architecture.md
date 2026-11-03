@@ -85,10 +85,10 @@ A run moves in this order.
 3. The window paints the preview. When the check finds a defect,
    the window offers the two return actions under the preview.
 4. When the check is clear, the person can run frame, grid, or
-   island-hop, or approve the surround. The library emits the
-   weed lines for the mode that cuts, and the surround for
-   Surround and Conquer. The window paints them in the weed-line
-   color. Conquer does not run.
+   island-hop, or start the surround. The library emits the
+   weed lines for the mode that cuts. It emits the surround
+   only after the person starts that step. The window paints
+   them in the weed-line color. Conquer does not run.
 5. Import reads the result file. A weed-line result brings in a
    copy of the design and the cuts. A correction-arrow result
    brings in only the arrow groups, above the open document.

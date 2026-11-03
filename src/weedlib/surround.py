@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Surrounds: one outer boundary around each subject cluster."""
+"""Surrounds: one smoothed outline around each subject cluster."""
 from __future__ import division
 
 import math
@@ -8,52 +8,1285 @@ from .paths import split_painter_path
 from .qt import QPainterPath, QPainterPathStroker, QPointF, QTransform, Qt
 
 # Boolean ops and the stroker flatten curves. Scale, and a tight
-# curve threshold, keep the inward error to rounding.
+# curve threshold, keep the inward error to rounding. The threshold
+# is in scaled units, so a length in user units uses it over the scale.
 _CLIP_SCALE = 32.0
 _CURVE_FLATNESS = 0.01
+_CHORD_PAD = _CURVE_FLATNESS / _CLIP_SCALE
 _CLOSED_TOL = 1e-4
 _AREA_EPS = 1e-8
 _TANGENT_EPS = 1e-12
-# Duplicate hits of one crossing, not two corners of a merge.
-_CROSS_CLUSTER = 0.02
-_CROSS_SNAP = 0.15
 _ARC_STEP = math.radians(4.0)
 # A right turn steeper than this is a corner, not stroker noise.
 _SHARP_TURN = 20.0
 _FILLET_ERR = 0.05
 
 
-def build_surrounds(subject, distance):
-    """One outer surround for each cluster, as closed paths.
+def build_surrounds(subject, distance, join_gap=0.0):
+    """One smoothed outline for each cluster, as closed paths.
 
     ``subject`` is the subject region in document user units, holes
-    included. ``distance`` is a length in those units and is never
-    negative. Zero is that region's outer boundary. A positive
-    distance expands it with a round join. A reflex corner is
-    rounded to that distance. Two reflex corners too close for
-    two setbacks become one turn of that radius. Where two
-    surrounds cross, one connector joins the smoothed crossings.
-    A loop that only follows a hole is not returned.
+    included. ``distance`` and ``join_gap`` are lengths in those
+    units and are never negative. Zero distance is that region's
+    outer boundary. A positive distance expands it with a round
+    join. Surrounds that meet, overlap, or lie within ``join_gap``
+    are one outline. That outline stays at least ``distance`` from
+    the subject. A loop that only follows a hole is not returned.
     """
     if not isinstance(subject, QPainterPath):
         raise TypeError(
             'subject must be a QPainterPath, got: {}'.format(
                 type(subject).__name__))
     distance = float(distance)
+    join_gap = float(join_gap)
     if distance < 0.0:
         raise ValueError(
             'surround distance must not be negative, got: {}'.format(distance))
+    if join_gap < 0.0:
+        raise ValueError(
+            'join gap must not be negative, got: {}'.format(join_gap))
     if subject.isEmpty():
         return []
     if distance == 0.0:
-        return _outer_boundaries(subject)
-    dilated = _dilate(subject, distance)
-    outers = _outer_boundaries(dilated)
-    pairs = _crossing_pairs(subject, distance)
+        dilated = None
+        outers = _meeting_outers(subject)
+    else:
+        dilated = _dilate(subject, distance)
+        outers = _outer_boundaries(dilated)
+    surrounds = []
+    for group in _join_groups(subject, outers, distance, join_gap):
+        kept, inner = _separate_inner_outers(group)
+        for piece, merged in _bridge_inner_outers(
+            inner, subject, distance, join_gap):
+            if distance == 0.0:
+                surrounds.append(piece)
+            else:
+                surrounds.append(_finish_outline(
+                    piece, distance, dilated, not merged))
+        if not kept:
+            continue
+        if len(kept) == 1:
+            outline = kept[0]
+        else:
+            outline = _bridge_outlines(kept)
+            if outline is None:
+                if distance == 0.0:
+                    surrounds.extend(kept)
+                else:
+                    surrounds.extend(
+                        _finish_outline(outer, distance, dilated)
+                        for outer in kept)
+                continue
+        if distance == 0.0:
+            surrounds.append(outline)
+        else:
+            # A merged step is not a channel mouth. Capping it would
+            # fill the pocket the bridges just kept open.
+            surrounds.append(_finish_outline(
+                outline, distance, dilated, len(kept) == 1))
+    return surrounds
+
+
+def _join_groups(subject, outers, distance, join_gap):
+    """Outers whose surrounds fall within ``join_gap``, as groups.
+
+    One wider round dilation sees every piece. A pairwise union
+    would repeat a boolean per piece and still leave the crossing
+    dent. Eroding that dilation back off drops a corner touch: the
+    neck is thinner than the disk that has to fit.
+    """
+    if join_gap == 0.0 or len(outers) < 2:
+        return [[outer] for outer in outers]
+    # Chords sit inside the arc by the scaled curve threshold.
+    # Adding that threshold in user units joins a straight gap early.
+    wide = _dilate(subject, distance + join_gap * 0.5 + _CHORD_PAD)
+    components = _components(wide)
+    groups = [[] for _component in components]
+    missed = []
+    for outer in outers:
+        point = _contained_point(outer)
+        placed = False
+        if point is not None:
+            for index, component in enumerate(components):
+                if component.contains(point):
+                    groups[index].append(outer)
+                    placed = True
+                    break
+        if not placed:
+            missed.append([outer])
+    return [group for group in groups if group] + missed
+
+
+def _separate_inner_outers(outers):
+    """Rings that sit inside another, and the rings around them.
+
+    A span from an inner ring to that outer cuts the frame. The
+    inner rings can still bridge each other.
+    """
+    rings = [_ring_points(outer) for outer in outers]
+    inner = []
+    kept = []
+    for index, outer in enumerate(outers):
+        if any(
+            other != index and _ring_sits_inside(rings[other], rings[index])
+            for other in range(len(outers))
+        ):
+            inner.append(outer)
+        else:
+            kept.append(outer)
+    return kept, inner
+
+
+def _bridge_inner_outers(outers, subject, distance, join_gap):
+    """Join inner rings that sit outside each other.
+
+    The separation has to fall within the join gap, and the bridge
+    has to stay at least ``distance`` from the subject. A span
+    through a wall does not.
+    """
+    pending = []
+    for outer in outers:
+        ring = _ring_points(outer)
+        if len(ring) >= 3:
+            pending.append((outer, ring, False))
+    while len(pending) > 1:
+        best = None
+        for left in range(len(pending)):
+            for right in range(left + 1, len(pending)):
+                ring_a = pending[left][1]
+                ring_b = pending[right][1]
+                if (
+                    _ring_sits_inside(ring_a, ring_b)
+                    or _ring_sits_inside(ring_b, ring_a)
+                ):
+                    continue
+                gap = _min_ring_distance(ring_a, ring_b)
+                if gap > join_gap + 1e-4:
+                    continue
+                if best is not None and gap >= best[0]:
+                    continue
+                merged = _merge_gap(ring_a, ring_b)
+                if merged is None:
+                    continue
+                if not _bridge_clears(
+                    merged, ring_a, ring_b, subject, distance):
+                    continue
+                best = (gap, left, right, merged)
+        if best is None:
+            break
+        _gap, left, right, merged = best
+        pending = [
+            pending[index]
+            for index in range(len(pending))
+            if index != left and index != right
+        ]
+        pending.append((None, merged, True))
+    outlines = []
+    for path, ring, merged in pending:
+        if path is None:
+            path = _closed_path(ring)
+        if path is not None:
+            outlines.append((path, merged))
+    return outlines
+
+
+def _bridge_clears(merged, ring_a, ring_b, subject, distance):
+    """Each new edge stays at least ``distance`` from the subject.
+
+    The edge is one segment. Samples leave a gap a finger can fill.
+    A chord of the subject sits inside a curve, so the gap is to the
+    curve, not to those chords.
+    """
+    rings = _ring_segments(ring_a) + _ring_segments(ring_b)
+    limit = distance - _CURVE_FLATNESS
+    if limit < 0.0:
+        limit = 0.0
+    count = len(merged)
+    for index in range(count):
+        start = merged[index]
+        end = merged[(index + 1) % count]
+        if _edge_on_segments(start, end, rings):
+            continue
+        if not _edge_clears_subject(start, end, subject, limit):
+            return False
+    return True
+
+
+def _edge_on_segments(start, end, segments):
+    """True when the edge is a piece of one segment."""
+    for origin, dest in segments:
+        if _point_segment_distance(start, origin, dest) > 1e-3:
+            continue
+        if _point_segment_distance(end, origin, dest) > 1e-3:
+            continue
+        return True
+    return False
+
+
+def _edge_clears_subject(start, end, subject, limit):
+    """The whole edge misses the subject and stays ``limit`` away.
+
+    Contact only at an endpoint is not a hit. The open edge still
+    fails when it crosses the curve or lies in the subject.
+    """
+    for kind, points in _segments(subject):
+        dist, hit = _primitive_gap(start, end, kind, points)
+        if hit or dist < limit:
+            return False
+    return not _open_edge_inside(start, end, subject)
+
+
+def _open_edge_inside(start, end, subject):
+    """True when the midpoint lies in the subject, off the boundary."""
+    mid = (
+        (start[0] + end[0]) * 0.5,
+        (start[1] + end[1]) * 0.5,
+    )
+    if not subject.contains(QPointF(mid[0], mid[1])):
+        return False
+    return _point_subject_distance(mid, subject) > 1e-4
+
+
+def _primitive_gap(start, end, kind, points):
+    """Distance from the closed segment, and an open-segment hit."""
+    if kind == 'line':
+        return (
+            _lines_gap(start, end, points[0], points[1]),
+            _open_segment_hits(start, end, points),
+        )
+    return _curve_segment_gap(start, end, points)
+
+
+def _lines_gap(start, end, origin, dest):
+    """Least distance between two segments."""
+    best = None
+    for point, left, right in (
+        (start, origin, dest),
+        (end, origin, dest),
+        (origin, start, end),
+        (dest, start, end),
+    ):
+        dist = _point_segment_distance(point, left, right)
+        if best is None or dist < best:
+            best = dist
+    if best is None:
+        return 0.0
+    return best
+
+
+def _point_subject_distance(point, subject):
+    best = None
+    for kind, points in _segments(subject):
+        if kind == 'line':
+            dist = _point_segment_distance(point, points[0], points[1])
+        else:
+            basis = _curve_basis(points)
+            dist = _point_curve_distance(point, basis[0], basis[1])
+        if best is None or dist < best:
+            best = dist
+    if best is None:
+        return 0.0
+    return best
+
+
+def _curve_basis(points):
+    """Power basis ``(t**3, t**2, t, const)`` of one quad or cubic."""
+    if len(points) == 4:
+        return (
+            _cubic_coeffs(
+                points[0][0], points[1][0], points[2][0], points[3][0]),
+            _cubic_coeffs(
+                points[0][1], points[1][1], points[2][1], points[3][1]),
+        )
+    return (
+        _quad_coeffs(points[0][0], points[1][0], points[2][0]),
+        _quad_coeffs(points[0][1], points[1][1], points[2][1]),
+    )
+
+
+def _curve_point(basis_x, basis_y, t):
+    return (_horner(basis_x, t), _horner(basis_y, t))
+
+
+def _horner(coeff, t):
+    cubic, quad, linear, constant = coeff
+    return ((cubic * t + quad) * t + linear) * t + constant
+
+
+def _curve_segment_gap(start, end, points):
+    """Distance to one quad or cubic, and whether the open edge meets it.
+
+    The closest point is an endpoint or a critical point. On a cubic,
+    ``(C - P) · C'`` is a quintic. A tangent parallel to the edge is a
+    quadratic, and a crossing of the edge's line is a cubic. None of
+    those is a sample spacing.
+    """
+    basis_x, basis_y = _curve_basis(points)
+    dx = end[0] - start[0]
+    dy = end[1] - start[1]
+    length_sq = dx * dx + dy * dy
+    best = None
+
+    def keep(dist):
+        nonlocal best
+        if best is None or dist < best:
+            best = dist
+
+    for t in (0.0, 1.0):
+        keep(_point_segment_distance(
+            _curve_point(basis_x, basis_y, t), start, end))
+    for point in (start, end):
+        keep(_point_curve_distance(point, basis_x, basis_y))
+    if length_sq <= 1e-18:
+        if best is None:
+            return 0.0, False
+        return best, False
+    direction = (dx, dy)
+    if _tangent_always_parallel(basis_x, basis_y, direction, length_sq):
+        # No isolated parallel root. The curve stays on one parallel line,
+        # so the gap is the perpendicular plus any along-line separation.
+        keep(_parallel_curve_gap(
+            start, basis_x, basis_y, direction, length_sq))
+        hit = _curve_hits_segment(
+            start, basis_x, basis_y, direction, length_sq)
+        if hit:
+            keep(0.0)
+        if best is None:
+            return 0.0, hit
+        return best, hit
+    for t in _unit_poly_roots(_parallel_coeffs(basis_x, basis_y, direction)):
+        point = _curve_point(basis_x, basis_y, _clamp_unit(t))
+        scale = (
+            (point[0] - start[0]) * dx + (point[1] - start[1]) * dy
+        ) / length_sq
+        if scale < -1e-8 or scale > 1.0 + 1e-8:
+            continue
+        keep(_point_segment_distance(point, start, end))
+    hit = _curve_hits_segment(
+        start, basis_x, basis_y, direction, length_sq)
+    if hit:
+        keep(0.0)
+    if best is None:
+        return 0.0, hit
+    return best, hit
+
+
+def _point_curve_distance(point, basis_x, basis_y):
+    best = None
+    candidates = [0.0, 1.0]
+    candidates.extend(
+        _unit_poly_roots(_approach_coeffs(point, basis_x, basis_y)))
+    for t in candidates:
+        curve = _curve_point(basis_x, basis_y, _clamp_unit(t))
+        dist = math.hypot(curve[0] - point[0], curve[1] - point[1])
+        if best is None or dist < best:
+            best = dist
+    if best is None:
+        return 0.0
+    return best
+
+
+def _dot(first, second):
+    return first[0] * second[0] + first[1] * second[1]
+
+
+def _approach_coeffs(point, basis_x, basis_y):
+    """``(C(t) - P) · C'(t)``, highest degree first."""
+    cubic = (basis_x[0], basis_y[0])
+    quad = (basis_x[1], basis_y[1])
+    linear = (basis_x[2], basis_y[2])
+    end = (
+        basis_x[3] - point[0],
+        basis_y[3] - point[1],
+    )
     return [
-        _finish_outline(outer, pairs, distance, dilated)
-        for outer in outers
+        3.0 * _dot(cubic, cubic),
+        5.0 * _dot(cubic, quad),
+        4.0 * _dot(cubic, linear) + 2.0 * _dot(quad, quad),
+        3.0 * _dot(quad, linear) + 3.0 * _dot(cubic, end),
+        _dot(linear, linear) + 2.0 * _dot(quad, end),
+        _dot(end, linear),
     ]
+
+
+def _parallel_coeffs(basis_x, basis_y, direction):
+    """``C'(t) × direction``, highest degree first."""
+    dx, dy = direction
+    return [
+        3.0 * (basis_x[0] * dy - basis_y[0] * dx),
+        2.0 * (basis_x[1] * dy - basis_y[1] * dx),
+        basis_x[2] * dy - basis_y[2] * dx,
+    ]
+
+
+def _crossing_coeffs(start, basis_x, basis_y, direction):
+    """``(C(t) - start) × direction``, highest degree first."""
+    dx, dy = direction
+    return [
+        basis_x[0] * dy - basis_y[0] * dx,
+        basis_x[1] * dy - basis_y[1] * dx,
+        basis_x[2] * dy - basis_y[2] * dx,
+        (basis_x[3] - start[0]) * dy - (basis_y[3] - start[1]) * dx,
+    ]
+
+
+def _coeffs_vanish(coeffs, span):
+    return max(abs(coeff) for coeff in coeffs) <= 1e-9 * span
+
+
+def _tangent_always_parallel(basis_x, basis_y, direction, length_sq):
+    """True when ``C'(t) × direction`` is identically zero."""
+    span = max(math.sqrt(length_sq), 1.0)
+    return _coeffs_vanish(
+        _parallel_coeffs(basis_x, basis_y, direction), span)
+
+
+def _curve_on_line(start, basis_x, basis_y, direction, length_sq):
+    """True when the whole curve lies on the edge's infinite line."""
+    span = max(math.sqrt(length_sq), 1.0)
+    return _coeffs_vanish(
+        _crossing_coeffs(start, basis_x, basis_y, direction), span)
+
+
+def _parallel_curve_gap(start, basis_x, basis_y, direction, length_sq):
+    """Gap to a curve whose tangent stays parallel to the edge."""
+    point = _curve_point(basis_x, basis_y, 0.0)
+    cross = (
+        (point[0] - start[0]) * direction[1]
+        - (point[1] - start[1]) * direction[0]
+    )
+    length = math.sqrt(length_sq)
+    perp = abs(cross) / length
+    low, high = _projection_span(
+        start, basis_x, basis_y, direction, length_sq)
+    if high >= 0.0 and low <= 1.0:
+        along = 0.0
+    elif high < 0.0:
+        along = -high * length
+    else:
+        along = (low - 1.0) * length
+    return math.hypot(perp, along)
+
+
+def _curve_hits_segment(start, basis_x, basis_y, direction, length_sq):
+    """True when the curve meets the open segment."""
+    if _curve_on_line(start, basis_x, basis_y, direction, length_sq):
+        return _flat_curve_hits(
+            start, basis_x, basis_y, direction, length_sq)
+    for t in _real_poly_roots(
+            _crossing_coeffs(start, basis_x, basis_y, direction)):
+        if t < -1e-8 or t > 1.0 + 1e-8:
+            continue
+        point = _curve_point(basis_x, basis_y, _clamp_unit(t))
+        scale = (
+            (point[0] - start[0]) * direction[0]
+            + (point[1] - start[1]) * direction[1]
+        ) / length_sq
+        if 1e-8 < scale < 1.0 - 1e-8:
+            return True
+    return False
+
+
+def _flat_curve_hits(start, basis_x, basis_y, direction, length_sq):
+    """The curve lies on the edge's line. True when the spans overlap."""
+    low, high = _projection_span(
+        start, basis_x, basis_y, direction, length_sq)
+    return high > 1e-8 and low < 1.0 - 1e-8
+
+
+def _projection_span(start, basis_x, basis_y, direction, length_sq):
+    samples = [0.0, 1.0]
+    samples.extend(_unit_poly_roots(
+        _speed_coeffs(basis_x, basis_y, direction)))
+    low = None
+    high = None
+    for t in samples:
+        point = _curve_point(basis_x, basis_y, _clamp_unit(t))
+        scale = (
+            (point[0] - start[0]) * direction[0]
+            + (point[1] - start[1]) * direction[1]
+        ) / length_sq
+        if low is None or scale < low:
+            low = scale
+        if high is None or scale > high:
+            high = scale
+    if low is None:
+        return 0.0, 0.0
+    return low, high
+
+
+def _speed_coeffs(basis_x, basis_y, direction):
+    """``C'(t) · direction``, highest degree first."""
+    return [
+        3.0 * (basis_x[0] * direction[0] + basis_y[0] * direction[1]),
+        2.0 * (basis_x[1] * direction[0] + basis_y[1] * direction[1]),
+        basis_x[2] * direction[0] + basis_y[2] * direction[1],
+    ]
+
+
+def _clamp_unit(value):
+    if value < 0.0:
+        return 0.0
+    if value > 1.0:
+        return 1.0
+    return value
+
+
+def _trim_coeffs(coeffs):
+    scale = 0.0
+    for coeff in coeffs:
+        if abs(coeff) > scale:
+            scale = abs(coeff)
+    tol = 1e-12 * scale
+    index = 0
+    last = len(coeffs) - 1
+    while index < last and abs(coeffs[index]) <= tol:
+        index += 1
+    return coeffs[index:]
+
+
+def _eval_poly(coeffs, t):
+    value = 0.0
+    for coeff in coeffs:
+        value = value * t + coeff
+    return value
+
+
+def _deriv_coeffs(coeffs):
+    degree = len(coeffs) - 1
+    return [
+        coeffs[index] * (degree - index)
+        for index in range(degree)
+    ]
+
+
+def _cube_root(value):
+    return math.copysign(abs(value) ** (1.0 / 3.0), value)
+
+
+def _quadratic_roots(a, b, c):
+    if abs(a) <= 1e-18:
+        if abs(b) <= 1e-18:
+            return []
+        return [-c / b]
+    disc = b * b - 4.0 * a * c
+    if disc < 0.0:
+        if disc > -1e-14:
+            disc = 0.0
+        else:
+            return []
+    root = math.sqrt(disc)
+    return [(-b + root) / (2.0 * a), (-b - root) / (2.0 * a)]
+
+
+def _cubic_roots(a, b, c, d):
+    scale = max(1.0, abs(b), abs(c), abs(d))
+    if abs(a) <= 1e-14 * scale:
+        return _quadratic_roots(b, c, d)
+    aa = a * a
+    shift = b / (3.0 * a)
+    p = (3.0 * a * c - b * b) / (3.0 * aa)
+    q = (
+        2.0 * b * b * b - 9.0 * a * b * c + 27.0 * aa * d
+    ) / (27.0 * aa * a)
+    disc = (q * 0.5) ** 2 + (p / 3.0) ** 3
+    if p < 0.0 and disc <= 1e-14:
+        radius = math.sqrt(-p / 3.0)
+        arg = (-0.5 * q) / (radius ** 3)
+        if arg > 1.0:
+            arg = 1.0
+        elif arg < -1.0:
+            arg = -1.0
+        theta = math.acos(arg)
+        return [
+            2.0 * radius * math.cos(
+                (theta - 2.0 * math.pi * k) / 3.0) - shift
+            for k in range(3)
+        ]
+    root = math.sqrt(disc) if disc > 0.0 else 0.0
+    left = _cube_root(-0.5 * q + root)
+    right = _cube_root(-0.5 * q - root)
+    return [left + right - shift]
+
+
+def _real_poly_roots(coeffs):
+    """Real roots of a polynomial of degree at most 3."""
+    coeffs = _trim_coeffs(coeffs)
+    degree = len(coeffs) - 1
+    if degree <= 0:
+        return []
+    if degree == 1:
+        lead, constant = coeffs
+        if abs(lead) <= 1e-18:
+            return []
+        return [-constant / lead]
+    if degree == 2:
+        return _quadratic_roots(coeffs[0], coeffs[1], coeffs[2])
+    return _cubic_roots(coeffs[0], coeffs[1], coeffs[2], coeffs[3])
+
+
+def _unit_poly_roots(coeffs):
+    """Real roots in ``[0, 1]``. Degree above 3 is split by its derivative."""
+    coeffs = _trim_coeffs(coeffs)
+    degree = len(coeffs) - 1
+    if degree <= 0:
+        return []
+    if degree <= 3:
+        return [
+            root for root in _real_poly_roots(coeffs)
+            if -1e-10 <= root <= 1.0 + 1e-10
+        ]
+    splits = [0.0, 1.0]
+    for root in _unit_poly_roots(_deriv_coeffs(coeffs)):
+        if 0.0 < root < 1.0:
+            splits.append(root)
+    splits.sort()
+    scale = 0.0
+    for coeff in coeffs:
+        if abs(coeff) > scale:
+            scale = abs(coeff)
+    tol = 1e-9 * max(scale, 1.0)
+    found = []
+    previous = None
+    for split in splits:
+        if previous is not None and split - previous <= 1e-14:
+            continue
+        if previous is not None:
+            found.extend(_bisect_root(coeffs, previous, split, tol))
+        if abs(_eval_poly(coeffs, split)) <= tol:
+            found.append(split)
+        previous = split
+    return found
+
+
+def _bisect_root(coeffs, left, right, tol):
+    start = _eval_poly(coeffs, left)
+    end = _eval_poly(coeffs, right)
+    if abs(start) <= tol or abs(end) <= tol:
+        return []
+    if start * end > 0.0:
+        return []
+    for _step in range(60):
+        mid = 0.5 * (left + right)
+        value = _eval_poly(coeffs, mid)
+        if abs(value) <= tol or right - left < 1e-14:
+            return [mid]
+        if start * value <= 0.0:
+            right = mid
+        else:
+            left = mid
+            start = value
+    return [0.5 * (left + right)]
+
+
+def _open_segment_hits(start, end, edge):
+    """True when the open segment meets ``edge``, ends excluded."""
+    ax, ay = start
+    bx, by = end
+    cx, cy = edge[0]
+    dx, dy = edge[1]
+    rx = bx - ax
+    ry = by - ay
+    sx = dx - cx
+    sy = dy - cy
+    denom = rx * sy - ry * sx
+    qx = cx - ax
+    qy = cy - ay
+    if abs(denom) <= 1e-9:
+        if abs(qx * ry - qy * rx) > 1e-7:
+            return False
+        length_sq = rx * rx + ry * ry
+        if length_sq <= 1e-18:
+            return False
+        t0 = (qx * rx + qy * ry) / length_sq
+        t1 = ((dx - ax) * rx + (dy - ay) * ry) / length_sq
+        if t0 > t1:
+            t0, t1 = t1, t0
+        left = t0 if t0 > 0.0 else 0.0
+        right = t1 if t1 < 1.0 else 1.0
+        return right - left > 1e-8
+    t = (qx * sy - qy * sx) / denom
+    u = (qx * ry - qy * rx) / denom
+    if t <= 1e-8 or t >= 1.0 - 1e-8:
+        return False
+    return -1e-8 <= u <= 1.0 + 1e-8
+
+
+def _segment_gap(start, end, edges):
+    """Least distance between the segment and the edges."""
+    best = None
+    for origin, dest in edges:
+        for point, left, right in (
+            (start, origin, dest),
+            (end, origin, dest),
+            (origin, start, end),
+            (dest, start, end),
+        ):
+            dist = _point_segment_distance(point, left, right)
+            if best is None or dist < best:
+                best = dist
+    if best is None:
+        return 0.0
+    return best
+
+
+def _point_edge_distance(point, edges):
+    best = None
+    for start, end in edges:
+        dist = _point_segment_distance(point, start, end)
+        if best is None or dist < best:
+            best = dist
+    if best is None:
+        return 0.0
+    return best
+
+
+def _bridge_outlines(outers):
+    """Join outlines across the gap between them.
+
+    Each bridge is an external tangent grown from the closest points.
+    The walk stops at a reflex vertex, then each outer keeps its own
+    boundary between the bridges. Two convex rings have no reflex, so
+    that tangent can be the hull edge across a step. The ends of the
+    facing overlap are the bridges then, and the straight offset stays.
+    """
+    rings = [
+        ring for ring in (_ring_points(outer) for outer in outers)
+        if len(ring) >= 3
+    ]
+    if len(rings) < 2:
+        return None
+    pending = rings
+    while len(pending) > 1:
+        nearest = None
+        for left in range(len(pending)):
+            for right in range(left + 1, len(pending)):
+                gap, _ia, _ib = _closest_vertices(pending[left], pending[right])
+                if nearest is None or gap < nearest[0]:
+                    nearest = (gap, left, right)
+        _gap, left, right = nearest
+        merged = _merge_gap(pending[left], pending[right])
+        if merged is None:
+            return None
+        pending = [
+            pending[index]
+            for index in range(len(pending))
+            if index != left and index != right
+        ]
+        pending.append(merged)
+    if len(pending[0]) < 3:
+        return None
+    return _closed_path(pending[0])
+
+
+def _closest_vertices(ring_a, ring_b):
+    best = None
+    for index_a, point_a in enumerate(ring_a):
+        for index_b, point_b in enumerate(ring_b):
+            gap = math.hypot(point_a[0] - point_b[0], point_a[1] - point_b[1])
+            if best is None or gap < best[0]:
+                best = (gap, index_a, index_b)
+    return best
+
+
+def _gap_tangent(ring_a, ring_b, index_a, index_b, direction):
+    """One external tangent, walking out from the closest points.
+
+    The rings advance in opposite directions. A reflex vertex is not
+    a bridge end, so the walk cannot cut across a notch.
+    """
+    step_a = direction
+    step_b = -direction
+    sign_a = -float(direction)
+    sign_b = float(direction)
+    count_a = len(ring_a)
+    count_b = len(ring_b)
+    for _step in range(count_a + count_b + 3):
+        moved = False
+        next_a = (index_a + step_a) % count_a
+        if (
+            not _reflex_vertex(ring_a, next_a)
+            and _cross(ring_b[index_b], ring_a[index_a], ring_a[next_a]) * sign_a
+            > 1e-9
+        ):
+            index_a = next_a
+            moved = True
+            continue
+        next_b = (index_b + step_b) % count_b
+        if (
+            not _reflex_vertex(ring_b, next_b)
+            and _cross(ring_a[index_a], ring_b[index_b], ring_b[next_b]) * sign_b
+            > 1e-9
+        ):
+            index_b = next_b
+            moved = True
+            continue
+        if not moved:
+            break
+    return index_a, index_b
+
+
+def _reflex_vertex(points, index):
+    return _signed_turn(points, index) <= -_SHARP_TURN
+
+
+def _cross(origin, first, second):
+    return (
+        (first[0] - origin[0]) * (second[1] - origin[1])
+        - (first[1] - origin[1]) * (second[0] - origin[0])
+    )
+
+
+def _index_chain(count, start, end):
+    indices = [start]
+    cursor = start
+    while cursor != end:
+        cursor = (cursor + 1) % count
+        indices.append(cursor)
+        if len(indices) > count + 1:
+            break
+    return indices
+
+
+def _chain_gap(ring, indices, other):
+    sample = indices[1:-1] if len(indices) > 2 else indices
+    if not sample:
+        sample = indices
+    segments = [
+        (other[index], other[(index + 1) % len(other)])
+        for index in range(len(other))
+    ]
+    total = 0.0
+    for index in sample:
+        total += _distance_to_segments(ring[index], segments)
+    return total / float(len(sample))
+
+
+def _merge_gap(ring_a, ring_b):
+    """One outline: the far boundary of each ring, plus two gap bridges."""
+    tangent = _tangent_points(ring_a, ring_b)
+    if tangent is None or _boundary_hidden(tangent, ring_a, ring_b):
+        # A walk that ends on one vertex drops the rest of that ring.
+        # A hull edge can also cut off a straight offset. Either way
+        # the bridges are the facing overlap.
+        spanned = _span_points(ring_a, ring_b)
+        if spanned is not None:
+            return spanned
+    return tangent
+
+
+def _tangent_points(ring_a, ring_b):
+    """External tangents. None when either ring has one bridge end."""
+    _gap, index_a, index_b = _closest_vertices(ring_a, ring_b)
+    ends = [
+        _gap_tangent(ring_a, ring_b, index_a, index_b, direction)
+        for direction in (1, -1)
+    ]
+    if ends[0][0] == ends[1][0] or ends[0][1] == ends[1][1]:
+        return None
+    return _assemble_gap(ring_a, ring_b, {
+        ends[0][0]: ends[0][1],
+        ends[1][0]: ends[1][1],
+    })
+
+
+def _assemble_gap(ring_a, ring_b, bridges):
+    if len(bridges) < 2:
+        return None
+    first, second = list(bridges.keys())
+    chain_ab = _index_chain(len(ring_a), first, second)
+    chain_ba = _index_chain(len(ring_a), second, first)
+    if _chain_gap(ring_a, chain_ab, ring_b) >= _chain_gap(ring_a, chain_ba, ring_b):
+        far = chain_ab
+    else:
+        far = chain_ba
+    start_b = bridges[far[-1]]
+    end_b = bridges[far[0]]
+    forward = _index_chain(len(ring_b), start_b, end_b)
+    backward = _index_chain(len(ring_b), end_b, start_b)
+    if _chain_gap(ring_b, forward, ring_a) < _chain_gap(ring_b, backward, ring_a):
+        far = list(reversed(far))
+        start_b = bridges[far[-1]]
+        end_b = bridges[far[0]]
+        forward = _index_chain(len(ring_b), start_b, end_b)
+    points = [ring_a[index] for index in far]
+    points.extend(ring_b[index] for index in forward)
+    return points
+
+
+def _point_segment_distance(point, start, end):
+    dx = end[0] - start[0]
+    dy = end[1] - start[1]
+    length_sq = dx * dx + dy * dy
+    if length_sq <= 1e-18:
+        return math.hypot(point[0] - start[0], point[1] - start[1])
+    scale = (
+        (point[0] - start[0]) * dx + (point[1] - start[1]) * dy
+    ) / length_sq
+    if scale < 0.0:
+        scale = 0.0
+    elif scale > 1.0:
+        scale = 1.0
+    return math.hypot(
+        point[0] - (start[0] + scale * dx),
+        point[1] - (start[1] + scale * dy),
+    )
+
+
+def _parallel_overlap(a0, a1, b0, b1):
+    """The facing overlap of two parallel edges, or None."""
+    adx = a1[0] - a0[0]
+    ady = a1[1] - a0[1]
+    length_a = math.hypot(adx, ady)
+    bdx = b1[0] - b0[0]
+    bdy = b1[1] - b0[1]
+    length_b = math.hypot(bdx, bdy)
+    if length_a <= _TANGENT_EPS or length_b <= _TANGENT_EPS:
+        return None
+    ux = adx / length_a
+    uy = ady / length_a
+    if abs(ux * bdy - uy * bdx) / length_b > 1e-6:
+        return None
+    nx = -uy
+    ny = ux
+    signed = (b0[0] - a0[0]) * nx + (b0[1] - a0[1]) * ny
+    signed_end = (b1[0] - a0[0]) * nx + (b1[1] - a0[1]) * ny
+    if abs(signed - signed_end) > 1e-4:
+        return None
+    dist = abs(signed)
+    if signed < 0.0:
+        nx = -nx
+        ny = -ny
+
+    def along(point):
+        return (point[0] - a0[0]) * ux + (point[1] - a0[1]) * uy
+
+    lo = min(along(b0), along(b1))
+    hi = max(along(b0), along(b1))
+    start = max(0.0, lo)
+    end = min(length_a, hi)
+    if end < start + 1e-6:
+        return None
+
+    def at(t):
+        return (a0[0] + ux * t, a0[1] + uy * t)
+
+    p0 = at(start)
+    p1 = at(end)
+    q0 = (p0[0] + nx * dist, p0[1] + ny * dist)
+    q1 = (p1[0] + nx * dist, p1[1] + ny * dist)
+    return dist, end - start, p0, q0, p1, q1
+
+
+def _run_continues(points, index):
+    """The next edge lies on this edge. An arc chord turns off the line."""
+    count = len(points)
+    a0 = points[index]
+    a1 = points[(index + 1) % count]
+    b1 = points[(index + 2) % count]
+    adx = a1[0] - a0[0]
+    ady = a1[1] - a0[1]
+    bdx = b1[0] - a1[0]
+    bdy = b1[1] - a1[1]
+    length_a = math.hypot(adx, ady)
+    length_b = math.hypot(bdx, bdy)
+    if length_a <= _TANGENT_EPS or length_b <= _TANGENT_EPS:
+        return False
+    ux = adx / length_a
+    uy = ady / length_a
+    if ux * bdx + uy * bdy < (1.0 - 1e-8) * length_b:
+        return False
+    if abs(ux * bdy - uy * bdx) > 1e-6:
+        return False
+    return True
+
+
+def _straight_runs(ring):
+    """Each run is one straight side, including across a colinear seam."""
+    count = len(ring)
+    if count < 2:
+        return []
+    continues = [_run_continues(ring, index) for index in range(count)]
+    start = 0
+    for index in range(count):
+        if not continues[(index - 1) % count]:
+            start = index
+            break
+    runs = []
+    index = start
+    for _step in range(count):
+        end = index
+        while continues[end]:
+            nxt = (end + 1) % count
+            if nxt == index:
+                break
+            end = nxt
+        run_end = (end + 1) % count
+        if not _near(ring[index], ring[run_end], 1e-12):
+            runs.append((ring[index], ring[run_end]))
+        nxt = (end + 1) % count
+        if nxt == start:
+            break
+        index = nxt
+    return runs
+
+
+def _gap_overlap(ring_a, ring_b):
+    """Longest parallel overlap that realizes the minimum separation.
+
+    A ring inside the other is a piece in a hole, not a gap.
+    """
+    if _ring_sits_inside(ring_a, ring_b) or _ring_sits_inside(ring_b, ring_a):
+        return None
+    min_d = None
+    best = None
+    runs_a = _straight_runs(ring_a)
+    runs_b = _straight_runs(ring_b)
+    for a0, a1 in runs_a:
+        for b0, b1 in runs_b:
+            overlap = _parallel_overlap(a0, a1, b0, b1)
+            if overlap is not None:
+                dist, length = overlap[0], overlap[1]
+                if best is None or dist < best[0] - 1e-6 or (
+                    abs(dist - best[0]) <= 1e-4 and length > best[1]
+                ):
+                    best = overlap
+    count_a = len(ring_a)
+    count_b = len(ring_b)
+    for index_a in range(count_a):
+        a0 = ring_a[index_a]
+        a1 = ring_a[(index_a + 1) % count_a]
+        for index_b in range(count_b):
+            b0 = ring_b[index_b]
+            b1 = ring_b[(index_b + 1) % count_b]
+            for point, start, end in (
+                (a0, b0, b1),
+                (b0, a0, a1),
+            ):
+                dist = _point_segment_distance(point, start, end)
+                if min_d is None or dist < min_d:
+                    min_d = dist
+    if best is None or min_d is None:
+        return None
+    if best[0] > min_d + 1e-3 or best[1] <= 1e-3:
+        return None
+    return best
+
+
+def _ring_segments(ring):
+    count = len(ring)
+    return [
+        (ring[index], ring[(index + 1) % count])
+        for index in range(count)
+    ]
+
+
+def _ring_sits_inside(outer, inner):
+    """True when ``inner`` lies in ``outer``."""
+    if len(inner) < 3 or len(outer) < 3:
+        return False
+    if abs(_ring_area(inner)) >= abs(_ring_area(outer)):
+        return False
+    left = min(point[0] for point in outer)
+    bottom = min(point[1] for point in outer)
+    right = max(point[0] for point in outer)
+    top = max(point[1] for point in outer)
+    for point in inner:
+        if (
+            point[0] < left - 1e-6
+            or point[0] > right + 1e-6
+            or point[1] < bottom - 1e-6
+            or point[1] > top + 1e-6
+        ):
+            return False
+    segments = _ring_segments(outer)
+    for point in inner:
+        if _distance_to_segments(point, segments) <= 1e-4:
+            continue
+        if not _point_inside_ring(point, outer):
+            return False
+    return True
+
+
+def _point_inside_ring(point, ring):
+    if _distance_to_segments(point, _ring_segments(ring)) <= 1e-4:
+        return False
+    x, y = point
+    inside = False
+    count = len(ring)
+    for index in range(count):
+        x0, y0 = ring[index]
+        x1, y1 = ring[(index + 1) % count]
+        if (y0 > y) == (y1 > y):
+            continue
+        cross_x = (x1 - x0) * (y - y0) / (y1 - y0) + x0
+        if x < cross_x:
+            inside = not inside
+    return inside
+
+
+def _min_ring_distance(ring_a, ring_b):
+    best = None
+    segments = _ring_segments(ring_b)
+    for point in ring_a:
+        dist = _distance_to_segments(point, segments)
+        if best is None or dist < best:
+            best = dist
+    segments = _ring_segments(ring_a)
+    for point in ring_b:
+        dist = _distance_to_segments(point, segments)
+        if best is None or dist < best:
+            best = dist
+    if best is None:
+        return 0.0
+    return best
+
+
+def _straight_side(points, index):
+    """A real offset side, including one shorter than the old cutoff of 1.
+
+    Arc chords match their neighbors. A unit side can measure just under 1.
+    """
+    count = len(points)
+    start = points[index]
+    end = points[(index + 1) % count]
+    length = math.hypot(end[0] - start[0], end[1] - start[1])
+    if length <= 1e-8:
+        return False
+    if abs(_signed_turn(points, index)) >= _SHARP_TURN:
+        return True
+    if abs(_signed_turn(points, (index + 1) % count)) >= _SHARP_TURN:
+        return True
+    if length >= 1.0 - 1e-6:
+        return True
+    prev = points[(index - 1) % count]
+    nxt = points[(index + 2) % count]
+    prev_len = math.hypot(start[0] - prev[0], start[1] - prev[1])
+    next_len = math.hypot(nxt[0] - end[0], nxt[1] - end[1])
+    return length > prev_len * 2.0 and length > next_len * 2.0
+
+
+def _side_samples(start, end):
+    """Points on the side, including a step in from each end.
+
+    Whole-unit steps miss a free end shorter than that step.
+    """
+    dx = end[0] - start[0]
+    dy = end[1] - start[1]
+    length = math.hypot(dx, dy)
+    if length <= 1e-12:
+        return
+    inset = min(0.05, length * 0.25)
+    fractions = [inset / length, 0.5, 1.0 - inset / length]
+    steps = int(math.ceil(length))
+    for step in range(1, steps):
+        fractions.append(step / float(steps))
+    for fraction in fractions:
+        yield (
+            start[0] + dx * fraction,
+            start[1] + dy * fraction,
+        )
+
+
+def _boundary_hidden(merged, ring_a, ring_b):
+    """A straight offset that does not face the gap fell inside.
+
+    Corner arcs inside an external tangent are the smooth outline.
+    A straight side inside that tangent is the step the hull cut off.
+    """
+    if not merged or len(merged) < 3:
+        return False
+    limit = _min_ring_distance(ring_a, ring_b) + 1e-3
+    for ring, other in ((ring_a, ring_b), (ring_b, ring_a)):
+        other_segments = _ring_segments(other)
+        count = len(ring)
+        for index in range(count):
+            if not _straight_side(ring, index):
+                continue
+            start = ring[index]
+            end = ring[(index + 1) % count]
+            for point in _side_samples(start, end):
+                if _distance_to_segments(point, other_segments) <= limit:
+                    continue
+                if _point_inside_ring(point, merged):
+                    return True
+    return False
+
+
+def _insert_points(ring, extras):
+    """Ring with boundary points inserted, and each extra's index."""
+    count = len(ring)
+    on_vertex = {}
+    additions = [[] for _index in range(count)]
+    for extra_index, point in enumerate(extras):
+        found = None
+        for index in range(count):
+            start = ring[index]
+            end = ring[(index + 1) % count]
+            dist = _point_segment_distance(point, start, end)
+            if dist > 1e-4:
+                continue
+            dx = end[0] - start[0]
+            dy = end[1] - start[1]
+            length_sq = dx * dx + dy * dy
+            if length_sq <= 1e-18:
+                t = 0.0
+            else:
+                t = (
+                    (point[0] - start[0]) * dx + (point[1] - start[1]) * dy
+                ) / length_sq
+            if t < -1e-5 or t > 1.0 + 1e-5:
+                continue
+            found = (index, max(0.0, min(1.0, t)))
+            break
+        if found is None:
+            return None
+        edge, t = found
+        if t <= 1e-6:
+            on_vertex[extra_index] = edge
+        elif t >= 1.0 - 1e-6:
+            on_vertex[extra_index] = (edge + 1) % count
+        else:
+            additions[edge].append((t, extra_index))
+    new_ring = []
+    origin_at = {}
+    extra_at = {}
+    for index in range(count):
+        origin_at[index] = len(new_ring)
+        new_ring.append(ring[index])
+        start = ring[index]
+        end = ring[(index + 1) % count]
+        for t, extra_index in sorted(additions[index]):
+            new_ring.append((
+                start[0] + (end[0] - start[0]) * t,
+                start[1] + (end[1] - start[1]) * t,
+            ))
+            extra_at[extra_index] = len(new_ring) - 1
+    for extra_index, index in on_vertex.items():
+        extra_at[extra_index] = origin_at[index]
+    if len(extra_at) != len(extras):
+        return None
+    return new_ring, extra_at
+
+
+def _span_points(ring_a, ring_b):
+    overlap = _gap_overlap(ring_a, ring_b)
+    if overlap is None:
+        return None
+    _dist, _length, p0, q0, p1, q1 = overlap
+    placed_a = _insert_points(ring_a, [p0, p1])
+    placed_b = _insert_points(ring_b, [q0, q1])
+    if placed_a is None or placed_b is None:
+        return None
+    ring_a, index_a = placed_a
+    ring_b, index_b = placed_b
+    if index_a[0] == index_a[1] or index_b[0] == index_b[1]:
+        return None
+    bridges = {
+        index_a[0]: index_b[0],
+        index_a[1]: index_b[1],
+    }
+    return _assemble_gap(ring_a, ring_b, bridges)
 
 
 def _dilate(subject, distance):
@@ -69,6 +1302,122 @@ def _dilate(subject, distance):
     expanded = scaled.united(stroke).simplified()
     expanded.setFillRule(Qt.OddEvenFill)
     return QTransform().scale(1.0 / scale, 1.0 / scale).map(expanded)
+
+
+def _meeting_outers(subject):
+    """Outer boundary of each cluster when the distance is zero.
+
+    Sibling pieces share one winding-fill simplify, so a meet or an
+    overlap becomes that union. A zero stroke leaves the overlap
+    empty, and a pairwise union repeats a boolean per piece. One
+    piece is returned as drawn. A piece in a hole is its own group.
+    """
+    loops, _depths = _nested_loops(subject)
+    depths = _strict_depths(loops)
+    groups = {}
+    for index, (subpath, _area, point) in enumerate(loops):
+        if depths[index] % 2 != 0:
+            continue
+        parent = _parent_index(loops, depths, index, point)
+        groups.setdefault(parent, []).append(subpath)
+    outers = []
+    for group in groups.values():
+        outers.extend(_winding_union(group))
+    return outers
+
+
+def _strict_depths(loops):
+    """Nest only a loop that sits inside a larger one.
+
+    One interior probe lands in an overlap and would hide the piece
+    that still sticks out. Vertices and an edge sample have to be in.
+    """
+    depths = []
+    for index, (subpath, area, point) in enumerate(loops):
+        depth = 0
+        for other, (outline, other_area, _other_point) in enumerate(loops):
+            if other == index or other_area <= area:
+                continue
+            if _loop_inside(outline, subpath, point):
+                depth += 1
+        depths.append(depth)
+    return depths
+
+
+def _parent_index(loops, depths, index, point):
+    depth = depths[index]
+    if depth == 0:
+        return -1
+    subpath = loops[index][0]
+    parent = -1
+    parent_area = None
+    for other, (outline, other_area, _other_point) in enumerate(loops):
+        if depths[other] != depth - 1:
+            continue
+        if not _loop_inside(outline, subpath, point):
+            continue
+        if parent_area is None or other_area < parent_area:
+            parent = other
+            parent_area = other_area
+    return parent
+
+
+def _loop_inside(outer, inner, inner_point):
+    if not outer.contains(inner_point):
+        return False
+    for kind, points in _segments(inner):
+        for vertex in (points[0], points[-1]):
+            if not outer.contains(QPointF(vertex[0], vertex[1])):
+                return False
+        sample = _edge_sample(kind, points)
+        if sample is None:
+            continue
+        if not outer.contains(QPointF(sample[0], sample[1])):
+            return False
+    return True
+
+
+def _winding_union(loops):
+    if len(loops) == 1:
+        return loops
+    combined = QPainterPath()
+    combined.setFillRule(Qt.WindingFill)
+    for loop in loops:
+        piece = loop
+        if _signed_area(loop) < 0.0:
+            piece = _reversed_closed(loop)
+        combined.addPath(piece)
+    merged = combined.simplified()
+    outers = _outer_boundaries(merged)
+    if not outers:
+        return loops
+    return outers
+
+
+def _reversed_closed(path):
+    commands = []
+    for kind, points in _segments(path):
+        commands.append((kind, points))
+    if not commands:
+        return path
+    reversed_path = QPainterPath()
+    end = commands[-1][1][-1]
+    reversed_path.moveTo(end[0], end[1])
+    for kind, points in reversed(commands):
+        start = points[0]
+        if kind == 'line':
+            reversed_path.lineTo(start[0], start[1])
+        elif kind == 'quad':
+            control = points[1]
+            reversed_path.quadTo(control[0], control[1], start[0], start[1])
+        else:
+            reversed_path.cubicTo(
+                points[2][0], points[2][1],
+                points[1][0], points[1][1],
+                start[0], start[1],
+            )
+    reversed_path.closeSubpath()
+    return reversed_path
 
 
 def _outer_boundaries(path):
@@ -349,103 +1698,6 @@ def _boundary_segments(path):
             if kind == 'line':
                 segments.append(points)
     return segments
-
-
-def _boxes_miss(first, second):
-    a, b = first
-    c, d = second
-    return (
-        max(a[0], b[0]) < min(c[0], d[0]) - 1e-9
-        or max(c[0], d[0]) < min(a[0], b[0]) - 1e-9
-        or max(a[1], b[1]) < min(c[1], d[1]) - 1e-9
-        or max(c[1], d[1]) < min(a[1], b[1]) - 1e-9
-    )
-
-
-def _segment_intersection(first, second):
-    """A point where the segments cross, including a shared endpoint."""
-    if _boxes_miss(first, second):
-        return None
-    ax, ay = first[0]
-    bx, by = first[1]
-    cx, cy = second[0]
-    dx, dy = second[1]
-    rx = bx - ax
-    ry = by - ay
-    sx = dx - cx
-    sy = dy - cy
-    den = rx * sy - ry * sx
-    if abs(den) <= 1e-12:
-        return None
-    qpx = cx - ax
-    qpy = cy - ay
-    t = (qpx * sy - qpy * sx) / den
-    u = (qpx * ry - qpy * rx) / den
-    if t < -1e-8 or t > 1.0 + 1e-8 or u < -1e-8 or u > 1.0 + 1e-8:
-        return None
-    return (ax + t * rx, ay + t * ry)
-
-
-def _cluster_points(points, tol):
-    groups = []
-    for point in points:
-        for group in groups:
-            if math.hypot(point[0] - group[0], point[1] - group[1]) <= tol:
-                break
-        else:
-            groups.append(point)
-    return groups
-
-
-def _crossing_pairs(subject, distance):
-    """Crossing pairs of dilated components.
-
-    Two points are one pair. Parallel contact, including a gap of
-    exactly twice the distance, is not a crossing.
-    """
-    components = _components(subject)
-    if len(components) < 2:
-        return []
-    boundaries = [
-        _boundary_segments(_dilate(component, distance))
-        for component in components
-    ]
-    pairs = []
-    for left in range(len(boundaries)):
-        for right in range(left + 1, len(boundaries)):
-            found = []
-            for first in boundaries[left]:
-                for second in boundaries[right]:
-                    point = _segment_intersection(first, second)
-                    if point is not None:
-                        found.append(point)
-            found = _cluster_points(found, _CROSS_CLUSTER)
-            pairs.extend(_match_crossings(found))
-    return pairs
-
-
-def _match_crossings(points):
-    if len(points) < 2:
-        return []
-    if len(points) == 2:
-        return [(points[0], points[1])]
-    remaining = list(points)
-    pairs = []
-    while len(remaining) >= 2:
-        best = None
-        for left in range(len(remaining)):
-            for right in range(left + 1, len(remaining)):
-                dist = math.hypot(
-                    remaining[left][0] - remaining[right][0],
-                    remaining[left][1] - remaining[right][1],
-                )
-                if best is None or dist < best[0]:
-                    best = (dist, left, right)
-        _dist, left, right = best
-        pairs.append((remaining[left], remaining[right]))
-        for index in sorted((left, right), reverse=True):
-            remaining.pop(index)
-    return pairs
 
 
 def _ring_area(points):
@@ -823,36 +2075,6 @@ def _fit_fillet_loose(points, index, radius, max_back, dilated):
     return found[1]
 
 
-def _crossing_corner_indices(points, pairs):
-    """Outline vertices where two surrounds actually cross.
-
-    A shallow kink is still a crossing. Stroker noise is a degree
-    or two and does not sit on the crossing point.
-    """
-    chosen = []
-    for pair in pairs:
-        for crossing in pair:
-            best = None
-            for index, point in enumerate(points):
-                dist = math.hypot(point[0] - crossing[0], point[1] - crossing[1])
-                if dist > _CROSS_SNAP:
-                    continue
-                turn = _signed_turn(points, index)
-                if best is None or turn < best[0] - 1e-6 or (
-                    abs(turn - best[0]) <= 1e-6 and dist < best[1]
-                ):
-                    best = (turn, dist, index)
-            if best is None:
-                continue
-            turn, dist, index = best
-            if turn >= -0.5:
-                continue
-            if dist > 0.02 and turn > -4.0:
-                continue
-            chosen.append(index)
-    return chosen
-
-
 def _forward_span(points, start, end):
     """Arc length from ``start`` to ``end`` along the ring."""
     lengths, total = _cumulative(points)
@@ -1069,103 +2291,6 @@ def _apply_fillets(points, fillets):
     return output, attachments
 
 
-def _snap_chords(pairs, attachments):
-    chords = []
-    for pair in pairs:
-        ends = []
-        used = set()
-        missed = False
-        for crossing in pair:
-            best = None
-            for slot, (corner, index) in enumerate(attachments):
-                if slot in used:
-                    continue
-                dist = math.hypot(
-                    corner[0] - crossing[0], corner[1] - crossing[1])
-                if best is None or dist < best[0]:
-                    best = (dist, slot, index)
-            if best is None or best[0] > _CROSS_SNAP:
-                missed = True
-                break
-            used.add(best[1])
-            ends.append(best[2])
-        if missed or len(ends) != 2 or ends[0] == ends[1]:
-            continue
-        chords.append((ends[0], ends[1]))
-    return chords
-
-
-def _connector_tour(count, chords):
-    """Ring once, each connector twice, ring and connector alternating.
-
-    Doubling the connector makes the outline one closed stroke. Each
-    end meets the connector from the surround, not from a reversal.
-    """
-    adj = [[] for _index in range(count)]
-
-    def add(start, end, kind):
-        forward = [end, kind, False]
-        back = [start, kind, False]
-        forward.append(back)
-        back.append(forward)
-        adj[start].append(forward)
-        adj[end].append(back)
-
-    for index in range(count):
-        add(index, (index + 1) % count, 'r')
-    for start, end in chords:
-        add(start, end, 'c')
-        add(start, end, 'c')
-
-    def pick(vertex, arrived):
-        options = [edge for edge in adj[vertex] if not edge[2]]
-        if not options:
-            return None
-        if arrived is None:
-            for edge in options:
-                if edge[1] == 'r':
-                    return edge
-            return options[0]
-        want = 'c' if arrived == 'r' else 'r'
-        for edge in options:
-            if edge[1] == want:
-                return edge
-        return options[0]
-
-    start = chords[0][0]
-    path = []
-    trail = []
-    arrived_stack = []
-    vertex = start
-    arrived = None
-    guard = 0
-    limit = (count + 2 * len(chords)) * 4 + 8
-    while guard < limit:
-        guard += 1
-        edge = pick(vertex, arrived)
-        if edge is not None:
-            edge[2] = True
-            edge[3][2] = True
-            trail.append(vertex)
-            arrived_stack.append(arrived)
-            arrived = edge[1]
-            vertex = edge[0]
-            continue
-        path.append(vertex)
-        if not trail:
-            break
-        vertex = trail.pop()
-        arrived = arrived_stack.pop()
-    else:
-        return None
-    path.reverse()
-    if len(path) >= 2 and path[0] == path[-1]:
-        path.pop()
-    if len(path) != count + 2 * len(chords):
-        return None
-    return path
-
-
 def _closed_path(points):
     cleaned = [points[0]]
     for point in points[1:]:
@@ -1183,23 +2308,166 @@ def _closed_path(points):
     return path
 
 
-def _finish_outline(outer, pairs, distance, dilated):
-    """Round reflex corners, then one connector per crossing pair.
+def _edges_colinear(points, first, second):
+    count = len(points)
+    a0 = points[first]
+    a1 = points[(first + 1) % count]
+    b0 = points[second]
+    b1 = points[(second + 1) % count]
+    adx = a1[0] - a0[0]
+    ady = a1[1] - a0[1]
+    bdx = b1[0] - b0[0]
+    bdy = b1[1] - b0[1]
+    length_a = math.hypot(adx, ady)
+    length_b = math.hypot(bdx, bdy)
+    if length_a <= _TANGENT_EPS or length_b <= _TANGENT_EPS:
+        return False
+    ux = adx / length_a
+    uy = ady / length_a
+    if ux * bdx + uy * bdy < 0.999 * length_b:
+        return False
+    if abs(ux * (b0[1] - a0[1]) - uy * (b0[0] - a0[0])) > 1e-3:
+        return False
+    if abs(ux * (b1[1] - a0[1]) - uy * (b1[0] - a0[0])) > 1e-3:
+        return False
+    return True
 
-    The connector may come closer than the surround distance. That is
-    the overlap exception. The rest of the outline may not.
+
+def _short_dip(points, edge, chain):
+    """The chain is a dent of arc chords under a straight offset."""
+    count = len(points)
+    start = points[edge]
+    end = points[(edge + 1) % count]
+    length = math.hypot(end[0] - start[0], end[1] - start[1])
+    if length <= _TANGENT_EPS:
+        return False
+    ux = (end[0] - start[0]) / length
+    uy = (end[1] - start[1]) / length
+    dipped = False
+    for index in chain[1:-1]:
+        point = points[index]
+        cross = ux * (point[1] - start[1]) - uy * (point[0] - start[0])
+        if cross < -1e-3:
+            return False
+        # A crossing of close pieces sits just under the line.
+        if cross > 1e-3:
+            dipped = True
+    for index in range(len(chain) - 1):
+        a = points[chain[index]]
+        b = points[chain[index + 1]]
+        edge_length = math.hypot(b[0] - a[0], b[1] - a[1])
+        if edge_length <= 0.75:
+            continue
+        if abs(ux * (a[1] - start[1]) - uy * (a[0] - start[0])) > 1e-3:
+            return False
+        if abs(ux * (b[1] - start[1]) - uy * (b[0] - start[0])) > 1e-3:
+            return False
+        if ux * (b[0] - a[0]) + uy * (b[1] - a[1]) < 0.999 * edge_length:
+            return False
+    return dipped
+
+
+def _shortcut_is_outer(points, chain, edge):
+    count = len(points)
+    start = points[edge]
+    end = points[(edge + 1) % count]
+    length = math.hypot(end[0] - start[0], end[1] - start[1])
+    if length <= _TANGENT_EPS:
+        return False
+    ux = (end[0] - start[0]) / length
+    uy = (end[1] - start[1]) / length
+    # Exterior is to the right of a counterclockwise edge.
+    ox = uy
+    oy = -ux
+    a = points[chain[0]]
+    b = points[chain[-1]]
+    for t in (0.25, 0.5, 0.75):
+        sample = (
+            a[0] + (b[0] - a[0]) * t + ox * 0.01,
+            a[1] + (b[1] - a[1]) * t + oy * 0.01,
+        )
+        if _point_inside_ring(sample, points):
+            return False
+    return True
+
+
+def _straighten_colinear(points):
+    """Keep a shared straight offset across the gaps between its pieces.
+
+    A fillet at each crossing leaves a bump. The line already clears
+    the subject where it stays outside the offset.
     """
-    points = _ring_points(outer)
+    count = len(points)
+    if count < 4:
+        return points
+    _lengths, total = _cumulative(points)
+    sides = []
+    for index in range(count):
+        # A short top anchors the line the same way a long one does.
+        if _straight_side(points, index):
+            sides.append(index)
+    gaps = []
+    for pos, edge in enumerate(sides):
+        end_vertex = (edge + 1) % count
+        for later in sides[pos + 1:] + sides[:pos]:
+            chain = _index_chain(count, end_vertex, later)
+            span = 0.0
+            for index in range(len(chain) - 1):
+                a = points[chain[index]]
+                b = points[chain[index + 1]]
+                span += math.hypot(b[0] - a[0], b[1] - a[1])
+            if span > total * 0.5:
+                break
+            if not _edges_colinear(points, edge, later):
+                continue
+            if not _short_dip(points, edge, chain):
+                continue
+            if not _shortcut_is_outer(points, chain, edge):
+                continue
+            gaps.append((chain[0], chain[-1]))
+            break
+    if not gaps:
+        return points
+    drop = [False] * count
+    for start, end in gaps:
+        cursor = (start + 1) % count
+        guard = 0
+        while cursor != end and guard < count:
+            drop[cursor] = True
+            cursor = (cursor + 1) % count
+            guard += 1
+    kept = [
+        point for index, point in enumerate(points) if not drop[index]
+    ]
+    if len(kept) < 3:
+        return points
+    return kept
+
+
+def _kept_outline(points, fallback):
+    path = _closed_path(points)
+    if path is None:
+        return fallback
+    return path
+
+
+def _finish_outline(outer, distance, dilated, cap_mouth=True):
+    """Round reflex corners outward to the surround distance.
+
+    The arc stays outside the offset, including at a crossing dent.
+    A connector through that dent would come closer than the distance.
+    Colinear straight offsets are one line before that fillet. A mouth
+    on one dilation is still one turn. A gap bridge is not a mouth.
+    """
+    points = _straighten_colinear(_ring_points(outer))
     if len(points) < 4:
         return outer
-    sharp = [
+    corners = [
         index for index in range(len(points))
         if _signed_turn(points, index) <= -_SHARP_TURN
     ]
-    crossing_corners = set(_crossing_corner_indices(points, pairs))
-    corners = sorted(set(sharp) | crossing_corners)
     if not corners:
-        return outer
+        return _kept_outline(points, outer)
     # Half the gap lets two fillets meet. The old 0.45 cap dropped a
     # corner whose setback fit in the space that was left.
     sharp_set = set(corners)
@@ -1209,29 +2477,31 @@ def _finish_outline(outer, pairs, distance, dilated):
         gap = _sharp_gap(points, index, sharp_set)
         max_back = min(0.5 * gap, 8.0 * distance)
         fillet = _fit_fillet(points, index, distance, max_back, dilated)
-        if fillet is None and index in crossing_corners:
-            fillet = _fit_fillet_loose(points, index, distance, max_back, dilated)
         if fillet is None:
             failed.append(index)
         else:
             fillets.append(fillet)
-    for chain in _close_chains(points, failed, distance):
-        bridge = _bridge_chain(points, chain, distance, dilated)
-        if bridge is not None:
+    consumed = set()
+    if cap_mouth:
+        for chain in _close_chains(points, failed, distance):
+            bridge = _bridge_chain(points, chain, distance, dilated)
+            if bridge is None:
+                continue
             fillets.append(bridge)
+            consumed.update(chain)
+    for index in failed:
+        if index in consumed:
+            continue
+        gap = _sharp_gap(points, index, sharp_set)
+        max_back = min(0.5 * gap, 8.0 * distance)
+        fillet = _fit_fillet_loose(points, index, distance, max_back, dilated)
+        if fillet is not None:
+            fillets.append(fillet)
     if not fillets:
-        return outer
+        return _kept_outline(points, outer)
     applied = _apply_fillets(points, fillets)
     if applied is None:
-        return outer
-    outline, attachments = applied
-    chords = _snap_chords(pairs, attachments)
-    if not chords:
-        path = _closed_path(outline)
-        return outer if path is None else path
-    indices = _connector_tour(len(outline), chords)
-    if indices is None:
-        path = _closed_path(outline)
-        return outer if path is None else path
-    path = _closed_path([outline[index] for index in indices])
+        return _kept_outline(points, outer)
+    outline, _attachments = applied
+    path = _closed_path(outline)
     return outer if path is None else path

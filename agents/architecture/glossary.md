@@ -33,4 +33,4 @@ in [`../glossary.md`](../glossary.md).
 | **surround distance** | The clearance between the subject and a surround. [`algorithms.md`](./algorithms.md) |
 | **surround** | The outer weed line around one cluster. [`algorithms.md`](./algorithms.md) |
 | **cluster** | The subject one surround encloses. [`algorithms.md`](./algorithms.md) |
-| **connector** | The line that joins two smoothed surrounds at a hard angle. [`algorithms.md`](./algorithms.md) |
+| **join gap** | The length within which separate surrounds are joined. [`algorithms.md`](./algorithms.md) |

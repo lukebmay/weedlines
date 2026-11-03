@@ -61,25 +61,29 @@ cuts, and that region is checkerboard too.
 ## Surround preview
 
 When the mode is Surround and Conquer and the figure check
-reports no defect, the window paints each surround in the
-weed-line color, on top of the checkerboard. It asks the
-library again when the surround distance changes, when the
-person swaps, or when the mode becomes Surround and Conquer.
-It paints no surround while a defect exists.
+reports no defect, the window waits. It does not ask for a
+surround, and it paints none, until the person starts that
+step. Start Algorithm starts it. The window then asks the
+library and paints each surround in the weed-line color, on
+top of the checkerboard. That start does not run a solver and
+does not write a result. It asks again when the surround
+distance changes, when the join gap changes, when the person
+swaps, or when the mode becomes Surround and Conquer after
+the step has been started. It paints no surround while a
+defect exists.
 
-The form shows the surround distance only in this mode. The
-label is "Surround distance". The window keeps the value the
-person set while the window is open. Until they set one, the
-value is the five percent from [`algorithms.md`](./algorithms.md).
+The form shows the surround distance and the join gap only in
+this mode. The labels are "Surround distance" and "Join gap".
+The window keeps the values the person set while the window
+is open. Until they set a distance, the value is the five
+percent from [`algorithms.md`](./algorithms.md). Until they
+set a join gap, the value is the quarter-inch baseline in
+[`boundary.md`](./boundary.md). The window does not allow
+either value below zero.
 
-The surround on screen is a preview until the person approves
-it. Start Algorithm approves the surround that is showing. That
-approval does not start a solver and does not write a result.
-After approval the window leaves the lines up and disables the
-surround distance. A control labeled "Change surround" clears
-the approval, enables the distance, and the preview follows the
-distance again. Swap, and a change to another mode, also clear
-an approval.
+A control labeled "Change surround" clears the lines and
+returns to the wait. Swap, and a change to another mode, also
+clear them.
 
 The plugin settings are four controls in the form above the
 preview. They change paint only. They do not change the figure
