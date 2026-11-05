@@ -7,14 +7,134 @@ import time
 
 import pytest
 
-pytest.importorskip('PyQt5', reason='Qt binding required')
-
-from weedlib.qt import QPainterPath, QRectF
-from weedlib import progress, generate_weeds
+from weedlib import progress
 from weedlib.progress import WeedCancelled
 
 
+def test_check_with_no_hooks():
+    progress.clear()
+    try:
+        progress.check()
+        progress.install()
+        progress.check(
+            outline=[(0, 0), (1, 0), (1, 1)],
+            line=(0, 0, 1, 1),
+        )
+    finally:
+        progress.clear()
+
+
+def test_pause_blocks_in_check_then_returns():
+    paused = threading.Event()
+    in_check = threading.Event()
+    progress.clear()
+
+    def on_pause():
+        in_check.set()
+        return paused.is_set()
+
+    progress.install(pause=on_pause)
+    paused.set()
+    thread = threading.Thread(target=progress.check)
+    thread.start()
+    try:
+        assert in_check.wait(2.0), 'check never paused'
+        time.sleep(0.2)
+        assert thread.is_alive()
+        paused.clear()
+        thread.join(5.0)
+        assert not thread.is_alive()
+    finally:
+        paused.clear()
+        progress.clear()
+        thread.join(5.0)
+
+
+def test_cancel_during_check_pause():
+    paused = threading.Event()
+    cancel = threading.Event()
+    in_check = threading.Event()
+    done = {'error': None}
+    progress.clear()
+
+    def on_pause():
+        in_check.set()
+        return paused.is_set()
+
+    def work():
+        try:
+            progress.check()
+        except Exception as exc:
+            done['error'] = exc
+
+    progress.install(pause=on_pause, cancel=lambda: cancel.is_set())
+    paused.set()
+    thread = threading.Thread(target=work)
+    thread.start()
+    try:
+        assert in_check.wait(2.0), 'check never paused'
+        cancel.set()
+        thread.join(5.0)
+        assert not thread.is_alive()
+        assert isinstance(done['error'], WeedCancelled)
+    finally:
+        cancel.set()
+        paused.clear()
+        progress.clear()
+        thread.join(5.0)
+
+
+def test_check_names_reach_host_and_clear():
+    seen = []
+    segs = []
+    progress.clear()
+
+    def on_focus(outline, line):
+        seen.append((outline, line))
+
+    progress.install(
+        focus=on_focus,
+        geometry=lambda seg: segs.append(tuple(seg)),
+    )
+    try:
+        outline = [(0, 0), (2, 0), (2, 2)]
+        progress.check(outline=outline, line=(0, 1, 3, 4))
+        outline.append((9, 9))
+        assert seen == [(
+            ((0, 0), (2, 0), (2, 2)),
+            ((0, 1), (3, 4)),
+        )]
+        assert segs == []
+        progress.check(outline=[(1, 1), (2, 2)])
+        assert seen[-1] == (((1, 1), (2, 2)), None)
+        progress.check(line=((5, 6), (7, 8)))
+        assert seen[-1] == (None, ((5, 6), (7, 8)))
+        progress.check()
+        assert seen[-1] == (None, None)
+        progress.check(outline=[], line=[])
+        assert seen[-1] == (None, None)
+        before = len(seen)
+        with pytest.raises(TypeError):
+            progress.check(outline=object())
+        with pytest.raises(TypeError):
+            progress.check(line=object())
+        assert len(seen) == before
+        progress.report_segment((1, 2, 3, 4))
+        assert segs == [(1, 2, 3, 4)]
+        assert seen[-1] == (None, None)
+    finally:
+        progress.clear()
+
+
+def _need_solver():
+    pytest.importorskip('PyQt5', reason='Qt binding required')
+    from weedlib.qt import QPainterPath, QRectF
+    from weedlib import generate_weeds
+    return QPainterPath, QRectF, generate_weeds
+
+
 def test_cancel_raises_during_grid():
+    QPainterPath, QRectF, generate_weeds = _need_solver()
     keep = QPainterPath()
     keep.addRect(QRectF(0, 0, 40, 40))
     raise_cancel = [False]
@@ -35,6 +155,7 @@ def test_cancel_raises_during_grid():
 
 
 def test_geometry_callback_sees_segments():
+    QPainterPath, QRectF, generate_weeds = _need_solver()
     keep = QPainterPath()
     keep.addRect(QRectF(0, 0, 50, 50))
     segs = []
@@ -50,6 +171,7 @@ def test_geometry_callback_sees_segments():
 
 
 def test_pause_blocks_then_resume_completes():
+    QPainterPath, QRectF, generate_weeds = _need_solver()
     keep = QPainterPath()
     keep.addRect(QRectF(0, 0, 60, 60))
     paused = threading.Event()
@@ -85,6 +207,7 @@ def test_pause_blocks_then_resume_completes():
 
 
 def test_cancel_while_paused():
+    QPainterPath, QRectF, generate_weeds = _need_solver()
     keep = QPainterPath()
     keep.addRect(QRectF(0, 0, 40, 40))
     paused = threading.Event()
