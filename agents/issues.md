@@ -22,6 +22,7 @@ paper the architecture with the story.
 
 | Seen | What happened | Rule |
 | --- | --- | --- |
+| 2026-11-04, `src/weedlib/figures.py` | Two figures, a radius-10 circle and a radius-3 circle whose centers are 12.97 apart along y=x, have outlines that cross. A point near (7.064, 7.064) lies in both fills, and each fill has a point outside the other. `intersected().simplified()` in `_overlap_defects` has no area, and the function returns before the outline test, so the figure check reports no separate-figure overlap. Distance 12.96 reports one. Distance 13 reports none. The review reported this. A second agent has not confirmed it. | [Separate-figure overlap](./architecture/preflight.md). [_bugs](./plans/_bugs/plan.md). |
 
 ## Closed
 
