@@ -22,6 +22,7 @@ paper the architecture with the story.
 
 | Seen | What happened | Rule |
 | --- | --- | --- |
+| 2026-11-04, `src/weedlib/figures.py` | Two figures, a radius-10 circle and a radius-3 circle whose centers are 7 apart along y=x, meet and do not cross. The inner fill lies inside the outer fill. `_overlap_defects` reports one separate-figure overlap at the inner center. Distance 6 reports none. Distance 8 crosses and stays an overlap. The review reported this. A second agent has not confirmed it. | [Separate-figure overlap](./architecture/preflight.md). [_bugs](./plans/_bugs/plan.md). |
 
 ## Closed
 
