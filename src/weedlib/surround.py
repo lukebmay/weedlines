@@ -4,6 +4,7 @@ from __future__ import division
 
 import math
 
+from . import progress
 from .paths import split_painter_path
 from .qt import QPainterPath, QPainterPathStroker, QPointF, QTransform, Qt
 
@@ -20,6 +21,16 @@ _ARC_STEP = math.radians(4.0)
 # A right turn steeper than this is a corner, not stroker noise.
 _SHARP_TURN = 20.0
 _FILLET_ERR = 0.05
+
+
+def _focus_outline(path):
+    """Points of one ring, or None when there is nothing to name."""
+    if path is None:
+        return None
+    points = _ring_points(path)
+    if not points:
+        return None
+    return points
 
 
 def build_surrounds(subject, distance, join_gap=0.0):
@@ -47,17 +58,23 @@ def build_surrounds(subject, distance, join_gap=0.0):
             'join gap must not be negative, got: {}'.format(join_gap))
     if subject.isEmpty():
         return []
+    progress.check()
     if distance == 0.0:
         dilated = None
         outers = _meeting_outers(subject)
     else:
         dilated = _dilate(subject, distance)
         outers = _outer_boundaries(dilated)
+    progress.check()
+    groups = _join_groups(subject, outers, distance, join_gap)
     surrounds = []
-    for group in _join_groups(subject, outers, distance, join_gap):
+    for group in groups:
+        named = _focus_outline(group[0]) if len(group) == 1 else None
+        progress.check(outline=named)
         kept, inner = _separate_inner_outers(group)
         for piece, merged in _bridge_inner_outers(
             inner, subject, distance, join_gap):
+            progress.check(outline=_focus_outline(piece))
             if distance == 0.0:
                 surrounds.append(piece)
             else:
@@ -65,18 +82,22 @@ def build_surrounds(subject, distance, join_gap=0.0):
                     piece, distance, dilated, not merged))
         if not kept:
             continue
+        progress.check(
+            outline=_focus_outline(kept[0]) if len(kept) == 1 else None)
         if len(kept) == 1:
             outline = kept[0]
         else:
             outline = _bridge_outlines(kept)
             if outline is None:
-                if distance == 0.0:
-                    surrounds.extend(kept)
-                else:
-                    surrounds.extend(
-                        _finish_outline(outer, distance, dilated)
-                        for outer in kept)
+                for outer in kept:
+                    progress.check(outline=_focus_outline(outer))
+                    if distance == 0.0:
+                        surrounds.append(outer)
+                    else:
+                        surrounds.append(
+                            _finish_outline(outer, distance, dilated))
                 continue
+        progress.check(outline=_focus_outline(outline))
         if distance == 0.0:
             surrounds.append(outline)
         else:
@@ -97,6 +118,7 @@ def _join_groups(subject, outers, distance, join_gap):
     """
     if join_gap == 0.0 or len(outers) < 2:
         return [[outer] for outer in outers]
+    progress.check()
     # Chords sit inside the arc by the scaled curve threshold.
     # Adding that threshold in user units joins a straight gap early.
     wide = _dilate(subject, distance + join_gap * 0.5 + _CHORD_PAD)
@@ -104,6 +126,7 @@ def _join_groups(subject, outers, distance, join_gap):
     groups = [[] for _component in components]
     missed = []
     for outer in outers:
+        progress.check(outline=_focus_outline(outer))
         point = _contained_point(outer)
         placed = False
         if point is not None:
@@ -153,6 +176,7 @@ def _bridge_inner_outers(outers, subject, distance, join_gap):
         best = None
         for left in range(len(pending)):
             for right in range(left + 1, len(pending)):
+                progress.check()
                 ring_a = pending[left][1]
                 ring_b = pending[right][1]
                 if (
@@ -202,11 +226,17 @@ def _bridge_clears(merged, ring_a, ring_b, subject, distance):
     if limit < 0.0:
         limit = 0.0
     count = len(merged)
+    named = merged if len(merged) >= 3 else None
     for index in range(count):
         start = merged[index]
         end = merged[(index + 1) % count]
         if _edge_on_segments(start, end, rings):
+            progress.check(outline=named)
             continue
+        progress.check(
+            outline=named,
+            line=(start[0], start[1], end[0], end[1]),
+        )
         if not _edge_clears_subject(start, end, subject, limit):
             return False
     return True
@@ -229,7 +259,9 @@ def _edge_clears_subject(start, end, subject, limit):
     Contact only at an endpoint is not a hit. The open edge still
     fails when it crosses the curve or lies in the subject.
     """
+    line = (start[0], start[1], end[0], end[1])
     for kind, points in _segments(subject):
+        progress.check(line=line)
         dist, hit = _primitive_gap(start, end, kind, points)
         if hit or dist < limit:
             return False
@@ -761,6 +793,7 @@ def _bridge_outlines(outers):
         nearest = None
         for left in range(len(pending)):
             for right in range(left + 1, len(pending)):
+                progress.check()
                 gap, _ia, _ib = _closest_vertices(pending[left], pending[right])
                 if nearest is None or gap < nearest[0]:
                     nearest = (gap, left, right)
@@ -782,6 +815,7 @@ def _bridge_outlines(outers):
 def _closest_vertices(ring_a, ring_b):
     best = None
     for index_a, point_a in enumerate(ring_a):
+        progress.check()
         for index_b, point_b in enumerate(ring_b):
             gap = math.hypot(point_a[0] - point_b[0], point_a[1] - point_b[1])
             if best is None or gap < best[0]:
@@ -858,6 +892,7 @@ def _chain_gap(ring, indices, other):
     ]
     total = 0.0
     for index in sample:
+        progress.check()
         total += _distance_to_segments(ring[index], segments)
     return total / float(len(sample))
 
@@ -1043,6 +1078,8 @@ def _gap_overlap(ring_a, ring_b):
     runs_a = _straight_runs(ring_a)
     runs_b = _straight_runs(ring_b)
     for a0, a1 in runs_a:
+        # One check per run. A check on every pair is the long work.
+        progress.check()
         for b0, b1 in runs_b:
             overlap = _parallel_overlap(a0, a1, b0, b1)
             if overlap is not None:
@@ -1054,6 +1091,7 @@ def _gap_overlap(ring_a, ring_b):
     count_a = len(ring_a)
     count_b = len(ring_b)
     for index_a in range(count_a):
+        progress.check()
         a0 = ring_a[index_a]
         a1 = ring_a[(index_a + 1) % count_a]
         for index_b in range(count_b):
@@ -1129,11 +1167,13 @@ def _min_ring_distance(ring_a, ring_b):
     best = None
     segments = _ring_segments(ring_b)
     for point in ring_a:
+        progress.check()
         dist = _distance_to_segments(point, segments)
         if best is None or dist < best:
             best = dist
     segments = _ring_segments(ring_a)
     for point in ring_b:
+        progress.check()
         dist = _distance_to_segments(point, segments)
         if best is None or dist < best:
             best = dist
@@ -1322,6 +1362,8 @@ def _meeting_outers(subject):
         groups.setdefault(parent, []).append(subpath)
     outers = []
     for group in groups.values():
+        named = _focus_outline(group[0]) if len(group) == 1 else None
+        progress.check(outline=named)
         outers.extend(_winding_union(group))
     return outers
 
@@ -1334,6 +1376,7 @@ def _strict_depths(loops):
     """
     depths = []
     for index, (subpath, area, point) in enumerate(loops):
+        progress.check(outline=_focus_outline(subpath))
         depth = 0
         for other, (outline, other_area, _other_point) in enumerate(loops):
             if other == index or other_area <= area:
@@ -1448,7 +1491,8 @@ def _nested_loops(path):
         loops.append((subpath, area, point))
 
     depths = []
-    for index, (_subpath, area, point) in enumerate(loops):
+    for index, (subpath, area, point) in enumerate(loops):
+        progress.check(outline=_focus_outline(subpath))
         depth = 0
         for other, (outline, other_area, _other_point) in enumerate(loops):
             if other == index or other_area <= area:
@@ -1905,6 +1949,7 @@ def _fit_fillet(points, index, radius, max_back, dilated):
     best = None
     back = 0.05
     while back <= max_back + 1e-9:
+        progress.check(outline=points)
         got = _center_pair(points, index, back, back, radius)
         if got is None:
             break
@@ -1920,6 +1965,7 @@ def _fit_fillet(points, index, radius, max_back, dilated):
     base_a = back_a
     base_b = back_b
     for step_a in range(-12, 13):
+        progress.check(outline=points)
         for step_b in range(-12, 13):
             trial_a = base_a + step_a * 0.01
             trial_b = base_b + step_b * 0.01
@@ -2030,6 +2076,7 @@ def _fit_fillet_loose(points, index, radius, max_back, dilated):
         grid.append(back)
         back += step
     for back_a in grid:
+        progress.check(outline=points)
         for back_b in grid:
             got = _center_pair(points, index, back_a, back_b, radius)
             if got is None:
@@ -2040,6 +2087,7 @@ def _fit_fillet_loose(points, index, radius, max_back, dilated):
         return None
     err, back_a, back_b = best
     for step_a in range(-10, 11):
+        progress.check(outline=points)
         for step_b in range(-10, 11):
             trial_a = back_a + step_a * 0.02
             trial_b = back_b + step_b * 0.02
@@ -2056,6 +2104,7 @@ def _fit_fillet_loose(points, index, radius, max_back, dilated):
     # Nearby setbacks can seat a center the coarse grid only approached.
     found = None
     for step_a in range(-6, 7):
+        progress.check(outline=points)
         for step_b in range(-6, 7):
             trial_a = back_a + step_a * 0.02
             trial_b = back_b + step_b * 0.02
@@ -2138,6 +2187,7 @@ def _bridge_chain(points, chain, radius, dilated):
     best = None
     back = 0.5
     while back <= limit + 1e-9:
+        progress.check(outline=points)
         incoming = _walk(points, start_index, back, -1)
         outgoing = _walk(points, end_index, back, 1)
         if incoming is None or outgoing is None:
@@ -2162,6 +2212,7 @@ def _bridge_chain(points, chain, radius, dilated):
     for _pass in range(2):
         step = 0.05 if _pass == 0 else 0.01
         for step_a in range(-8, 9):
+            progress.check(outline=points)
             for step_b in range(-8, 9):
                 trial_a = back_a + step_a * step
                 trial_b = back_b + step_b * step
@@ -2408,6 +2459,7 @@ def _straighten_colinear(points):
             sides.append(index)
     gaps = []
     for pos, edge in enumerate(sides):
+        progress.check(outline=points)
         end_vertex = (edge + 1) % count
         for later in sides[pos + 1:] + sides[:pos]:
             chain = _index_chain(count, end_vertex, later)
@@ -2460,6 +2512,7 @@ def _finish_outline(outer, distance, dilated, cap_mouth=True):
     on one dilation is still one turn. A gap bridge is not a mouth.
     """
     points = _straighten_colinear(_ring_points(outer))
+    progress.check(outline=points or None)
     if len(points) < 4:
         return outer
     corners = [
@@ -2474,6 +2527,7 @@ def _finish_outline(outer, distance, dilated, cap_mouth=True):
     fillets = []
     failed = []
     for index in corners:
+        progress.check(outline=points)
         gap = _sharp_gap(points, index, sharp_set)
         max_back = min(0.5 * gap, 8.0 * distance)
         fillet = _fit_fillet(points, index, distance, max_back, dilated)
@@ -2484,6 +2538,7 @@ def _finish_outline(outer, distance, dilated, cap_mouth=True):
     consumed = set()
     if cap_mouth:
         for chain in _close_chains(points, failed, distance):
+            progress.check(outline=points)
             bridge = _bridge_chain(points, chain, distance, dilated)
             if bridge is None:
                 continue
@@ -2492,6 +2547,7 @@ def _finish_outline(outer, distance, dilated, cap_mouth=True):
     for index in failed:
         if index in consumed:
             continue
+        progress.check(outline=points)
         gap = _sharp_gap(points, index, sharp_set)
         max_back = min(0.5 * gap, 8.0 * distance)
         fillet = _fit_fillet_loose(points, index, distance, max_back, dilated)

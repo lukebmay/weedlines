@@ -11,7 +11,9 @@ try:
 except ImportError:
     pytest.skip('Qt cannot load', allow_module_level=True)
 
-from weedlib import build_surrounds
+import weedlib.surround as surround
+from weedlib import build_surrounds, progress
+from weedlib.progress import WeedCancelled
 from weedlib.qt import QPainterPath, QPointF, QTransform, Qt
 from weedlib.surround import _bridge_clears
 
@@ -1065,3 +1067,299 @@ def test_negative_join_gap_is_rejected():
         build_surrounds(_square(), 1.0, -0.1)
     with pytest.raises(ValueError):
         build_surrounds(_square(), -0.1)
+
+
+def test_cancel_before_a_long_stage_returns_no_outline():
+    progress.clear()
+    try:
+        progress.install(cancel=lambda: True)
+        with pytest.raises(WeedCancelled):
+            build_surrounds(_two_squares(_SIDE + 5, 0), 2.0)
+    finally:
+        progress.clear()
+
+
+def test_multi_cluster_records_a_check_before_return():
+    seen = []
+    progress.clear()
+    try:
+        progress.install(
+            focus=lambda outline, line: seen.append((outline, line)))
+        build_surrounds(_two_squares(_SIDE + 5, 0), 2.0)
+        assert seen
+    finally:
+        progress.clear()
+
+
+def _ellipse(x, y, width, height):
+    path = QPainterPath()
+    path.addEllipse(x, y, width, height)
+    return path
+
+
+def _straight_sides(points):
+    if len(points) < 4:
+        return 0
+    return sum(
+        1 for index in range(len(points))
+        if surround._straight_side(points, index)
+    )
+
+
+def _chain_samples(indices):
+    sample = indices[1:-1] if len(indices) > 2 else indices
+    if not sample:
+        sample = indices
+    return sample
+
+
+def test_fine_outline_checks_during_straighten():
+    # This offset is one fine ring. The long stretch is the
+    # straighten walk, so a check outside that walk does not count.
+    path = _ellipse(0, 0, 400, 220)
+    seen = {'sides': 0, 'checks': 0, 'named': 0}
+    real = surround._straighten_colinear
+
+    def wrapped(points):
+        seen['sides'] += _straight_sides(points)
+        seen['expect'] = tuple(points)
+        seen['inside'] = True
+        try:
+            return real(points)
+        finally:
+            seen['inside'] = False
+
+    def focus(outline, line):
+        if not seen.get('inside'):
+            return
+        seen['checks'] += 1
+        if line is None and outline == seen['expect']:
+            seen['named'] += 1
+
+    surround._straighten_colinear = wrapped
+    progress.clear()
+    try:
+        progress.install(focus=focus)
+        surrounds = build_surrounds(path, 8)
+        assert len(surrounds) == 1
+        assert seen['sides'] > 1
+        assert seen['checks'] == seen['sides']
+        assert seen['named'] == seen['sides']
+    finally:
+        surround._straighten_colinear = real
+        progress.clear()
+
+
+def test_cancel_after_the_preamble_returns_no_outline():
+    # Cancel stays false through the checks that already sit
+    # outside the walk. It has to be raised from inside it.
+    path = _ellipse(0, 0, 400, 220)
+    seen = {'inside': False, 'before': 0, 'during': 0}
+    real = surround._straighten_colinear
+
+    def wrapped(points):
+        seen['inside'] = True
+        try:
+            return real(points)
+        finally:
+            seen['inside'] = False
+
+    def focus(outline, line):
+        if seen['inside']:
+            seen['during'] += 1
+        else:
+            seen['before'] += 1
+
+    def cancel():
+        return seen['inside']
+
+    surround._straighten_colinear = wrapped
+    returned = None
+    progress.clear()
+    try:
+        progress.install(focus=focus, cancel=cancel)
+        with pytest.raises(WeedCancelled):
+            returned = build_surrounds(path, 8)
+        assert returned is None
+        assert seen['before'] >= 1
+        assert seen['during'] >= 1
+    finally:
+        surround._straighten_colinear = real
+        progress.clear()
+
+
+def test_joined_fine_rings_check_during_the_gap_walk():
+    # Two fine rings. The long stretch is the overlap walk or
+    # the chain walk. A check that names either ring is wrong.
+    subject = QPainterPath()
+    subject.addPath(_ellipse(0, 0, 400, 220))
+    subject.addPath(_ellipse(420, 0, 400, 220))
+    seen = {
+        'phase': None,
+        'gap': 0,
+        'chain': 0,
+        'gap_clear': 0,
+        'chain_clear': 0,
+        'expect_gap': 0,
+        'expect_chain': 0,
+    }
+    real_gap = surround._gap_overlap
+    real_chain = surround._chain_gap
+
+    def wrap_gap(ring_a, ring_b):
+        if not (
+            surround._ring_sits_inside(ring_a, ring_b)
+            or surround._ring_sits_inside(ring_b, ring_a)
+        ):
+            # One check per straight run, then one per edge.
+            seen['expect_gap'] += (
+                len(ring_a) + len(surround._straight_runs(ring_a))
+            )
+        seen['phase'] = 'gap'
+        try:
+            return real_gap(ring_a, ring_b)
+        finally:
+            seen['phase'] = None
+
+    def wrap_chain(ring, indices, other):
+        seen['expect_chain'] += len(_chain_samples(indices))
+        seen['phase'] = 'chain'
+        try:
+            return real_chain(ring, indices, other)
+        finally:
+            seen['phase'] = None
+
+    def focus(outline, line):
+        phase = seen['phase']
+        if phase is None:
+            return
+        seen[phase] += 1
+        if outline is None and line is None:
+            seen[phase + '_clear'] += 1
+
+    surround._gap_overlap = wrap_gap
+    surround._chain_gap = wrap_chain
+    progress.clear()
+    try:
+        progress.install(focus=focus)
+        surrounds = build_surrounds(subject, 8, 40)
+        assert len(surrounds) == 1
+        assert seen['expect_gap'] > 1
+        assert seen['expect_chain'] > 1
+        assert seen['gap'] == seen['expect_gap']
+        assert seen['chain'] == seen['expect_chain']
+        assert seen['gap_clear'] == seen['gap']
+        assert seen['chain_clear'] == seen['chain']
+    finally:
+        surround._gap_overlap = real_gap
+        surround._chain_gap = real_chain
+        progress.clear()
+
+
+def _joined_ellipses():
+    subject = QPainterPath()
+    subject.addPath(_ellipse(0, 0, 400, 220))
+    subject.addPath(_ellipse(420, 0, 400, 220))
+    return subject
+
+
+def _open_pair_walk(seen, real_gap, real_parallel):
+    def wrap_gap(ring_a, ring_b):
+        if (
+            surround._ring_sits_inside(ring_a, ring_b)
+            or surround._ring_sits_inside(ring_b, ring_a)
+        ):
+            return real_gap(ring_a, ring_b)
+        runs_a = surround._straight_runs(ring_a)
+        runs_b = surround._straight_runs(ring_b)
+        seen['in_gap'] = True
+        seen['pairs'] = 0
+        seen['total'] = len(runs_a) * len(runs_b)
+        seen['during'] = []
+        try:
+            return real_gap(ring_a, ring_b)
+        finally:
+            seen['in_gap'] = False
+
+    def wrap_parallel(a0, a1, b0, b1):
+        if seen['in_gap']:
+            seen['pairs'] += 1
+        return real_parallel(a0, a1, b0, b1)
+
+    return wrap_gap, wrap_parallel
+
+
+def test_pair_walk_records_a_check_before_it_finishes():
+    # The straight-run pair loop is the long stretch. A check
+    # before the first comparison, or after the last, does not count.
+    seen = {
+        'in_gap': False,
+        'pairs': 0,
+        'total': 0,
+        'during': [],
+    }
+    real_gap = surround._gap_overlap
+    real_parallel = surround._parallel_overlap
+    wrap_gap, wrap_parallel = _open_pair_walk(seen, real_gap, real_parallel)
+
+    def focus(outline, line):
+        if not seen['in_gap']:
+            return
+        if 0 < seen['pairs'] < seen['total']:
+            seen['during'].append((outline, line))
+
+    surround._gap_overlap = wrap_gap
+    surround._parallel_overlap = wrap_parallel
+    progress.clear()
+    try:
+        progress.install(focus=focus)
+        surrounds = build_surrounds(_joined_ellipses(), 8, 40)
+        assert len(surrounds) == 1
+        assert seen['total'] > 1
+        assert seen['pairs'] == seen['total']
+        assert seen['during']
+        assert all(
+            outline is None and line is None
+            for outline, line in seen['during']
+        )
+    finally:
+        surround._gap_overlap = real_gap
+        surround._parallel_overlap = real_parallel
+        progress.clear()
+
+
+def test_cancel_during_the_pair_walk_returns_no_outline():
+    # Cancel stays false outside this sweep. It has to be raised
+    # from a check while comparisons are still left.
+    seen = {
+        'in_gap': False,
+        'pairs': 0,
+        'total': 0,
+        'during': [],
+    }
+    real_gap = surround._gap_overlap
+    real_parallel = surround._parallel_overlap
+    wrap_gap, wrap_parallel = _open_pair_walk(seen, real_gap, real_parallel)
+
+    def cancel():
+        return (
+            seen['in_gap']
+            and seen['pairs'] > 0
+            and seen['pairs'] < seen['total']
+        )
+
+    surround._gap_overlap = wrap_gap
+    surround._parallel_overlap = wrap_parallel
+    returned = None
+    progress.clear()
+    try:
+        progress.install(cancel=cancel)
+        with pytest.raises(WeedCancelled):
+            returned = build_surrounds(_joined_ellipses(), 8, 40)
+        assert returned is None
+        assert seen['pairs'] > 0
+        assert seen['pairs'] < seen['total']
+    finally:
+        surround._gap_overlap = real_gap
+        surround._parallel_overlap = real_parallel
+        progress.clear()
