@@ -22,6 +22,7 @@ paper the architecture with the story.
 
 | Seen | What happened | Rule |
 | --- | --- | --- |
+| 2026-11-04, `src/weedlib/figures.py` | A radius-10 circle and a radius-3 circle that meet (inner center 7 units out along y=x, within 1e-10) do not keep that hole as the counter. `inner.subtracted(outer).simplified()` in `_painted_parts` leaves a triangle of area about 0.003 in the outer fill, so the inner center stays subject and is not weed area. A radius-3 circle centered 6 units out, with a gap, stays the counter. The review reported this. A second agent has not confirmed it. | [Counter](./architecture/preflight.md). [_bugs](./plans/_bugs/plan.md). |
 
 ## Closed
 
