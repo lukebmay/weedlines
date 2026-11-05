@@ -2,15 +2,16 @@
 """Figure check: open paths, twins, dangling ends, and overlap."""
 from __future__ import division
 
+import math
+
 import pytest
 
 try:
-    from weedlib.qt import QPainterPath  # noqa: F401
+    from weedlib.qt import QPainterPath, QPointF, QTransform, Qt
 except ImportError:
     pytest.skip("Qt cannot load", allow_module_level=True)
 
 from weedlib.figures import classify_figures, subject_weed_regions
-from weedlib.qt import QPointF, Qt
 from weedlib.svg_paths import svg_d_to_qpainterpath
 
 _OPEN = "M 5,6 L 15,6 L 15,20"
@@ -427,3 +428,369 @@ def test_swap_does_not_add_or_remove_defects():
         assert left.kind == right.kind
         assert left.target.x() == pytest.approx(right.target.x())
         assert left.target.y() == pytest.approx(right.target.y())
+
+
+def _ring_points(path):
+    try:
+        polygons = path.toSubpathPolygons()
+    except TypeError:
+        polygons = path.toSubpathPolygons(QTransform())
+    points = [(point.x(), point.y()) for point in polygons[0]]
+    if len(points) >= 2 and math.hypot(
+            points[0][0] - points[-1][0],
+            points[0][1] - points[-1][1]) <= 1e-9:
+        points.pop()
+    return points
+
+
+def _deepest_chord(ring):
+    best = None
+    count = len(ring)
+    for index in range(count):
+        ax, ay = ring[index]
+        bx, by = ring[(index + 1) % count]
+        mx = 0.5 * (ax + bx)
+        my = 0.5 * (ay + by)
+        radius = math.hypot(mx, my)
+        if best is None or radius < best[0]:
+            best = (radius, mx, my)
+    return best
+
+
+def _point_in_ring(x, y, ring):
+    inside = False
+    previous = len(ring) - 1
+    for index in range(len(ring)):
+        xi, yi = ring[index]
+        xj, yj = ring[previous]
+        if (yi > y) != (yj > y):
+            cross_x = (xj - xi) * (y - yi) / (yj - yi) + xi
+            if x < cross_x:
+                inside = not inside
+        previous = index
+    return inside
+
+
+def _triangle_at_radius(mid_x, mid_y, vertex_radius):
+    aim = math.hypot(mid_x, mid_y)
+    vx = mid_x * vertex_radius / aim
+    vy = mid_y * vertex_radius / aim
+    px = -mid_y / aim
+    py = mid_x / aim
+    base = 7.0
+    spread = 1.2
+    first = (
+        mid_x * base / aim + spread * px,
+        mid_y * base / aim + spread * py,
+    )
+    second = (
+        mid_x * base / aim - spread * px,
+        mid_y * base / aim - spread * py,
+    )
+    triangle = QPainterPath()
+    triangle.moveTo(vx, vy)
+    triangle.lineTo(first[0], first[1])
+    triangle.lineTo(second[0], second[1])
+    triangle.closeSubpath()
+    return QPointF(vx, vy), triangle
+
+
+def _triangle_centroid(triangle):
+    points = []
+    for index in range(triangle.elementCount()):
+        element = triangle.elementAt(index)
+        if element.type == QPainterPath.MoveToElement and points:
+            break
+        points.append((element.x, element.y))
+    if len(points) >= 2 and points[0] == points[-1]:
+        points.pop()
+    count = float(len(points))
+    return QPointF(
+        sum(point[0] for point in points) / count,
+        sum(point[1] for point in points) / count,
+    )
+
+
+def _moves(path):
+    move = QPainterPath.MoveToElement
+    return sum(
+        1 for index in range(path.elementCount())
+        if path.elementAt(index).type == move
+    )
+
+
+def _assert_curved_counter(ellipse, hole):
+    path = QPainterPath()
+    path.addPath(ellipse)
+    path.addPath(hole)
+    result = classify_figures([{
+        "id": "ring",
+        "path": path,
+        "closed": [True, True],
+        "fill": "#222222",
+    }])
+    assert [figure.id for figure in result.figures] == ["ring"]
+    assert _moves(result.figures[0].path) == 2
+    assert result.defects == []
+    regions = subject_weed_regions(result.figures, False)
+    assert _moves(regions.subject) == 2
+    centroid = _triangle_centroid(hole)
+    assert regions.weed_area.contains(centroid)
+    assert not regions.subject.contains(centroid)
+    assert not hole.contains(QPointF(0.0, 0.0))
+    assert regions.subject.contains(QPointF(0.0, 0.0))
+    assert not regions.weed_area.contains(QPointF(0.0, 0.0))
+
+
+def test_curved_hole_in_a_chord_gap_stays_a_counter():
+    radius = 10.0
+    ellipse = QPainterPath()
+    ellipse.addEllipse(-radius, -radius, radius * 2.0, radius * 2.0)
+    ring = _ring_points(ellipse)
+    chord, mx, my = _deepest_chord(ring)
+    vertex, gap = _triangle_at_radius(mx, my, chord + 0.05)
+    assert math.hypot(vertex.x(), vertex.y()) < radius
+    assert ellipse.contains(vertex)
+    assert not _point_in_ring(vertex.x(), vertex.y(), ring)
+    _assert_curved_counter(ellipse, gap)
+
+    inward_vertex, inward = _triangle_at_radius(mx, my, 9.0)
+    assert ellipse.contains(inward_vertex)
+    assert _point_in_ring(inward_vertex.x(), inward_vertex.y(), ring)
+    _assert_curved_counter(ellipse, inward)
+
+
+def _figure(path, closed):
+    return classify_figures([{
+        "id": "shape",
+        "path": path,
+        "closed": closed,
+        "fill": "#222222",
+    }])
+
+
+def _self_overlaps(path, closed):
+    return _by_kind(_figure(path, closed)).get("self-overlap", [])
+
+
+def _near(points, expected, tol):
+    pending = list(points)
+    for ex, ey in expected:
+        found = None
+        for index, (x, y) in enumerate(pending):
+            if abs(x - ex) <= tol and abs(y - ey) <= tol:
+                found = index
+                break
+        if found is None:
+            return False
+        pending.pop(found)
+    return not pending
+
+
+def test_neighboring_pieces_that_cross_are_a_self_overlap():
+    path = QPainterPath()
+    path.moveTo(0, 0)
+    path.lineTo(10, 0)
+    path.cubicTo(10, 5, 0, -5, 0, 2)
+    found = _by_kind(_figure(path, [False]))
+    assert _near(found["self-overlap"], [(0.51, 0.0), (4.36, 0.0)], 0.01)
+    assert found["dangling"] == [(0.0, 0.0), (0.0, 2.0)]
+
+    joint = QPainterPath()
+    joint.moveTo(0, 0)
+    joint.lineTo(10, 0)
+    joint.cubicTo(11, 1, 12, 1, 13, 0.5)
+    assert _self_overlaps(joint, [False]) == []
+
+    curves = QPainterPath()
+    curves.moveTo(0, 0)
+    curves.cubicTo(0, 4, 4, 4, 4, 0)
+    curves.cubicTo(4, 2, 0, 2, 0, 3)
+    assert _near(_self_overlaps(curves, [False]), [(0.708, 2.354)], 0.001)
+
+
+def test_line_touching_a_cubic_is_not_a_self_overlap():
+    def hump(y):
+        path = QPainterPath()
+        path.moveTo(0, 0)
+        path.cubicTo(0, 3, 3, 3, 3, 0)
+        path.moveTo(-1, y)
+        path.lineTo(4, y)
+        return path
+
+    assert _self_overlaps(hump(2.25), [False, False]) == []
+    assert _near(
+        _self_overlaps(hump(2.05), [False, False]),
+        [(0.849056, 2.05), (2.150944, 2.05)],
+        1e-5,
+    )
+
+    flat = QPainterPath()
+    flat.moveTo(0, -0.125)
+    flat.cubicTo(1.0 / 3.0, 0.125, 2.0 / 3.0, -0.125, 1, 0.125)
+    flat.moveTo(-0.2, 0)
+    flat.lineTo(1.2, 0)
+    assert _near(_self_overlaps(flat, [False, False]), [(0.5, 0.0)], 1e-4)
+
+
+def test_straight_cubic_crosses_when_its_line_does():
+    def hump(y):
+        path = QPainterPath()
+        path.moveTo(0, 0)
+        path.cubicTo(0, 3, 3, 3, 3, 0)
+        path.moveTo(-1, y)
+        path.cubicTo(1, y, 2, y, 4, y)
+        return path
+
+    assert _self_overlaps(hump(2.25), [False, False]) == []
+    assert _near(
+        _self_overlaps(hump(2.05), [False, False]),
+        [(0.849056, 2.05), (2.150944, 2.05)],
+        1e-5,
+    )
+
+    slant = QPainterPath()
+    slant.moveTo(0, -1)
+    slant.cubicTo(3, -1, 7, 1, 10, 1)
+    slant.moveTo(0, 0)
+    slant.cubicTo(0.2, 0, 0.4, 0, 10, 0)
+    assert _near(_self_overlaps(slant, [False, False]), [(5.0, 0.0)], 1e-5)
+
+
+def test_flat_inflection_against_an_even_straight_cubic():
+    flat = QPainterPath()
+    flat.moveTo(0, -0.125)
+    flat.cubicTo(1.0 / 3.0, 0.125, 2.0 / 3.0, -0.125, 1, 0.125)
+    span = 1.4
+    flat.moveTo(-0.2, 0)
+    flat.cubicTo(
+        -0.2 + span / 3.0, 0.0,
+        -0.2 + 2.0 * span / 3.0, 0.0,
+        1.2, 0.0,
+    )
+    assert _near(_self_overlaps(flat, [False, False]), [(0.5, 0.0)], 1e-4)
+
+
+def _cubic_mid_miss(path, x, y):
+    curve = QPainterPath.CurveToElement
+    data = QPainterPath.CurveToDataElement
+    best = None
+    current = None
+    index = 0
+    count = path.elementCount()
+    while index < count:
+        element = path.elementAt(index)
+        if element.type == QPainterPath.MoveToElement:
+            current = (element.x, element.y)
+            index += 1
+            continue
+        if (
+            element.type == curve
+            and index + 2 < count
+            and path.elementAt(index + 1).type == data
+            and path.elementAt(index + 2).type == data
+        ):
+            control = (element.x, element.y)
+            follow = path.elementAt(index + 1)
+            end = path.elementAt(index + 2)
+            mid = _bezier_mid(
+                current, control, (follow.x, follow.y), (end.x, end.y),
+            )
+            miss = math.hypot(mid[0] - x, mid[1] - y)
+            best = miss if best is None else min(best, miss)
+            current = (end.x, end.y)
+            index += 3
+            continue
+        if element.type != data:
+            current = (element.x, element.y)
+        index += 1
+    return best
+
+
+def _bezier_mid(p0, p1, p2, p3):
+    return (
+        0.125 * p0[0] + 0.375 * p1[0] + 0.375 * p2[0] + 0.125 * p3[0],
+        0.125 * p0[1] + 0.375 * p1[1] + 0.375 * p2[1] + 0.125 * p3[1],
+    )
+
+
+def test_uneven_cubic_just_off_the_segment_is_a_self_overlap():
+    def hump(y, upper, lower):
+        path = QPainterPath()
+        path.moveTo(0, 0)
+        path.cubicTo(0, 3, 3, 3, 3, 0)
+        path.moveTo(-1, y)
+        path.cubicTo(1, upper, 2, lower, 4, y)
+        return path
+
+    assert _self_overlaps(hump(2.25, 2.2501, 2.2499), [False, False]) == []
+    assert _near(
+        _self_overlaps(hump(2.05, 2.0501, 2.0499), [False, False]),
+        [(0.849, 2.05), (2.151, 2.05)],
+        1e-3,
+    )
+
+    ellipse = QPainterPath()
+    ellipse.addEllipse(-10, -10, 20, 20)
+    ellipse.moveTo(-12, 1)
+    ellipse.cubicTo(-11.5, 1.01, -11, 0.99, 12, 1)
+    assert _near(
+        _self_overlaps(ellipse, [True, False]),
+        [(-9.950, 1.001), (9.951, 0.999)],
+        1e-3,
+    )
+
+
+def test_shallow_curve_side_change_is_a_self_overlap():
+    flat = QPainterPath()
+    flat.moveTo(0, -0.125)
+    flat.cubicTo(1.0 / 3.0, 0.125, 2.0 / 3.0, -0.125, 1, 0.125)
+    flat.moveTo(0, 0)
+    flat.cubicTo(1.0 / 3.0, 5e-6, 2.0 / 3.0, -5e-6, 1, 0)
+    assert _near(_self_overlaps(flat, [False, False]), [(0.5, 0.0)], 1e-4)
+
+
+def test_collinear_cubic_past_its_ends_is_a_self_overlap():
+    def pair(bow):
+        path = QPainterPath()
+        path.moveTo(0, 0)
+        path.cubicTo(-1, bow, 2, -bow, 1, 0)
+        path.moveTo(0.6, -0.4)
+        path.cubicTo(1.4, -0.3, 0.9, 0.2, 1.6, 0.5)
+        return path
+
+    for bow in (0.0, 1e-6, 2e-6, 3e-6):
+        assert _near(
+            _self_overlaps(pair(bow), [False, False]), [(1.146, 0.0)], 1e-3,
+        )
+
+    # x=1.5 is past the curve, which ends near x=1.207.
+    past = QPainterPath()
+    past.moveTo(0, 0)
+    past.cubicTo(-1, 1e-6, 2, -1e-6, 1, 0)
+    past.moveTo(1.5, -0.4)
+    past.cubicTo(1.55, -0.1, 1.45, 0.1, 1.5, 0.4)
+    assert _self_overlaps(past, [False, False]) == []
+
+
+def test_curves_that_only_touch_are_not_a_self_overlap():
+    radius = 10.0
+    outer = QPainterPath()
+    outer.addEllipse(-radius, -radius, radius * 2.0, radius * 2.0)
+    center = 7.0 / math.sqrt(2.0)
+    inner_radius = 3.0
+    inner = QPainterPath()
+    inner.addEllipse(
+        center - inner_radius, center - inner_radius,
+        inner_radius * 2.0, inner_radius * 2.0,
+    )
+    meet = radius / math.sqrt(2.0)
+    # Float leaves the shared midpoint just past 1e-10.
+    assert _cubic_mid_miss(outer, meet, meet) <= 2e-10
+    assert _cubic_mid_miss(inner, meet, meet) <= 2e-10
+    path = QPainterPath()
+    path.addPath(outer)
+    path.addPath(inner)
+    # The outlines only touch. Whether the hole stays the counter is
+    # touching-hole-counter, not this check.
+    assert _self_overlaps(path, [True, True]) == []
