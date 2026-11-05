@@ -856,3 +856,57 @@ def test_touching_circles_keep_the_hole_as_the_counter():
     assert _cubic_mid_miss(inner, meet, meet) <= 2e-10
     assert_counter(7.0)
     assert_counter(6.0)
+
+
+def _circle(cx, cy, radius):
+    path = QPainterPath()
+    path.addEllipse(cx - radius, cy - radius, radius * 2.0, radius * 2.0)
+    return path
+
+
+def _two_circles(center_dist):
+    center = center_dist / math.sqrt(2.0)
+    return classify_figures([
+        {
+            "id": "outer",
+            "path": _circle(0.0, 0.0, 10.0),
+            "closed": [True],
+            "fill": "#336699",
+        },
+        {
+            "id": "inner",
+            "path": _circle(center, center, 3.0),
+            "closed": [True],
+            "fill": "none",
+        },
+    ])
+
+
+def _assert_one_overlap(result, center_dist):
+    assert [figure.id for figure in result.figures] == ["outer", "inner"]
+    found = _by_kind(result)
+    assert set(found) == {"overlap"}
+    assert len(found["overlap"]) == 1
+    x, y = found["overlap"][0]
+    point = QPointF(x, y)
+    center = center_dist / math.sqrt(2.0)
+    assert _circle(0.0, 0.0, 10.0).contains(point)
+    assert _circle(center, center, 3.0).contains(point)
+
+
+def test_touching_contained_circles_are_not_a_separate_overlap():
+    center = 7.0 / math.sqrt(2.0)
+    meet = 10.0 / math.sqrt(2.0)
+    outer = _circle(0.0, 0.0, 10.0)
+    inner = _circle(center, center, 3.0)
+    # Float leaves the shared midpoint just past 1e-10.
+    assert _cubic_mid_miss(outer, meet, meet) <= 2e-10
+    assert _cubic_mid_miss(inner, meet, meet) <= 2e-10
+    touched = _two_circles(7.0)
+    assert [figure.id for figure in touched.figures] == ["outer", "inner"]
+    assert touched.defects == []
+    assert _two_circles(6.0).defects == []
+    # The outlines cross here while the inner leftover is still contained.
+    _assert_one_overlap(_two_circles(7.001), 7.001)
+    _assert_one_overlap(_two_circles(7.07), 7.07)
+    _assert_one_overlap(_two_circles(8.0), 8.0)

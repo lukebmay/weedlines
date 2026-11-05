@@ -90,9 +90,13 @@ def classify_figures(records):
     for subpaths in kept_parts:
         defects.extend(_self_overlap_defects(subpaths))
     painted = [_painted_parts(subpaths) for subpaths in kept_parts]
-    for index, left in enumerate(painted):
-        for right in painted[index + 1:]:
-            defects.extend(_overlap_defects(left, right))
+    count = len(painted)
+    for index in range(count):
+        for other in range(index + 1, count):
+            defects.extend(_overlap_defects(
+                painted[index], painted[other],
+                kept_parts[index], kept_parts[other],
+            ))
     return FigureCheck(figures=figures, defects=defects)
 
 
@@ -346,19 +350,28 @@ def _nest_depth(parent, index):
     return seen
 
 
-def _overlap_defects(left, right):
+def _overlap_defects(left, right, left_parts, right_parts):
     shared = left.intersected(right).simplified()
     if not _has_area(shared):
         return []
-    # Each interior must keep a point the other does not. That excludes
-    # nesting, where one painted interior lies inside the other.
-    if not _has_area(left.subtracted(right).simplified()):
-        return []
-    if not _has_area(right.subtracted(left).simplified()):
+    # A leftover the other fill contains is not exclusive area.
+    # Outlines that cross still share a partial interior.
+    both_outside = (
+        _outside_fill(left, right) and _outside_fill(right, left)
+    )
+    if not both_outside and not _outlines_cross(left_parts, right_parts):
         return []
     points = _unique_points(_component_points(shared))
     points.sort(key=lambda point: (point.x(), point.y()))
     return [Defect(kind="overlap", target=point) for point in points]
+
+
+def _outlines_cross(left_parts, right_parts):
+    for left in left_parts:
+        for right in right_parts:
+            if _borders_cross(left, right):
+                return True
+    return False
 
 
 def _has_area(path):
