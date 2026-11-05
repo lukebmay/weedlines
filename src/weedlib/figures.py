@@ -273,7 +273,7 @@ def _painted_parts(subpaths):
         for other in range(count):
             if index == other or areas[other] <= areas[index]:
                 continue
-            if _has_area(fills[index].subtracted(fills[other]).simplified()):
+            if _outside_fill(fills[index], fills[other]):
                 continue
             if _borders_cross(subpaths[index], subpaths[other]):
                 continue
@@ -293,6 +293,29 @@ def _painted_parts(subpaths):
             continue
         acc = solid if acc.isEmpty() else acc.united(solid)
     return acc
+
+
+def _outside_fill(inner, outer):
+    """True when *inner* has painted area outside *outer*.
+
+    Subtracting a curve can leave a sliver that the outer fill still
+    contains. That sliver is the chord gap, not area outside.
+    """
+    leftover = inner.subtracted(outer).simplified()
+    if not _has_area(leftover):
+        return False
+    saw_inside = False
+    for polygon in _polygons(leftover):
+        ring = _clean_ring(polygon)
+        if len(ring) < 3 or _abs_area(ring) <= _AREA_EPS:
+            continue
+        point = _filled_point(ring, leftover)
+        if point is None:
+            continue
+        if not outer.contains(point):
+            return True
+        saw_inside = True
+    return not saw_inside
 
 
 def _fill_subpath(subpath):

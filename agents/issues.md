@@ -22,10 +22,10 @@ paper the architecture with the story.
 
 | Seen | What happened | Rule |
 | --- | --- | --- |
-| 2026-11-04, `src/weedlib/figures.py` | A radius-10 circle and a radius-3 circle that meet (inner center 7 units out along y=x, within 1e-10) do not keep that hole as the counter. `inner.subtracted(outer).simplified()` in `_painted_parts` leaves a triangle of area about 0.003 in the outer fill, so the inner center stays subject and is not weed area. A radius-3 circle centered 6 units out, with a gap, stays the counter. The review reported this. A second agent has not confirmed it. | [Counter](./architecture/preflight.md). [_bugs](./plans/_bugs/plan.md). |
 
 ## Closed
 
 | Seen | What happened | Rule |
 | --- | --- | --- |
 | 2026-10-29, `src/weedlib/figures.py`, Qt 5.15.18 | A radius-10 ellipse with a triangular hole whose vertex sits between the curve and a chord (about radius 9.85) returns two self-overlaps. The hole is contained, the outlines do not cross, and the counter is dropped from the subject. The same triangle at radius 9.0 is a counter with no defect. Fixed. The hole stays the counter. | [Self-overlap](./architecture/preflight.md). [_bugs](./plans/_bugs/plan.md). |
+| 2026-11-04, `src/weedlib/figures.py` | A radius-10 circle and a radius-3 circle that meet (inner center 7 units out along y=x, within 1e-10) do not keep that hole as the counter. Confirmed and fixed. The hole stays the counter. The inner center is weed area. | [Counter](./architecture/preflight.md). [_bugs](./plans/_bugs/plan.md). |

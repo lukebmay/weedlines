@@ -794,3 +794,65 @@ def test_curves_that_only_touch_are_not_a_self_overlap():
     # The outlines only touch. Whether the hole stays the counter is
     # touching-hole-counter, not this check.
     assert _self_overlaps(path, [True, True]) == []
+
+
+def _near_element(path, x, y, tol):
+    for index in range(path.elementCount()):
+        element = path.elementAt(index)
+        if math.hypot(element.x - x, element.y - y) <= tol:
+            return True
+    return False
+
+
+def test_touching_circles_keep_the_hole_as_the_counter():
+    radius = 10.0
+    inner_radius = 3.0
+
+    def pair(center_dist):
+        outer = QPainterPath()
+        outer.addEllipse(-radius, -radius, radius * 2.0, radius * 2.0)
+        center = center_dist / math.sqrt(2.0)
+        inner = QPainterPath()
+        inner.addEllipse(
+            center - inner_radius,
+            center - inner_radius,
+            inner_radius * 2.0,
+            inner_radius * 2.0,
+        )
+        path = QPainterPath()
+        path.addPath(outer)
+        path.addPath(inner)
+        return outer, inner, path, QPointF(center, center)
+
+    def assert_counter(center_dist):
+        _outer, _inner, path, center = pair(center_dist)
+        result = classify_figures([{
+            "id": "ring",
+            "path": path,
+            "closed": [True, True],
+            "fill": "#222222",
+        }])
+        assert [figure.id for figure in result.figures] == ["ring"]
+        assert _moves(result.figures[0].path) == 2
+        assert result.defects == []
+        regions = subject_weed_regions(result.figures, False)
+        assert regions.weed_area.contains(center)
+        assert not regions.subject.contains(center)
+        assert regions.subject.contains(QPointF(0.0, 0.0))
+        assert not regions.weed_area.contains(QPointF(0.0, 0.0))
+        assert _near_element(regions.subject, -radius, 0.0, 0.05)
+        assert _near_element(
+            regions.subject,
+            center.x() - inner_radius,
+            center.y(),
+            0.05,
+        )
+
+    outer, inner, _path, center = pair(7.0)
+    meet = radius / math.sqrt(2.0)
+    assert math.hypot(center.x(), center.y()) == pytest.approx(7.0, abs=1e-10)
+    # Float leaves the shared midpoint just past 1e-10.
+    assert _cubic_mid_miss(outer, meet, meet) <= 2e-10
+    assert _cubic_mid_miss(inner, meet, meet) <= 2e-10
+    assert_counter(7.0)
+    assert_counter(6.0)
