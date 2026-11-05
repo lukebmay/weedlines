@@ -910,3 +910,322 @@ def test_touching_contained_circles_are_not_a_separate_overlap():
     _assert_one_overlap(_two_circles(7.001), 7.001)
     _assert_one_overlap(_two_circles(7.07), 7.07)
     _assert_one_overlap(_two_circles(8.0), 8.0)
+
+
+def test_shallow_crossing_circles_are_one_overlap():
+    # The outlines still cross after the intersection polygon loses its area.
+    _assert_one_overlap(_two_circles(12.97), 12.97)
+    _assert_one_overlap(_two_circles(12.96), 12.96)
+    for center_dist in (13.0, 7.0):
+        result = _two_circles(center_dist)
+        assert [figure.id for figure in result.figures] == ["outer", "inner"]
+        assert result.defects == []
+
+
+def test_rotated_shallow_band_is_one_overlap():
+    # Four crossings of one sliver. The segment between the ends is one region.
+    outer = _circle(0.0, 0.0, 10.0)
+    band = QPainterPath()
+    band.addRect(-3.0, 9.99, 6.0, 0.005)
+    band = QTransform().rotate(45.0).map(band)
+    result = classify_figures([
+        {"id": "outer", "path": outer, "closed": [True], "fill": "#336699"},
+        {"id": "band", "path": band, "closed": [True], "fill": "none"},
+    ])
+    assert [figure.id for figure in result.figures] == ["outer", "band"]
+    found = _by_kind(result)
+    assert set(found) == {"overlap"}
+    assert len(found["overlap"]) == 1
+    x, y = found["overlap"][0]
+    point = QPointF(x, y)
+    assert outer.contains(point)
+    assert band.contains(point)
+
+
+def test_two_subpath_circles_are_two_overlaps():
+    # The deep lens keeps polygon area. The shallow lens does not.
+    center = 12.97 / math.sqrt(2.0)
+    outer = _circle(0.0, 0.0, 10.0)
+    pair = QPainterPath()
+    pair.addEllipse(5.0, -3.0, 6.0, 6.0)
+    pair.addEllipse(center - 3.0, center - 3.0, 6.0, 6.0)
+    result = classify_figures([
+        {"id": "outer", "path": outer, "closed": [True], "fill": "#336699"},
+        {"id": "pair", "path": pair, "closed": [True, True], "fill": "none"},
+    ])
+    assert [figure.id for figure in result.figures] == ["outer", "pair"]
+    found = _by_kind(result)
+    assert set(found) == {"overlap"}
+    assert len(found["overlap"]) == 2
+    side = _circle(8.0, 0.0, 3.0)
+    diagonal = _circle(center, center, 3.0)
+    hits = [0, 0]
+    for x, y in found["overlap"]:
+        point = QPointF(x, y)
+        assert outer.contains(point)
+        assert pair.contains(point)
+        in_side = side.contains(point)
+        in_diagonal = diagonal.contains(point)
+        assert in_side != in_diagonal
+        hits[0 if in_side else 1] += 1
+    assert hits == [1, 1]
+
+
+def _arc_band(inner, outer, start, end, pieces=24):
+    """Annular sector as straight pieces. The inner arc runs back."""
+    path = QPainterPath()
+    path.moveTo(outer * math.cos(start), outer * math.sin(start))
+    for index in range(1, pieces + 1):
+        angle = start + (end - start) * index / float(pieces)
+        path.lineTo(outer * math.cos(angle), outer * math.sin(angle))
+    for index in range(pieces + 1):
+        angle = end - (end - start) * index / float(pieces)
+        path.lineTo(inner * math.cos(angle), inner * math.sin(angle))
+    path.closeSubpath()
+    return path
+
+
+def _assert_curved_band(start, end):
+    # The boolean splits this one lens into pieces. The pieces are not regions.
+    outer = _circle(0.0, 0.0, 10.0)
+    band = _arc_band(9.99, 10.05, start, end)
+    result = classify_figures([
+        {"id": "outer", "path": outer, "closed": [True], "fill": "#336699"},
+        {"id": "band", "path": band, "closed": [True], "fill": "none"},
+    ])
+    assert [figure.id for figure in result.figures] == ["outer", "band"]
+    found = _by_kind(result)
+    assert set(found) == {"overlap"}
+    assert len(found["overlap"]) == 1
+    x, y = found["overlap"][0]
+    point = QPointF(x, y)
+    assert outer.contains(point)
+    assert band.contains(point)
+    assert outer.contains(QPointF(0.0, 0.0))
+    assert not band.contains(QPointF(0.0, 0.0))
+    assert band.contains(QPointF(10.04, 0.0))
+    assert not outer.contains(QPointF(10.04, 0.0))
+
+
+def test_curved_shallow_band_is_one_overlap():
+    _assert_curved_band(-1.0, 1.0)
+    _assert_curved_band(-0.2, 0.2)
+
+
+def _ngon(radius, sides, reverse=False):
+    path = QPainterPath()
+    step = 2.0 * math.pi / float(sides)
+    order = range(sides)
+    if reverse:
+        order = range(sides - 1, -1, -1)
+    started = False
+    for index in order:
+        angle = step * index
+        point = (radius * math.cos(angle), radius * math.sin(angle))
+        if not started:
+            path.moveTo(*point)
+            started = True
+        else:
+            path.lineTo(*point)
+    path.closeSubpath()
+    return path
+
+
+def _ring(sides, inner, outer):
+    path = QPainterPath()
+    path.addPath(_ngon(outer, sides))
+    path.addPath(_ngon(inner, sides, reverse=True))
+    return path
+
+
+def test_thin_ring_without_crossings_is_one_overlap():
+    # The outlines do not cross. Boolean pieces of the band are one region.
+    outer = _circle(0.0, 0.0, 10.0)
+    for sides in (64, 48, 96):
+        ring = _ring(sides, 9.99, 10.05)
+        result = classify_figures([
+            {"id": "outer", "path": outer, "closed": [True], "fill": "#336699"},
+            {"id": "ring", "path": ring, "closed": [True, True], "fill": "none"},
+        ])
+        assert [figure.id for figure in result.figures] == ["outer", "ring"]
+        found = _by_kind(result)
+        assert set(found) == {"overlap"}
+        assert len(found["overlap"]) == 1
+        x, y = found["overlap"][0]
+        point = QPointF(x, y)
+        assert outer.contains(point)
+        assert ring.contains(point)
+        assert outer.contains(QPointF(0.0, 0.0))
+        assert not ring.contains(QPointF(0.0, 0.0))
+        assert ring.contains(QPointF(10.04, 0.0))
+        assert not outer.contains(QPointF(10.04, 0.0))
+
+
+def test_two_distant_shallow_lenses_are_two_overlaps():
+    # Both lenses lose their polygon. They stay two regions.
+    center = 12.97 / math.sqrt(2.0)
+    big = QPainterPath()
+    big.addEllipse(-10.0, -10.0, 20.0, 20.0)
+    big.addEllipse(30.0, -10.0, 20.0, 20.0)
+    smalls = QPainterPath()
+    smalls.addEllipse(center - 3.0, center - 3.0, 6.0, 6.0)
+    smalls.addEllipse(40.0 + center - 3.0, center - 3.0, 6.0, 6.0)
+    result = classify_figures([
+        {"id": "big", "path": big, "closed": [True, True], "fill": "#336699"},
+        {
+            "id": "smalls",
+            "path": smalls,
+            "closed": [True, True],
+            "fill": "none",
+        },
+    ])
+    assert [figure.id for figure in result.figures] == ["big", "smalls"]
+    found = _by_kind(result)
+    assert set(found) == {"overlap"}
+    assert len(found["overlap"]) == 2
+    left = _circle(center, center, 3.0)
+    right = _circle(40.0 + center, center, 3.0)
+    hits = [0, 0]
+    for x, y in found["overlap"]:
+        point = QPointF(x, y)
+        assert big.contains(point)
+        assert smalls.contains(point)
+        in_left = left.contains(point)
+        in_right = right.contains(point)
+        assert in_left != in_right
+        hits[0 if in_left else 1] += 1
+    assert hits == [1, 1]
+
+
+def _diamond(radius, reverse=False):
+    points = [(radius, 0.0), (0.0, radius), (-radius, 0.0), (0.0, -radius)]
+    if reverse:
+        points.reverse()
+    path = QPainterPath()
+    path.moveTo(*points[0])
+    for point in points[1:]:
+        path.lineTo(*point)
+    path.closeSubpath()
+    return path
+
+
+def test_four_vertex_ring_is_four_overlaps():
+    # Inner vertices lie on the circle. Four lenses meet only at a point.
+    outer = _circle(0.0, 0.0, 10.0)
+    ring = QPainterPath()
+    ring.addPath(_diamond(15.0))
+    ring.addPath(_diamond(10.0, reverse=True))
+    result = classify_figures([
+        {"id": "outer", "path": outer, "closed": [True], "fill": "#336699"},
+        {"id": "ring", "path": ring, "closed": [True, True], "fill": "none"},
+    ])
+    assert [figure.id for figure in result.figures] == ["outer", "ring"]
+    found = _by_kind(result)
+    assert set(found) == {"overlap"}
+    assert len(found["overlap"]) == 4
+    quadrants = [0, 0, 0, 0]
+    for x, y in found["overlap"]:
+        point = QPointF(x, y)
+        assert outer.contains(point)
+        assert ring.contains(point)
+        assert abs(x) > 1.0 and abs(y) > 1.0
+        quadrants[(0 if x > 0.0 else 1) + (0 if y > 0.0 else 2)] += 1
+    assert quadrants == [1, 1, 1, 1]
+    assert outer.contains(QPointF(0.0, 0.0))
+    assert not ring.contains(QPointF(0.0, 0.0))
+    assert ring.contains(QPointF(12.0, 0.0))
+    assert not outer.contains(QPointF(12.0, 0.0))
+
+
+def test_gapped_rectangles_are_two_overlaps():
+    # The gap is narrower than a fixed probe step along the long chord.
+    wide = QPainterPath()
+    wide.addRect(0.0, 0.0, 30.0, 4.0)
+    pair = QPainterPath()
+    pair.addRect(-2.0, 1.0, 10.0, 2.0)
+    pair.addRect(8.5, 1.0, 24.0, 2.0)
+    result = classify_figures([
+        {"id": "wide", "path": wide, "closed": [True], "fill": "#336699"},
+        {"id": "pair", "path": pair, "closed": [True, True], "fill": "none"},
+    ])
+    assert [figure.id for figure in result.figures] == ["wide", "pair"]
+    found = _by_kind(result)
+    assert set(found) == {"overlap"}
+    assert len(found["overlap"]) == 2
+    sides = [0, 0]
+    for x, y in found["overlap"]:
+        point = QPointF(x, y)
+        assert wide.contains(point)
+        assert pair.contains(point)
+        assert 1.0 < y < 3.0
+        assert x < 8.0 or x > 8.5
+        sides[0 if x < 8.0 else 1] += 1
+    assert sides == [1, 1]
+    assert wide.contains(QPointF(8.2, 2.0))
+    assert not pair.contains(QPointF(8.2, 2.0))
+
+
+def _closed_polygon(points):
+    path = QPainterPath()
+    path.moveTo(*points[0])
+    for point in points[1:]:
+        path.lineTo(*point)
+    path.closeSubpath()
+    return path
+
+
+def test_bridged_rectangles_are_three_overlaps():
+    # One outline. The bridge outside the wide rectangle leaves three regions.
+    wide = QPainterPath()
+    wide.addRect(0.0, 0.0, 30.0, 4.0)
+    bridge = _closed_polygon((
+        (-2.0, 1.0), (8.0, 1.0), (8.0, 6.0), (8.5, 6.0), (8.5, 1.0),
+        (32.5, 1.0), (32.5, 3.0), (8.5, 3.0), (8.0, 3.0), (-2.0, 3.0),
+    ))
+    result = classify_figures([
+        {"id": "wide", "path": wide, "closed": [True], "fill": "#336699"},
+        {"id": "bridge", "path": bridge, "closed": [True], "fill": "none"},
+    ])
+    assert [figure.id for figure in result.figures] == ["wide", "bridge"]
+    found = _by_kind(result)
+    assert set(found) == {"overlap"}
+    assert len(found["overlap"]) == 3
+    zones = [0, 0, 0]
+    for x, y in found["overlap"]:
+        point = QPointF(x, y)
+        assert wide.contains(point)
+        assert bridge.contains(point)
+        if x < 8.0:
+            zones[0] += 1
+        elif x > 8.5:
+            zones[1] += 1
+        else:
+            assert y > 3.0
+            zones[2] += 1
+    assert zones == [1, 1, 1]
+    assert wide.contains(QPointF(8.25, 2.0))
+    assert not bridge.contains(QPointF(8.25, 2.0))
+
+
+def test_two_arm_outline_is_two_overlaps():
+    # The outlines meet at the notch corner. That touch is two regions.
+    outer = _circle(0.0, 0.0, 10.0)
+    arms = _closed_polygon((
+        (2.0, 14.0), (2.0, 0.0), (4.0, 0.0), (4.0, 8.0),
+        (6.0, 8.0), (6.0, 0.0), (8.0, 0.0), (8.0, 14.0),
+    ))
+    result = classify_figures([
+        {"id": "outer", "path": outer, "closed": [True], "fill": "#336699"},
+        {"id": "arms", "path": arms, "closed": [True], "fill": "none"},
+    ])
+    assert [figure.id for figure in result.figures] == ["outer", "arms"]
+    found = _by_kind(result)
+    assert set(found) == {"overlap"}
+    assert len(found["overlap"]) == 2
+    sides = [0, 0]
+    for x, y in found["overlap"]:
+        point = QPointF(x, y)
+        assert outer.contains(point)
+        assert arms.contains(point)
+        sides[0 if x < 6.0 else 1] += 1
+    assert sides == [1, 1]
