@@ -185,6 +185,8 @@ def _publish_path_segments(path):
 def frame_weeds(keep_path, padding=None):
     """Padded rectangle around keep bbox (legacy weedline)."""
     padding = _normalize_padding(padding)
+    # Before the rectangle is accepted. Frame has no long search.
+    _progress_check()
     rect = _padded_rect(keep_path.boundingRect(), padding)
     out = QPainterPath()
     out.addRect(rect)
@@ -1099,6 +1101,8 @@ def _grid_in_region(rect, region_path, spacing, invert_keep,
     x = x0
     while x <= x1 + 1e-9:
         xs.append(x)
+        # One trial hatch line, before any segment of it is accepted.
+        _progress_check(line=(x, y0, x, y1))
         v_segs.extend(_clip_line_to_region(
             x, y0, x, y1, region_path, invert_keep=invert_keep))
         x += spacing
@@ -1106,6 +1110,7 @@ def _grid_in_region(rect, region_path, spacing, invert_keep,
     y = y0
     while y <= y1 + 1e-9:
         ys.append(y)
+        _progress_check(line=(x0, y, x1, y))
         h_segs.extend(_clip_line_to_region(
             x0, y, x1, y, region_path, invert_keep=invert_keep))
         y += spacing
@@ -1928,6 +1933,8 @@ def _require_connected_ends(weed_path, keep_path, tol=1.5, work=None):
         changed = False
         kept = []
         for seg in segs:
+            # The scan is the long part once a grid has many lines.
+            _progress_check(line=seg)
             dx = seg[2] - seg[0]
             dy = seg[3] - seg[1]
             ln = math.hypot(dx, dy)
@@ -1970,6 +1977,8 @@ def _is_parallel_hug(seg, keep_path, min_cut):
     length = math.hypot(dx, dy)
     if length < 1e-12:
         return False
+    # Densify plus nearest-edge is the long part of a seal or hug pass.
+    _progress_check(line=seg)
     # Bay mouth chord / corner→corner dam is not a hug (D012 exact emit).
     if (_near_waste_reflex_corner(keep_path, QPointF(x0, y0))
             and _near_waste_reflex_corner(keep_path, QPointF(x1, y1))):
@@ -2219,6 +2228,20 @@ def _drop_slivers_and_needless(weed_path, keep_path):
         out.moveTo(seg[0], seg[1])
         out.lineTo(seg[2], seg[3])
     return out
+
+
+def _one_outline(path):
+    """One ring as ``(x, y)`` points, or None. Not a cut."""
+    pts = _polyline_points(path)
+    if len(pts) < 2:
+        return None
+    return [(p.x(), p.y()) for p in pts]
+
+
+def _progress_check(line=None, outline=None):
+    """Pause or cancel. At most one outline and one trial line."""
+    from . import progress as _progress
+    _progress.check(outline=outline, line=line)
 
 
 def _add_seg(out, seg, min_cut, keep_path=None, rules=None):
@@ -2758,6 +2781,8 @@ def _seg_body_clearance_ok(seg, keep_path, other_segs=None, clearance=None):
     ln = math.hypot(dx, dy)
     if ln < 1e-12:
         return True
+    # Sample walk against the keep rings. One trial line.
+    _progress_check(line=seg)
     n = max(int(math.ceil(ln)), 3)
     end_a = (seg[0], seg[1])
     end_b = (seg[2], seg[3])
@@ -3793,6 +3818,9 @@ def _iter_bay_far_ends(primary, opposite, body, alpha_min, primary_locked,
         ranked.append((d, dm, p))
     ranked.sort(key=lambda t: (t[0], t[1]))
     for _d, _dm, p in ranked:
+        # Coast trials run before a pocket segment is accepted.
+        _progress_check(line=(
+            primary.x(), primary.y(), p.x(), p.y()))
         if _bay_seal_ends_ok(primary, p, body, alpha_min, primary_locked):
             yield QPointF(p)
 
@@ -4962,6 +4990,8 @@ def _mouth_seal(path_a, path_b, pa, pb, ax, ay, hit_t, standoff, keep_fill,
         emit_keep = keep_fill if keep_fill is not None else path_a
         others = _other_weed_segs(against)
         for ha, hb in pairs:
+            # Two bodies, so the trial line only. Not either outline.
+            _progress_check(line=(ha.x(), ha.y(), hb.x(), hb.y()))
             seg = _fuse_bridge(
                 ha, hb, standoff, keep_fill, work, min_cut, container)
             if seg is None or not _seg_spans_pair(seg, path_a, path_b):
@@ -6891,6 +6921,10 @@ def _body_pocket_seals(body, keep_fill, work, standoff, min_cut, container,
     a_min = (float(alpha_min) if alpha_min is not None
              else use_rules.alpha_min)
     for left, right, deep, run in _hull_bay_mouths(body, min_depth, min_width):
+        # One bay mouth. The body is the one object.
+        _progress_check(
+            outline=_one_outline(body),
+            line=(left.x(), left.y(), right.x(), right.y()))
         ln = math.hypot(right.x() - left.x(), right.y() - left.y())
         depth = _point_seg_dist(
             deep.x(), deep.y(), left.x(), left.y(), right.x(), right.y())
