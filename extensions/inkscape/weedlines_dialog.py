@@ -971,6 +971,11 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     dialog.focus_mark = None
     dialog.focus_named = None
     dialog.ask_name = None
+    # Baselines for committed options. Opening values are not edits.
+    state['history_lengths'] = dict(state['lengths'])
+    state['history_mode'] = mode_box.currentIndex()
+    state['history_layer'] = layer_edit.text()
+    state['applying_history'] = False
     CheckerItem = _checker_type(QtWidgets, QtGui, QtCore)
 
     def _set_ask(kind):
@@ -1364,9 +1369,10 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
             edit.blockSignals(False)
             return
         color = _hex_color(edit.text())
-        if color is None or color == edit.property('color'):
+        old = edit.property('color')
+        if color is None or color == old:
             edit.blockSignals(True)
-            edit.setText(edit.property('color'))
+            edit.setText(old)
             edit.blockSignals(False)
             return
         edit.blockSignals(True)
@@ -1375,6 +1381,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         edit.blockSignals(False)
         _tint_edit(edit, color)
         refresh_preview()
+        _push_color(edit, old, color)
 
     def _on_swap():
         if state.get('opening') or _solver_running():
@@ -1394,6 +1401,14 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
             app_loop.processEvents(QtCore.QEventLoop.AllEvents, 50)
 
     def _on_mode(_index=None):
+        _remember_mode()
+        if state.get('applying_history'):
+            # Restoring the mode shows its knobs. It does not remove
+            # a surround or a cut already on screen.
+            _show_surround_controls()
+            _show_mode_knobs()
+            _arm_surround_controls()
+            return
         if _solver_running() or state.get('ask') not in (None, 'surround'):
             return
         had_surrounds = bool(state['surround_paths'])
@@ -1476,15 +1491,26 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
                 spin.blockSignals(False)
         finally:
             state['applying_unit'] = False
+        # A show from user units is not a committed edit.
+        for key, value in state['lengths'].items():
+            state['history_lengths'][key] = float(value)
 
     def _remember_length(key, spin, follow):
         def edited(_value):
             if state.get('applying_unit'):
                 return
-            state['lengths'][key] = _to_user(
+            old_user = float(state['history_lengths'][key])
+            new_user = _to_user(
                 spin.value(), dialog.user_unit_scale, state['unit_inches'])
+            state['lengths'][key] = new_user
             if follow is not None:
                 follow()
+            if state.get('applying_history'):
+                return
+            if abs(new_user - old_user) <= 1e-9:
+                return
+            state['history_lengths'][key] = new_user
+            _push_length(key, old_user, new_user)
         spin.valueChanged.connect(edited)
 
     def _on_unit(_index=None):
@@ -1507,6 +1533,185 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     for _edit in (light_edit, dark_edit, weed_edit, subject_edit):
         _edit.editingFinished.connect(
             lambda edit=_edit: _commit_color(edit))
+
+    class _OptionCommand(object):
+        def __init__(self, redo_fn, undo_fn):
+            self._redo_fn = redo_fn
+            self._undo_fn = undo_fn
+            # push() calls redo while the control already shows the new value.
+            self._armed = False
+
+        def redo(self):
+            if not self._armed:
+                self._armed = True
+                return
+            self._redo_fn()
+
+        def undo(self):
+            self._undo_fn()
+
+    class _OptionStack(object):
+        def __init__(self):
+            self._items = []
+            self._index = 0
+
+        def push(self, command):
+            del self._items[self._index:]
+            self._items.append(command)
+            self._index += 1
+            command.redo()
+
+        def undo(self):
+            if self._index <= 0:
+                return
+            self._index -= 1
+            self._items[self._index].undo()
+
+        def redo(self):
+            if self._index >= len(self._items):
+                return
+            self._items[self._index].redo()
+            self._index += 1
+
+    option_stack = _OptionStack()
+
+    def _push_option(redo_fn, undo_fn):
+        if state.get('applying_history'):
+            return
+        option_stack.push(_OptionCommand(redo_fn, undo_fn))
+
+    def _restore_length(key, user_units):
+        state['applying_history'] = True
+        try:
+            state['lengths'][key] = float(user_units)
+            _show_lengths()
+        finally:
+            state['applying_history'] = False
+        if key in ('distance', 'join'):
+            _on_surround_length(state['lengths'][key])
+
+    def _push_length(key, old_user, new_user):
+        _push_option(
+            lambda key=key, value=new_user: _restore_length(key, value),
+            lambda key=key, value=old_user: _restore_length(key, value))
+
+    def _restore_mode(index):
+        state['applying_history'] = True
+        try:
+            state['history_mode'] = index
+            mode_box.setCurrentIndex(index)
+        finally:
+            state['applying_history'] = False
+
+    def _remember_mode():
+        if state.get('applying_history'):
+            return
+        new_index = mode_box.currentIndex()
+        old_index = state['history_mode']
+        if new_index == old_index:
+            return
+        state['history_mode'] = new_index
+        _push_option(
+            lambda index=new_index: _restore_mode(index),
+            lambda index=old_index: _restore_mode(index))
+
+    def _restore_layer(text):
+        state['applying_history'] = True
+        try:
+            state['history_layer'] = text
+            layer_edit.blockSignals(True)
+            layer_edit.setText(text)
+            layer_edit.blockSignals(False)
+        finally:
+            state['applying_history'] = False
+
+    def _commit_layer():
+        if state.get('applying_history'):
+            return
+        text = layer_edit.text()
+        # Same text still drops keystrokes from the field's own undo.
+        layer_edit.blockSignals(True)
+        layer_edit.setText(text)
+        layer_edit.blockSignals(False)
+        old = state['history_layer']
+        if text == old:
+            return
+        state['history_layer'] = text
+        _push_option(
+            lambda value=text: _restore_layer(value),
+            lambda value=old: _restore_layer(value))
+
+    def _restore_color(edit, color):
+        state['applying_history'] = True
+        try:
+            edit.blockSignals(True)
+            edit.setText(color)
+            edit.setProperty('color', color)
+            edit.blockSignals(False)
+            _tint_edit(edit, color)
+        finally:
+            state['applying_history'] = False
+        refresh_preview()
+
+    def _push_color(edit, old, new):
+        if old == new:
+            return
+        _push_option(
+            lambda edit=edit, value=new: _restore_color(edit, value),
+            lambda edit=edit, value=old: _restore_color(edit, value))
+
+    def _is_shift_redo(event):
+        if event.key() != QtCore.Qt.Key_Z:
+            return False
+        ctrl = QtCore.Qt.ControlModifier
+        shift = QtCore.Qt.ShiftModifier
+        alt = QtCore.Qt.AltModifier
+        meta = QtCore.Qt.MetaModifier
+        kept = event.modifiers() & (ctrl | shift | alt | meta)
+        return kept == (ctrl | shift)
+
+    _text_edits = (
+        layer_edit, light_edit, dark_edit, weed_edit, subject_edit)
+
+    class _OptionKeyFilter(QtCore.QObject):
+        def __init__(self, parent):
+            QtCore.QObject.__init__(self, parent)
+
+        def eventFilter(self, obj, event):
+            if event.type() != QtCore.QEvent.KeyPress:
+                return False
+            app = QtWidgets.QApplication.instance()
+            if app is None or app.activeWindow() is not dialog:
+                return False
+            undo = bool(event.matches(QtGui.QKeySequence.Undo))
+            redo = (
+                bool(event.matches(QtGui.QKeySequence.Redo))
+                or _is_shift_redo(event))
+            if not undo and not redo:
+                return False
+            # A layer name or color still being typed undoes in the field.
+            # A spin value is already committed, so the key is the history.
+            focus = app.focusWidget()
+            if focus in _text_edits and (
+                    (undo and focus.isUndoAvailable())
+                    or (redo and focus.isRedoAvailable())):
+                return False
+            if undo:
+                option_stack.undo()
+            else:
+                option_stack.redo()
+            return True
+
+    _key_filter = _OptionKeyFilter(dialog)
+    QtWidgets.QApplication.instance().installEventFilter(_key_filter)
+
+    def _drop_option_keys():
+        app = QtWidgets.QApplication.instance()
+        if app is not None:
+            app.removeEventFilter(_key_filter)
+
+    dialog.finished.connect(_drop_option_keys)
+    layer_edit.editingFinished.connect(_commit_layer)
 
     hint = QtWidgets.QLabel(
         'Builds weed cuts only (no cutter travel planning). '
