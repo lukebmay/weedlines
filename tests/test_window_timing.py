@@ -180,11 +180,38 @@ def _watch(monkeypatch):
     monkeypatch.setattr(arrow_mod, 'build_arrow_paths', arrows_wrap)
     monkeypatch.setattr(weedlib, 'build_surrounds', surrounds_wrap)
     monkeypatch.setattr(weedlib, 'generate_weeds', refuse_solver)
-    return parent, surrounds
+    return parent, surrounds, real_surrounds, real_classify, real_subject
+
+
+def _wait_idle(dialog, timeout=20):
+    import time
+    app = QtWidgets.QApplication.instance()
+    deadline = time.monotonic() + timeout
+    quiet = 0
+    while time.monotonic() < deadline:
+        app.processEvents(QtCore.QEventLoop.AllEvents, 30)
+        start = dialog.findChild(QtWidgets.QPushButton, 'start')
+        busy = start is None or not start.isVisible()
+        if not busy:
+            for button in dialog.findChildren(QtWidgets.QPushButton):
+                if not button.isVisible():
+                    continue
+                if button.text() in ('Pause', 'Resume', 'Cancelling…'):
+                    busy = True
+                elif button.text().startswith('Cancel'):
+                    busy = True
+        if busy:
+            quiet = 0
+            continue
+        quiet += 1
+        if quiet >= 2:
+            return
+    raise AssertionError('surround ask did not finish')
 
 
 def test_clear_surround_waits_until_start(monkeypatch):
-    parent, surrounds = _watch(monkeypatch)
+    parent, surrounds, real_surrounds, real_classify, real_subject = _watch(
+        monkeypatch)
 
     def drive(dialog):
         assert dialog.isVisible() is True
@@ -211,16 +238,19 @@ def test_clear_surround_waits_until_start(monkeypatch):
         ]
         assert correction == []
         start.click()
-        assert list(dialog.worker_calls) == ['classify', 'subject']
-        assert parent == ['surrounds']
+        _wait_idle(dialog)
+        assert list(dialog.worker_calls) == ['classify', 'subject', 'surrounds']
+        assert parent == []
+        assert surrounds == []
         assert dialog.isVisible() is True
-        assert len(surrounds) == 1
-        distance, join_gap, paths, seen = surrounds[0]
-        assert seen is dialog
+        assert len(dialog.surround_args) == 1
+        distance, join_gap = dialog.surround_args[0]
         assert distance == pytest.approx(spin.value())
         assert join_gap == pytest.approx(join.value())
         assert distance == pytest.approx(2.5)
         assert join_gap == pytest.approx(6.35)
+        regions = real_subject(real_classify(_CLEAR).figures, False)
+        paths = real_surrounds(regions.subject, distance, join_gap)
         assert paths
         items = _path_items(dialog)
         for path in paths:
@@ -241,7 +271,8 @@ def test_clear_surround_waits_until_start(monkeypatch):
 def test_defect_asks_once_after_the_window_is_visible(monkeypatch):
     expected = _library_arrows(_DEFECTS)
     assert len(expected) >= 3
-    parent, surrounds = _watch(monkeypatch)
+    parent, surrounds, _real_surrounds, _real_classify, _real_subject = _watch(
+        monkeypatch)
 
     def drive(dialog):
         assert dialog.isVisible() is True

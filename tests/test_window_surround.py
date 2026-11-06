@@ -243,7 +243,70 @@ def _watch(monkeypatch):
         return paths
 
     monkeypatch.setattr(weedlib, 'build_surrounds', wrapped)
-    return calls
+    return calls, real
+
+
+def _visible_dialog():
+    app = QtWidgets.QApplication.instance()
+    if app is None:
+        return None
+    found = [
+        widget for widget in app.topLevelWidgets()
+        if widget.isVisible() and widget.windowTitle() == 'Weedlines'
+    ]
+    if len(found) != 1:
+        return None
+    return found[0]
+
+
+def _run_busy(dialog):
+    start = dialog.findChild(QtWidgets.QPushButton, 'start')
+    if start is None or not start.isVisible():
+        return True
+    for button in dialog.findChildren(QtWidgets.QPushButton):
+        if not button.isVisible():
+            continue
+        if button.text() in ('Pause', 'Resume', 'Cancelling…'):
+            return True
+        if button.text().startswith('Cancel'):
+            return True
+    return False
+
+
+def _wait_idle(dialog, timeout=20):
+    import time
+    app = QtWidgets.QApplication.instance()
+    deadline = time.monotonic() + timeout
+    quiet = 0
+    while time.monotonic() < deadline:
+        app.processEvents(QtCore.QEventLoop.AllEvents, 30)
+        if _run_busy(dialog):
+            quiet = 0
+            continue
+        quiet += 1
+        if quiet >= 2:
+            return
+    raise AssertionError('surround ask did not finish')
+
+
+def _pump_until(predicate, timeout=20):
+    import time
+    app = QtWidgets.QApplication.instance()
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        app.processEvents(QtCore.QEventLoop.AllEvents, 30)
+        if predicate():
+            return
+    raise AssertionError('timed out')
+
+
+def _click_text(dialog, text):
+    found = [
+        button for button in dialog.findChildren(QtWidgets.QPushButton)
+        if button.isVisible() and button.text() == text
+    ]
+    assert len(found) == 1, text
+    found[0].click()
 
 
 def _regions(records, swap):
@@ -278,7 +341,7 @@ def test_window_opens_on_the_named_mode(defaults, expected):
 
 def test_clear_design_strokes_surrounds_and_follows_distance(monkeypatch):
     import weedlib
-    calls = _watch(monkeypatch)
+    calls, real = _watch(monkeypatch)
     cuts = []
 
     def refuse(*_args, **_kwargs):
@@ -294,6 +357,7 @@ def test_clear_design_strokes_surrounds_and_follows_distance(monkeypatch):
 
     def drive(dialog):
         assert calls == []
+        assert dialog.surround_args == []
         spin = _distance_spin(dialog)
         join = _join_spin(dialog)
         label = _distance_label(dialog)
@@ -342,63 +406,75 @@ def test_clear_design_strokes_surrounds_and_follows_distance(monkeypatch):
         assert calls == []
 
         _button(dialog, 'start').click()
-        assert len(calls) == 1
-        assert _same_path(calls[0][0], subject)
-        assert calls[0][1] == pytest.approx(_FIVE_PERCENT)
-        assert calls[0][2] == pytest.approx(6.35)
+        _wait_idle(dialog)
+        assert calls == []
+        assert len(dialog.surround_args) == 1
+        assert dialog.surround_args[0][0] == pytest.approx(_FIVE_PERCENT)
+        assert dialog.surround_args[0][1] == pytest.approx(6.35)
+        assert dialog.worker_calls.count('surrounds') == 1
+        paths = real(subject, _FIVE_PERCENT, 6.35)
         assert spin.isEnabled() is True
         assert join.isEnabled() is True
         assert _button(dialog, 'apply').isEnabled() is False
-        _assert_strokes(dialog, calls[-1][3], _WEED)
+        _assert_strokes(dialog, paths, _WEED)
         view = _view(dialog)
         assert _at(view, view_rect, stroke[0], stroke[1]) == _WEED
         assert _at(view, view_rect, band[0], band[1]) in (_LIGHT, _DARK)
         assert _at(view, view_rect, letter[0], letter[1]) == '#112233'
 
-        asked = len(calls)
-        paths = calls[-1][3]
+        asked = len(dialog.surround_args)
         _named_spin(dialog, 'padding').setValue(8.0)
         _named_spin(dialog, 'spacing').setValue(11.0)
         _collar(dialog).setValue(2.0)
-        assert len(calls) == asked
+        assert calls == []
+        assert len(dialog.surround_args) == asked
         _assert_strokes(dialog, paths, _WEED)
 
         spin.setValue(6.0)
-        assert len(calls) == asked + 1
-        assert calls[-1][1] == pytest.approx(6.0)
-        assert calls[-1][2] == pytest.approx(6.35)
+        _wait_idle(dialog)
+        assert calls == []
+        assert len(dialog.surround_args) == asked + 1
+        assert dialog.surround_args[-1][0] == pytest.approx(6.0)
+        assert dialog.surround_args[-1][1] == pytest.approx(6.35)
         assert spin.value() == pytest.approx(6.0)
-        _assert_strokes(dialog, calls[-1][3], _WEED)
-        assert not _same_path(calls[-1][3][0], paths[0])
+        widened = real(subject, 6.0, 6.35)
+        _assert_strokes(dialog, widened, _WEED)
+        assert not _same_path(widened[0], paths[0])
 
-        asked = len(calls)
+        asked = len(dialog.surround_args)
         join.setValue(9.0)
-        assert len(calls) == asked + 1
-        assert calls[-1][1] == pytest.approx(6.0)
-        assert calls[-1][2] == pytest.approx(9.0)
+        _wait_idle(dialog)
+        assert calls == []
+        assert len(dialog.surround_args) == asked + 1
+        assert dialog.surround_args[-1][0] == pytest.approx(6.0)
+        assert dialog.surround_args[-1][1] == pytest.approx(9.0)
 
         join.setValue(-1.0)
+        _wait_idle(dialog)
         assert join.value() == pytest.approx(0.0)
-        assert calls[-1][2] == pytest.approx(0.0)
-        assert calls[-1][2] >= 0.0
+        assert dialog.surround_args[-1][1] == pytest.approx(0.0)
+        assert dialog.surround_args[-1][1] >= 0.0
 
         spin.setValue(-3.0)
+        _wait_idle(dialog)
         assert spin.value() == pytest.approx(0.0)
-        assert calls[-1][1] == pytest.approx(0.0)
-        assert calls[-1][1] >= 0.0
+        assert dialog.surround_args[-1][0] == pytest.approx(0.0)
+        assert dialog.surround_args[-1][0] >= 0.0
 
         swapped = _regions(_CLEAR, swap=True).subject
-        asked = len(calls)
+        asked = len(dialog.surround_args)
         _button(dialog, 'swap').click()
-        assert len(calls) == asked + 1
-        assert _same_path(calls[-1][0], swapped)
-        assert calls[-1][1] == pytest.approx(0.0)
-        assert calls[-1][2] == pytest.approx(0.0)
-        _assert_strokes(dialog, calls[-1][3], _WEED)
+        _wait_idle(dialog)
+        assert calls == []
+        assert len(dialog.surround_args) == asked + 1
+        assert dialog.surround_args[-1][0] == pytest.approx(0.0)
+        assert dialog.surround_args[-1][1] == pytest.approx(0.0)
+        _assert_strokes(dialog, real(swapped, 0.0, 0.0), _WEED)
 
-        asked = len(calls)
+        asked = len(dialog.surround_args)
         _set_mode(dialog, 'frame')
-        assert len(calls) == asked
+        assert calls == []
+        assert len(dialog.surround_args) == asked
         assert label.isVisible() is False
         assert spin.isVisible() is False
         assert join_label.isVisible() is False
@@ -409,18 +485,21 @@ def test_clear_design_strokes_surrounds_and_follows_distance(monkeypatch):
         assert join.value() == pytest.approx(0.0)
 
         _set_mode(dialog, _SURROUND)
-        assert len(calls) == asked + 1
-        assert calls[-1][1] == pytest.approx(0.0)
-        assert calls[-1][2] == pytest.approx(0.0)
+        _wait_idle(dialog)
+        assert calls == []
+        assert len(dialog.surround_args) == asked + 1
+        assert dialog.surround_args[-1][0] == pytest.approx(0.0)
+        assert dialog.surround_args[-1][1] == pytest.approx(0.0)
         assert spin.value() == pytest.approx(0.0)
         assert join.value() == pytest.approx(0.0)
         assert label.isVisible() and spin.isVisible() and change.isVisible()
         assert join_label.isVisible() and join.isVisible()
-        _assert_strokes(dialog, calls[-1][3], _WEED)
+        _assert_strokes(dialog, real(swapped, 0.0, 0.0), _WEED)
 
-        asked = len(calls)
+        asked = len(dialog.surround_args)
         change.click()
-        assert len(calls) == asked
+        assert calls == []
+        assert len(dialog.surround_args) == asked
         assert spin.value() == pytest.approx(0.0)
         assert join.value() == pytest.approx(0.0)
         assert spin.isEnabled() is True
@@ -429,20 +508,24 @@ def test_clear_design_strokes_surrounds_and_follows_distance(monkeypatch):
 
         spin.setValue(4.0)
         join.setValue(2.0)
-        assert len(calls) == asked
+        assert calls == []
+        assert len(dialog.surround_args) == asked
         assert spin.value() == pytest.approx(4.0)
         assert join.value() == pytest.approx(2.0)
         _set_mode(dialog, 'grid')
         _set_mode(dialog, _SURROUND)
-        assert len(calls) == asked
+        assert calls == []
+        assert len(dialog.surround_args) == asked
         assert spin.value() == pytest.approx(4.0)
         assert join.value() == pytest.approx(2.0)
 
         _button(dialog, 'start').click()
-        assert len(calls) == asked + 1
-        assert calls[-1][1] == pytest.approx(4.0)
-        assert calls[-1][2] == pytest.approx(2.0)
-        _assert_strokes(dialog, calls[-1][3], _WEED)
+        _wait_idle(dialog)
+        assert calls == []
+        assert len(dialog.surround_args) == asked + 1
+        assert dialog.surround_args[-1][0] == pytest.approx(4.0)
+        assert dialog.surround_args[-1][1] == pytest.approx(2.0)
+        _assert_strokes(dialog, real(swapped, 4.0, 2.0), _WEED)
         assert _button(dialog, 'apply').isEnabled() is False
         assert cuts == []
         dialog.reject()
@@ -518,6 +601,8 @@ def test_defect_paints_no_surround_and_disables_start(monkeypatch):
         assert start.isEnabled() is False
         assert _button(dialog, 'apply').isEnabled() is False
         assert calls == []
+        assert dialog.surround_args == []
+        assert 'surrounds' not in dialog.worker_calls
         assert cuts == []
         assert _WEED not in _pen_colors(dialog)
         dialog.reject()
@@ -528,7 +613,7 @@ def test_defect_paints_no_surround_and_disables_start(monkeypatch):
 def test_start_paints_without_a_solver_or_a_result(monkeypatch, tmp_path):
     import weedlib
     import weedlines_job as JOB
-    calls = _watch(monkeypatch)
+    calls, real = _watch(monkeypatch)
     cuts = []
     writes = []
 
@@ -553,22 +638,25 @@ def test_start_paints_without_a_solver_or_a_result(monkeypatch, tmp_path):
         change = _button(dialog, 'change-surround')
         apply_btn = _button(dialog, 'apply')
         assert calls == []
+        assert dialog.surround_args == []
         assert apply_btn.isEnabled() is False
         subject = _regions(_CLEAR, swap=False).subject
         _button(dialog, 'start').click()
+        _wait_idle(dialog)
         assert dialog.isVisible() is True
-        assert len(calls) == 1
-        assert _same_path(calls[0][0], subject)
-        assert calls[0][1] == pytest.approx(spin.value())
-        assert calls[0][2] == pytest.approx(join.value())
-        assert calls[0][2] == pytest.approx(6.35)
+        assert calls == []
+        assert len(dialog.surround_args) == 1
+        assert dialog.worker_calls.count('surrounds') == 1
+        assert dialog.surround_args[0][0] == pytest.approx(spin.value())
+        assert dialog.surround_args[0][1] == pytest.approx(join.value())
+        assert dialog.surround_args[0][1] == pytest.approx(6.35)
         assert cuts == []
         assert writes == []
         assert apply_btn.isEnabled() is False
         assert spin.isEnabled() is True
         assert join.isEnabled() is True
         assert change.isEnabled() is True
-        shown = calls[-1][3]
+        shown = real(subject, spin.value(), join.value())
         _assert_strokes(dialog, shown, _WEED)
         apply_btn.click()
         assert dialog.isVisible() is True
@@ -577,7 +665,8 @@ def test_start_paints_without_a_solver_or_a_result(monkeypatch, tmp_path):
         assert edit is not None
         edit.setText('#123456')
         edit.editingFinished.emit()
-        assert len(calls) == 1
+        assert calls == []
+        assert len(dialog.surround_args) == 1
         assert spin.isEnabled() is True
         assert join.isEnabled() is True
         _assert_strokes(dialog, shown, '#123456')
@@ -585,7 +674,8 @@ def test_start_paints_without_a_solver_or_a_result(monkeypatch, tmp_path):
         kept_distance = spin.value()
         kept_join = join.value()
         change.click()
-        assert len(calls) == 1
+        assert calls == []
+        assert len(dialog.surround_args) == 1
         assert spin.value() == pytest.approx(kept_distance)
         assert join.value() == pytest.approx(kept_join)
         assert spin.isEnabled() is True
@@ -600,3 +690,266 @@ def test_start_paints_without_a_solver_or_a_result(monkeypatch, tmp_path):
     assert cuts == []
     assert writes == []
     assert list(tmp_path.iterdir()) == []
+
+
+def _keep_timer(dialog, timer):
+    timers = getattr(dialog, '_hold_timers', None)
+    if timers is None:
+        timers = []
+        dialog._hold_timers = timers
+    timers.append(timer)
+
+
+def test_surround_hold_drops_a_newer_distance_join_and_swap(monkeypatch):
+    """A GUI timer fires before the surround is painted. The older result is dropped."""
+    import weedlib
+    import weedlines_dialog as dialog_mod
+
+    fired = []
+    painted_early = []
+    cuts = []
+    real = weedlib.build_surrounds
+
+    def parent_saw(*_args, **_kwargs):
+        raise AssertionError('parent saw build_surrounds')
+
+    def refuse(*_args, **_kwargs):
+        cuts.append('cut')
+        raise AssertionError('generate_weeds ran')
+
+    monkeypatch.setattr(weedlib, 'build_surrounds', parent_saw)
+    monkeypatch.setattr(weedlib, 'generate_weeds', refuse)
+    real_spawn = dialog_mod._spawn_ask
+
+    def wrapped_spawn(request, hold, pausing, cancelled):
+        proc, conn = real_spawn(request, hold, pausing, cancelled)
+        if request.get('kind') != 'surround':
+            return proc, conn
+        assert hold
+        assert proc._start_method == 'spawn'
+        dialog = _visible_dialog()
+        assert dialog is not None and dialog.isVisible()
+        if getattr(dialog, '_hold_armed', False):
+            return proc, conn
+        dialog._hold_armed = True
+        timer = QtCore.QTimer(dialog)
+        timer.setSingleShot(True)
+
+        def mark():
+            alive = dialog.isVisible() and proc.is_alive()
+            fired.append(bool(alive))
+            painted_early.append(_WEED in _pen_colors(dialog))
+            if not alive:
+                return
+            _distance_spin(dialog).setValue(6.0)
+            _join_spin(dialog).setValue(1.25)
+            _button(dialog, 'swap').click()
+
+        timer.timeout.connect(mark)
+        timer.start(0)
+        _keep_timer(dialog, timer)
+        return proc, conn
+
+    monkeypatch.setattr(dialog_mod, '_spawn_ask', wrapped_spawn)
+    old_hold = dialog_mod._ASK_HOLD
+    dialog_mod._ASK_HOLD = 8000000
+
+    def drive(dialog):
+        apply_btn = _button(dialog, 'apply')
+        assert apply_btn.isEnabled() is False
+        _button(dialog, 'start').click()
+        _pump_until(lambda: bool(fired), timeout=10)
+        assert fired == [True]
+        assert painted_early == [False]
+        assert dialog.isVisible() is True
+        assert apply_btn.isEnabled() is False
+        assert cuts == []
+        _wait_idle(dialog, timeout=30)
+        assert dialog.isVisible() is True
+        assert apply_btn.isEnabled() is False
+        assert cuts == []
+        assert len(dialog.surround_args) == 2
+        assert dialog.surround_args[0][0] == pytest.approx(_FIVE_PERCENT)
+        assert dialog.surround_args[0][1] == pytest.approx(6.35)
+        assert dialog.surround_args[-1][0] == pytest.approx(6.0)
+        assert dialog.surround_args[-1][1] == pytest.approx(1.25)
+        fresh = real(_regions(_CLEAR, swap=True).subject, 6.0, 1.25)
+        stale = real(_regions(_CLEAR, swap=False).subject, _FIVE_PERCENT, 6.35)
+        _assert_strokes(dialog, fresh, _WEED)
+        assert not _same_path(fresh[0], stale[0])
+        assert dialog.worker_swaps[-1] is True
+        assert 'surrounds' in dialog.worker_calls
+        dialog.reject()
+
+    try:
+        _run(_CLEAR, drive)
+    finally:
+        dialog_mod._ASK_HOLD = old_hold
+    assert cuts == []
+
+
+def test_clear_all_discards_the_surround_and_does_not_kill(monkeypatch):
+    import weedlines_dialog as dialog_mod
+
+    killed = []
+    real_spawn = dialog_mod._spawn_ask
+
+    def wrapped_spawn(request, hold, pausing, cancelled):
+        proc, conn = real_spawn(request, hold, pausing, cancelled)
+        if request.get('kind') != 'surround':
+            return proc, conn
+
+        def deny(*_args, **_kwargs):
+            killed.append('kill')
+            raise AssertionError('child killed')
+
+        proc.terminate = deny
+        proc.kill = deny
+        return proc, conn
+
+    monkeypatch.setattr(dialog_mod, '_spawn_ask', wrapped_spawn)
+    old_hold = dialog_mod._ASK_HOLD
+    dialog_mod._ASK_HOLD = 8000000
+
+    def _cancel(dialog):
+        found = [
+            button for button in dialog.findChildren(QtWidgets.QPushButton)
+            if button.isVisible() and button.text().startswith('Cancel')
+        ]
+        assert len(found) == 1
+        found[0].click()
+
+    def drive(dialog):
+        _button(dialog, 'start').click()
+        _pump_until(
+            lambda: any(
+                button.isVisible() and button.text().startswith('Cancel')
+                for button in dialog.findChildren(QtWidgets.QPushButton)),
+            timeout=5)
+        _cancel(dialog)
+        _wait_idle(dialog)
+        assert killed == []
+        assert _WEED not in _pen_colors(dialog)
+        assert dialog.isVisible() is True
+        assert _button(dialog, 'start').isEnabled() is True
+        assert _button(dialog, 'apply').isEnabled() is False
+        asked = len(dialog.surround_args)
+        _distance_spin(dialog).setValue(4.0)
+        _wait_idle(dialog)
+        assert len(dialog.surround_args) == asked
+        assert _WEED not in _pen_colors(dialog)
+        dialog.reject()
+
+    try:
+        _run(_CLEAR, drive)
+    finally:
+        dialog_mod._ASK_HOLD = old_hold
+
+
+def test_pause_holds_the_surround_until_resume(monkeypatch):
+    import weedlines_dialog as dialog_mod
+
+    paused = []
+    real_spawn = dialog_mod._spawn_ask
+
+    def wrapped_spawn(request, hold, pausing, cancelled):
+        proc, conn = real_spawn(request, hold, pausing, cancelled)
+        if request.get('kind') != 'surround':
+            return proc, conn
+        dialog = _visible_dialog()
+        assert dialog is not None
+        timer = QtCore.QTimer(dialog)
+        timer.setSingleShot(True)
+
+        def mark():
+            if dialog.isVisible() and proc.is_alive():
+                _click_text(dialog, 'Pause')
+                paused.append(proc.is_alive())
+
+        timer.timeout.connect(mark)
+        timer.start(0)
+        _keep_timer(dialog, timer)
+        return proc, conn
+
+    monkeypatch.setattr(dialog_mod, '_spawn_ask', wrapped_spawn)
+    old_hold = dialog_mod._ASK_HOLD
+    dialog_mod._ASK_HOLD = 8000000
+
+    def drive(dialog):
+        try:
+            _button(dialog, 'start').click()
+            _pump_until(lambda: bool(paused), timeout=10)
+            assert paused == [True]
+            assert dialog.isVisible() is True
+            _pump_until(
+                lambda: dialog.worker_calls.count('surrounds') >= 1,
+                timeout=10)
+            assert _WEED not in _pen_colors(dialog)
+            app = QtWidgets.QApplication.instance()
+            for _ in range(4):
+                app.processEvents(QtCore.QEventLoop.AllEvents, 50)
+            assert _WEED not in _pen_colors(dialog)
+            assert _run_busy(dialog) is True
+            assert dialog.isVisible() is True
+            _click_text(dialog, 'Resume')
+            _wait_idle(dialog)
+            assert _WEED in _pen_colors(dialog)
+            assert _button(dialog, 'apply').isEnabled() is False
+            assert dialog.isVisible() is True
+        finally:
+            if dialog.isVisible() and _run_busy(dialog):
+                resume = [
+                    button for button in dialog.findChildren(
+                        QtWidgets.QPushButton)
+                    if button.isVisible() and button.text() == 'Resume'
+                ]
+                if resume:
+                    resume[0].click()
+                _wait_idle(dialog)
+            if dialog.isVisible():
+                dialog.reject()
+
+    try:
+        _run(_CLEAR, drive)
+    finally:
+        dialog_mod._ASK_HOLD = old_hold
+
+
+def test_surround_stdio_reaches_the_algorithm_log():
+    import weedlines_dialog as dialog_mod
+
+    old_trace = dialog_mod._ASK_TRACE
+
+    def drive(dialog):
+        dialog_mod._ASK_TRACE = 'surround-stdio-marker'
+        _button(dialog, 'start').click()
+        _wait_idle(dialog)
+        log = dialog.findChild(QtWidgets.QPlainTextEdit)
+        assert log is not None
+        assert log.toPlainText().count('surround-stdio-marker') >= 2
+        dialog.reject()
+
+    try:
+        _run(_CLEAR, drive)
+    finally:
+        dialog_mod._ASK_TRACE = old_trace
+
+
+def test_surround_forwards_focus_and_does_not_paint_it():
+    def drive(dialog):
+        dialog.focus_mark = None
+        _button(dialog, 'start').click()
+        _wait_idle(dialog)
+        mark = dialog.focus_mark
+        assert isinstance(mark, tuple) and len(mark) == 2
+        outline, line = mark
+        assert isinstance(outline, tuple) and outline
+        assert all(
+            isinstance(point, tuple) and len(point) == 2 for point in outline)
+        assert line is None or (isinstance(line, tuple) and len(line) == 2)
+        for item in _path_items(_view(dialog).scene()):
+            assert _pen_hex(item) not in ('#7a5cff', '#15803d')
+            assert _brush_hex(item) not in ('#7a5cff', '#15803d')
+        dialog.reject()
+
+    _run(_CLEAR, drive)

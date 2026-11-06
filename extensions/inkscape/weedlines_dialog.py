@@ -378,6 +378,7 @@ def _empty_inbox():
         'bounds': None,
         'fills': [],
         'arrows': [],
+        'surrounds': [],
         'error': None,
         'cancelled': False,
     }
@@ -400,6 +401,29 @@ def _ask_classify(request, conn):
     for defect in check.defects:
         x, y = _point_xy(defect.target)
         conn.send(('defect', defect.kind, x, y))
+
+
+def _ask_surround(request, conn):
+    """One surround ask. Plain paths back. No window and no solver."""
+    from weedlib import build_surrounds
+    try:
+        distance = float(request.get('distance', 0.0))
+    except (TypeError, ValueError):
+        distance = 0.0
+    try:
+        join_gap = float(request.get('join_gap', 0.0))
+    except (TypeError, ValueError):
+        join_gap = 0.0
+    if distance < 0.0:
+        distance = 0.0
+    if join_gap < 0.0:
+        join_gap = 0.0
+    conn.send(('call', 'surrounds', distance, join_gap))
+    subject = _unpack_path(
+        request.get('elements') or [], request.get('rule') or 'odd')
+    for path in build_surrounds(subject, distance, join_gap):
+        elements, rule = _pack_path(path)
+        conn.send(('surround', elements, rule))
 
 
 def _ask_subject(request, conn):
@@ -469,6 +493,8 @@ def _run_geometry_ask(request, conn, pausing, cancelled):
             _ask_classify(request, conn)
         elif kind == 'subject':
             _ask_subject(request, conn)
+        elif kind == 'surround':
+            _ask_surround(request, conn)
         else:
             conn.send(('error', 'unknown ask'))
     except WeedCancelled:
@@ -553,9 +579,11 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     *ready*, when given, is called with the dialog once the window is
     shown. The figure check, the subject and weed area, and any arrow
     paths finish after the window is visible and before that call.
-    The surround is not asked until Start Algorithm.
+    The surround is not asked until Start Algorithm. That ask uses
+    the same spawn target. This thread builds the paths and paints
+    them. It does not run the surround or a solver on this thread.
     """
-    from weedlib import build_surrounds, generate_weeds, padded_work_rect
+    from weedlib import generate_weeds, padded_work_rect
     from weedlib.arrows import ArrowPath
     from weedlib.progress import WeedCancelled
     from weedlib.qt import QPainterPath, load_widgets
@@ -745,6 +773,8 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         'thread': None,
         'surround_started': False,
         'surround_paths': [],
+        'surround_args': [],
+        'surround_inflight': None,
         'regions_swap': None,
         'asked': False,
         'calls': [],
@@ -768,8 +798,25 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     }
     dialog.worker_calls = state['calls']
     dialog.worker_swaps = state['swaps']
+    dialog.surround_args = state['surround_args']
     dialog.focus_mark = None
+    dialog.ask_name = None
     CheckerItem = _checker_type(QtWidgets, QtGui, QtCore)
+
+    def _set_ask(kind):
+        state['ask'] = kind
+        dialog.ask_name = kind
+
+    def _solver_running():
+        thread = state.get('thread')
+        return thread is not None and thread.is_alive()
+
+    def _form_locked():
+        # Distance, join, swap, and mode stay live during a surround
+        # ask so a newer one can wait. The solver still locks the form.
+        if state.get('opening') or _solver_running():
+            return True
+        return state['busy'] and state.get('ask') != 'surround'
 
     def append_log(text):
         log_view.moveCursor(QtGui.QTextCursor.End)
@@ -814,12 +861,13 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
             pause_btn.setEnabled(False)
         else:
             cancel_btn.setText('Cancel…')
-        mode_box.setEnabled(not busy)
+        locked = _form_locked()
+        mode_box.setEnabled(not locked)
         pad_spin.setEnabled(not busy)
         space_spin.setEnabled(not busy)
         collar_spin.setEnabled(not busy)
         layer_edit.setEnabled(not busy)
-        swap_btn.setEnabled(not busy)
+        swap_btn.setEnabled(not locked)
         light_edit.setEnabled(not busy)
         dark_edit.setEnabled(not busy)
         weed_edit.setEnabled(not busy)
@@ -942,33 +990,65 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         change_btn.setVisible(show)
 
     def _arm_surround_controls():
-        live = not state['busy']
+        live = not _form_locked()
         distance_spin.setEnabled(live)
         join_spin.setEnabled(live)
         change_btn.setEnabled(live)
 
+    def _surround_due():
+        return (
+            state['surround_started'] and not blocked and _in_surround()
+            and not state.get('drop') and not state['cancel'].is_set())
+
+    def _surround_stale():
+        """True when a newer distance, join, or swap is already waiting."""
+        asked = state.get('surround_inflight')
+        if not asked:
+            return False
+        distance, join_gap, swap = asked
+        if bool(state['swapped']) != bool(swap):
+            return True
+        if abs(float(distance_spin.value()) - float(distance)) > 1e-9:
+            return True
+        if abs(float(join_spin.value()) - float(join_gap)) > 1e-9:
+            return True
+        return False
+
     def _ask_surrounds():
-        # Callers set surround_started. Setting a spin is not an ask.
-        if blocked or not state['surround_started'] or not _in_surround():
-            return
+        # Callers set surround_started. The child builds. This thread paints.
+        if not _surround_due():
+            return False
         regions = _ensure_regions()
-        if regions is None:
-            return
+        if regions is None or regions.subject is None:
+            return False
+        if state.get('ask'):
+            return False
         distance = float(distance_spin.value())
         join_gap = float(join_spin.value())
         if distance < 0.0:
             distance = 0.0
         if join_gap < 0.0:
             join_gap = 0.0
-        state['surround_paths'] = list(
-            build_surrounds(regions.subject, distance, join_gap))
+        elements, rule = _pack_path(regions.subject)
+        state['surround_inflight'] = (
+            distance, join_gap, bool(state['swapped']))
+        return _begin_ask({
+            'kind': 'surround',
+            'elements': elements,
+            'rule': rule,
+            'distance': distance,
+            'join_gap': join_gap,
+        })
 
     def on_start():
         if state['busy'] or blocked or state.get('ask'):
             return
         if _in_surround():
             # Start asks for the surround. It does not run a solver.
+            state['cancel'].clear()
+            state['pause'].clear()
             state['surround_started'] = True
+            state['surround_paths'] = []
             _ask_surrounds()
             refresh_preview()
             return
@@ -1155,6 +1235,11 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         state['cancel'].set()
         _sync_worker_flags()
         append_log('Cancel requested — stopping algorithm…\n')
+        if state.get('ask') == 'surround':
+            # Clear All returns this step to the wait. The child is not killed.
+            state['surround_started'] = False
+            state['surround_paths'] = []
+            refresh_preview()
         set_controls(True, paused=False)
         cancel_btn.setEnabled(False)
         cancel_btn.setText('Cancelling…')
@@ -1221,25 +1306,32 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         refresh_preview()
 
     def _on_swap():
-        if state['busy'] or state.get('ask') or state.get('opening'):
+        if state.get('opening') or _solver_running():
+            return
+        if state['busy'] and state.get('ask') != 'surround':
             return
         state['swapped'] = not state['swapped']
+        if state.get('ask') == 'surround':
+            # The swap flag is already toggled. The arrival starts
+            # the subject ask. This thread does not wait on the child.
+            return
         if not _begin_ask(_subject_request()):
             state['swapped'] = not state['swapped']
             return
         app_loop = QtWidgets.QApplication.instance()
-        while state.get('ask') and dialog.isVisible():
+        while state.get('ask') == 'subject' and dialog.isVisible():
             app_loop.processEvents(QtCore.QEventLoop.AllEvents, 50)
 
     def _on_mode(_index=None):
-        if state['busy'] or state.get('ask'):
+        if _solver_running() or state.get('ask') not in (None, 'surround'):
             return
         had_surrounds = bool(state['surround_paths'])
         _show_surround_controls()
         _arm_surround_controls()
         if state['surround_started'] and not blocked and _in_surround():
+            if state.get('ask'):
+                return
             _ask_surrounds()
-            refresh_preview()
             return
         state['surround_paths'] = []
         # Cut-mode changes do not rebuild arrows or the checkerboard.
@@ -1249,14 +1341,19 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     def _on_surround_length(value=None):
         if isinstance(value, str):
             return
-        if (state['busy'] or state.get('ask') or blocked
+        if (blocked or state.get('opening') or _solver_running()
                 or not state['surround_started'] or not _in_surround()):
             return
+        if state.get('ask'):
+            # The spin already holds the newer length. Do not paint
+            # the in-flight result when it arrives.
+            return
         _ask_surrounds()
-        refresh_preview()
 
     def _on_change_surround():
-        if state['busy'] or state.get('ask') or not _in_surround():
+        if _solver_running() or not _in_surround():
+            return
+        if state.get('ask') not in (None, 'surround'):
             return
         state['surround_started'] = False
         state['surround_paths'] = []
@@ -1309,8 +1406,10 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
             state['seg_q'].append(msg[1])
         elif kind == 'call':
             state['calls'].append(msg[1])
-            if msg[1] == 'subject':
+            if msg[1] == 'subject' and len(msg) > 2:
                 state['swaps'].append(bool(msg[2]))
+            elif msg[1] == 'surrounds' and len(msg) >= 4:
+                state['surround_args'].append((float(msg[2]), float(msg[3])))
         elif kind == 'figure':
             inbox['figures'].append(msg[1:])
         elif kind == 'defect':
@@ -1323,6 +1422,8 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
             inbox['fills'].append((msg[1], msg[2], msg[3]))
         elif kind == 'arrow':
             inbox['arrows'].append(msg[1:])
+        elif kind == 'surround':
+            inbox['surrounds'].append((msg[1], msg[2]))
         elif kind == 'cancelled':
             inbox['cancelled'] = True
         elif kind == 'error':
@@ -1369,7 +1470,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         state['ask_seq'] = token
         state['ask_token'] = token
         state['pump_token'] = token
-        state['ask'] = request['kind']
+        _set_ask(request['kind'])
         state['ask_done'] = False
         state['inbox'] = _empty_inbox()
         ctx = multiprocessing.get_context('spawn')
@@ -1382,7 +1483,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         try:
             proc, conn = _spawn_ask(request, _ASK_HOLD, pausing, cancelled)
         except Exception:
-            state['ask'] = None
+            _set_ask(None)
             state['ask_token'] = None
             raise
         state['proc'] = proc
@@ -1453,10 +1554,22 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
             distance_spin.blockSignals(False)
 
     def _fail_ask(exc):
-        state['ask'] = None
+        _set_ask(None)
         state['opening'] = False
         state['ready_error'] = exc
         dialog.reject()
+
+    def _follow_surround():
+        """Start the newer ask, if one was waiting. Do not paint the old one."""
+        if state.get('ask') or state.get('drop'):
+            return
+        if state['swapped'] != state.get('regions_swap'):
+            _begin_ask(_subject_request())
+            return
+        if _surround_due() and _surround_stale():
+            _ask_surrounds()
+            return
+        state['surround_inflight'] = None
 
     def _after_classify(inbox):
         if state.get('drop'):
@@ -1475,14 +1588,14 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
 
     def _after_subject(inbox):
         if state.get('drop'):
-            state['ask'] = None
+            _set_ask(None)
             state['opening'] = False
             return
         if inbox.get('error'):
             if not state.get('opening'):
                 state['swapped'] = not state['swapped']
                 append_log('Error: %s\n' % inbox['error'])
-                state['ask'] = None
+                _set_ask(None)
                 set_controls(False)
                 return
             raise RuntimeError(inbox['error'])
@@ -1490,23 +1603,69 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
             append_log('Cancelled.\n')
             if not state.get('opening'):
                 state['swapped'] = not state['swapped']
-            state['ask'] = None
+            _set_ask(None)
             state['opening'] = False
             set_controls(False)
             return
         _store_subject(inbox)
-        if state['surround_started'] and not blocked and _in_surround():
-            _ask_surrounds()
+        due = _surround_due()
+        if due:
+            state['surround_paths'] = []
+        was_opening = bool(state.get('opening'))
+        if was_opening:
+            # Unlock the form after the first paint. _form_locked
+            # still sees opening until this flag drops.
+            state['opening'] = False
         refresh_preview()
         set_controls(False)
-        state['ask'] = None
-        if state.get('opening'):
-            state['opening'] = False
+        _set_ask(None)
+        if was_opening:
             root.invalidate()
             root.activate()
             _fit()
             if ready is not None:
                 ready(dialog)
+            return
+        if due:
+            _ask_surrounds()
+
+    def _after_surround(inbox):
+        if state.get('drop'):
+            _set_ask(None)
+            return
+        abort = bool(inbox.get('cancelled')) or state['cancel'].is_set()
+        if abort:
+            append_log('Cancelled.\n')
+            state['surround_paths'] = []
+            state['surround_started'] = False
+            state['surround_inflight'] = None
+            state['cancel'].clear()
+            state['pause'].clear()
+            refresh_preview()
+            _set_ask(None)
+            set_controls(False)
+            _follow_surround()
+            return
+        if inbox.get('error'):
+            append_log('Error: %s\n' % inbox['error'])
+            _set_ask(None)
+            set_controls(False)
+            _follow_surround()
+            return
+        # A newer distance, join, or swap is waiting. Do not paint this one.
+        if not _surround_due() or _surround_stale():
+            _set_ask(None)
+            set_controls(False)
+            _follow_surround()
+            return
+        paths = []
+        for elements, rule in inbox.get('surrounds') or []:
+            paths.append(_unpack_path(elements, rule))
+        state['surround_paths'] = paths
+        refresh_preview()
+        _set_ask(None)
+        set_controls(False)
+        _follow_surround()
 
     def _finish_ask(token):
         if state.get('ask_token') != token:
@@ -1534,10 +1693,12 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
                 inbox['error'] = 'figure check stopped'
         try:
             if kind == 'classify':
-                state['ask'] = None
+                _set_ask(None)
                 _after_classify(inbox)
             elif kind == 'subject':
                 _after_subject(inbox)
+            elif kind == 'surround':
+                _after_surround(inbox)
         except Exception as exc:
             _fail_ask(exc)
 
