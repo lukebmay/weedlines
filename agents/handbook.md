@@ -39,6 +39,38 @@ field. That field was copied into the retired index.
 The orchestrator reads the whole architecture. Another agent opens
 the part the task names.
 
+## Source files
+
+A source file owns one responsibility. 500 lines is the
+usual ceiling. Past 1000 lines the file is too big. Split
+it before adding more.
+
+A file under 500 lines stays whole. Do not split it to
+hit a count. From 500 to 1000, split only when the new
+code is a separate responsibility. Over 1000, split first.
+
+Split on a responsibility that already has a name. A
+window, a widget that is not trivial, an algorithm, or
+one stage of that algorithm. A trivial piece stays with
+its neighbor. A generated file or one table may be
+longer. Name that exception in the directory index. Do
+not use it for a module that mixes responsibilities.
+
+Put new code in the file that already owns that work,
+then stop. Do not shop for a finer split.
+
+A directory with more than one source file has an index.
+Each entry is the file name and one sentence for what
+that file owns. Open the index, then the one file the
+task needs. Leave the other files closed. The index is
+a map. It does not copy the file.
+
+This covers product code, tests, plans, and the
+handbook. The sentence above that forbids a second
+handbook index is about the old index that was injected
+on every turn. A directory index of source files is this
+section.
+
 ## One home
 
 A fact has one home. The guide is the product. A plan is the work.

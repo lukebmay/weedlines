@@ -30,7 +30,8 @@ Do not treat a shebang alone as “this is a bin entry.” See `agents/scripts-b
 - Colors: `ansi-colors.md`; print stack: prefer `pansi` when needed; logging:
   prefer `plog` (query, never raw `tail` at TRACE) — see those catalog files
 - Comments: `comments.md`
-- Prefer single-file ~500–1000 lines; larger → multi-file project
+- Prefer single-file ~500–1000 lines; larger → multi-file project.
+  Not the rule for all source; that is `Source files` in `agents/handbook.md`
 - Almost never emoji in code (except test ✓/X)
 
 ## Missing dependencies (FIRM)
