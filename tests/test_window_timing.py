@@ -270,16 +270,19 @@ def _wait_idle(dialog, timeout=20):
     quiet = 0
     while time.monotonic() < deadline:
         app.processEvents(QtCore.QEventLoop.AllEvents, 30)
+        status = dialog.findChild(QtWidgets.QLabel, 'status')
+        text = '' if status is None else status.text()
+        busy = text.startswith('working') or text.startswith('paused')
         start = dialog.findChild(QtWidgets.QPushButton, 'start')
-        busy = start is None or not start.isVisible()
-        if not busy:
-            for button in dialog.findChildren(QtWidgets.QPushButton):
-                if not button.isVisible():
-                    continue
-                if button.text() in ('Pause', 'Resume', 'Cancelling…'):
-                    busy = True
-                elif button.text().startswith('Cancel'):
-                    busy = True
+        if start is None or not start.isVisible():
+            busy = True
+        for button in dialog.findChildren(QtWidgets.QPushButton):
+            if not button.isVisible():
+                continue
+            if button.text() in ('Pause', 'Resume', 'Cancelling…'):
+                busy = True
+            elif button.text().startswith('Cancel'):
+                busy = True
         if busy:
             quiet = 0
             continue
@@ -287,6 +290,17 @@ def _wait_idle(dialog, timeout=20):
         if quiet >= 2:
             return
     raise AssertionError('surround ask did not finish')
+
+
+def _pump_until(predicate, timeout=20):
+    import time
+    app = QtWidgets.QApplication.instance()
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        app.processEvents(QtCore.QEventLoop.AllEvents, 30)
+        if predicate():
+            return
+    raise AssertionError('timed out')
 
 
 def test_clear_surround_waits_until_start(monkeypatch):
@@ -522,3 +536,310 @@ def test_focus_is_forwarded_and_not_painted():
         dialog.reject()
 
     _run(_CLEAR, drive)
+
+
+def _button(dialog, name):
+    widget = dialog.findChild(QtWidgets.QPushButton, name)
+    assert widget is not None, name
+    return widget
+
+
+def _set_mode(dialog, mode):
+    box = dialog.findChild(QtWidgets.QComboBox, 'mode')
+    assert box is not None
+    for index in range(box.count()):
+        if box.itemData(index) == mode:
+            box.setCurrentIndex(index)
+            return
+    raise AssertionError('missing mode %s' % mode)
+
+
+def _status(dialog):
+    label = dialog.findChild(QtWidgets.QLabel, 'status')
+    assert label is not None
+    return label
+
+
+def _spinner(dialog):
+    widget = dialog.findChild(QtWidgets.QProgressBar, 'spinner')
+    assert widget is not None
+    return widget
+
+
+def _pen_names(dialog):
+    view = dialog.findChild(QtWidgets.QGraphicsView, 'preview')
+    assert view is not None
+    names = set()
+    for item in view.scene().items():
+        pen = getattr(item, 'pen', None)
+        if not callable(pen):
+            continue
+        color = pen().color()
+        if color.alpha() == 0:
+            continue
+        names.add(color.name().lower())
+    return names
+
+
+def _label_names(dialog):
+    return sorted(
+        label.objectName()
+        for label in dialog.findChildren(QtWidgets.QLabel)
+        if label.objectName())
+
+
+def _visible_steps(dialog):
+    shown = []
+    for name in ('step-cut', 'step-surround', 'step-conquer'):
+        widget = dialog.findChild(QtWidgets.QWidget, name)
+        assert widget is not None, name
+        if widget.isVisible():
+            shown.append(name)
+    return shown
+
+
+def _run_busy_for(dialog):
+    text = _status(dialog).text()
+    if text.startswith('working') or text.startswith('paused'):
+        return True
+    return _button(dialog, 'pause').isVisible()
+
+
+def test_cut_shows_one_step_and_a_phase_does_not_add_one():
+    def drive(dialog):
+        color = dialog.findChild(QtWidgets.QLineEdit, 'weed-line-color')
+        assert color is not None
+        color.setText('#123456')
+        color.editingFinished.emit()
+        assert color.property('color') == '#123456'
+        _set_mode(dialog, 'frame')
+        assert _visible_steps(dialog) == ['step-cut']
+        assert _button(dialog, 'conquer-start').isVisible() is False
+        labels = _label_names(dialog)
+        start = _button(dialog, 'start')
+        assert start.text() == 'Start'
+        start.click()
+        assert _status(dialog).text().startswith('working')
+        assert _spinner(dialog).isVisible() is True
+        assert start.text() == 'Restart'
+        assert start.isEnabled() is False
+        assert _visible_steps(dialog) == ['step-cut']
+        _wait_idle(dialog)
+        assert _status(dialog).text() == 'done'
+        assert _spinner(dialog).isVisible() is False
+        assert start.text() == 'Restart'
+        assert start.isEnabled() is True
+        assert dialog.last_phase == 'frame'
+        assert _visible_steps(dialog) == ['step-cut']
+        assert _label_names(dialog) == labels
+        assert '#123456' in _pen_names(dialog)
+        assert dialog.worker_calls.count('solver') == 1
+        start.click()
+        assert '#123456' not in _pen_names(dialog)
+        assert _status(dialog).text().startswith('working')
+        assert _spinner(dialog).isVisible() is True
+        assert start.isEnabled() is False
+        _wait_idle(dialog)
+        assert dialog.worker_calls.count('solver') == 2
+        assert '#123456' in _pen_names(dialog)
+        assert _status(dialog).text() == 'done'
+        assert _button(dialog, 'apply').isEnabled() is True
+        _button(dialog, 'clear-all').click()
+        assert '#123456' not in _pen_names(dialog)
+        assert _status(dialog).text() == 'ready'
+        assert _spinner(dialog).isVisible() is False
+        assert start.text() == 'Start'
+        assert start.isEnabled() is True
+        assert _button(dialog, 'apply').isEnabled() is False
+        mode = dialog.findChild(QtWidgets.QComboBox, 'mode')
+        assert mode.currentData() == 'frame'
+        assert color.property('color') == '#123456'
+        dialog.reject()
+
+    _run(_CLEAR, drive)
+
+
+def test_pause_hides_the_spinner_and_resume_keeps_the_run(monkeypatch):
+    import weedlines_dialog as dialog_mod
+
+    paused = []
+    real_spawn = dialog_mod._spawn_ask
+
+    def wrapped(request, hold, pausing, cancelled):
+        proc, conn = real_spawn(request, hold, pausing, cancelled)
+        if request.get('kind') != 'solver':
+            return proc, conn
+        dialog = _visible_dialog()
+        assert dialog is not None
+        timer = QtCore.QTimer(dialog)
+        timer.setSingleShot(True)
+
+        def mark():
+            if dialog.isVisible() and proc.is_alive():
+                _button(dialog, 'pause').click()
+                paused.append(proc.is_alive())
+
+        timer.timeout.connect(mark)
+        timer.start(0)
+        timers = getattr(dialog, '_hold_timers', None)
+        if timers is None:
+            timers = []
+            dialog._hold_timers = timers
+        timers.append(timer)
+        return proc, conn
+
+    monkeypatch.setattr(dialog_mod, '_spawn_ask', wrapped)
+    old_hold = dialog_mod._ASK_HOLD
+    dialog_mod._ASK_HOLD = 8000000
+
+    def drive(dialog):
+        try:
+            _set_mode(dialog, 'grid')
+            view = dialog.findChild(QtWidgets.QGraphicsView, 'preview')
+            assert view is not None
+            _button(dialog, 'start').click()
+            _pump_until(lambda: bool(paused), timeout=10)
+            assert paused == [True]
+            _pump_until(lambda: dialog.worker_calls.count('solver') >= 1)
+            assert _status(dialog).text().startswith('paused')
+            assert _spinner(dialog).isVisible() is False
+            assert _WEED not in _pen_names(dialog)
+            kept = len(view.scene().items())
+            app = QtWidgets.QApplication.instance()
+            for _ in range(4):
+                app.processEvents(QtCore.QEventLoop.AllEvents, 50)
+            assert len(view.scene().items()) == kept
+            assert dialog.worker_calls.count('solver') == 1
+            assert _run_busy_for(dialog) is True
+            _button(dialog, 'pause').click()
+            _wait_idle(dialog)
+            assert dialog.worker_calls.count('solver') == 1
+            assert _WEED in _pen_names(dialog)
+            assert _status(dialog).text() == 'done'
+            assert _spinner(dialog).isVisible() is False
+            dialog.reject()
+        finally:
+            if dialog.isVisible() and _run_busy_for(dialog):
+                _button(dialog, 'clear-all').click()
+                _wait_idle(dialog)
+            if dialog.isVisible():
+                dialog.reject()
+
+    try:
+        _run(_CLEAR, drive)
+    finally:
+        dialog_mod._ASK_HOLD = old_hold
+
+
+def test_clear_all_from_pause_drops_the_cut(monkeypatch):
+    import weedlines_dialog as dialog_mod
+
+    killed = []
+    real_spawn = dialog_mod._spawn_ask
+
+    def wrapped(request, hold, pausing, cancelled):
+        proc, conn = real_spawn(request, hold, pausing, cancelled)
+        if request.get('kind') != 'solver':
+            return proc, conn
+
+        def deny(*_args, **_kwargs):
+            killed.append('kill')
+            raise AssertionError('child killed')
+
+        proc.terminate = deny
+        proc.kill = deny
+        dialog = _visible_dialog()
+        timer = QtCore.QTimer(dialog)
+        timer.setSingleShot(True)
+
+        def mark():
+            if dialog.isVisible() and proc.is_alive():
+                _button(dialog, 'pause').click()
+
+        timer.timeout.connect(mark)
+        timer.start(0)
+        timers = getattr(dialog, '_hold_timers', None)
+        if timers is None:
+            timers = []
+            dialog._hold_timers = timers
+        timers.append(timer)
+        return proc, conn
+
+    monkeypatch.setattr(dialog_mod, '_spawn_ask', wrapped)
+    old_hold = dialog_mod._ASK_HOLD
+    dialog_mod._ASK_HOLD = 8000000
+
+    def drive(dialog):
+        color = dialog.findChild(QtWidgets.QLineEdit, 'weed-line-color')
+        try:
+            _set_mode(dialog, 'frame')
+            _button(dialog, 'start').click()
+            _pump_until(
+                lambda: _status(dialog).text().startswith('paused'),
+                timeout=10)
+            _pump_until(lambda: dialog.worker_calls.count('solver') >= 1)
+            assert _spinner(dialog).isVisible() is False
+            _button(dialog, 'clear-all').click()
+            _wait_idle(dialog)
+            assert killed == []
+            assert _WEED not in _pen_names(dialog)
+            assert _status(dialog).text() == 'ready'
+            assert _spinner(dialog).isVisible() is False
+            assert _button(dialog, 'start').text() == 'Start'
+            assert _button(dialog, 'apply').isEnabled() is False
+            mode = dialog.findChild(QtWidgets.QComboBox, 'mode')
+            assert mode.currentData() == 'frame'
+            assert color.property('color') == '#FF0000'
+            dialog.reject()
+        finally:
+            if dialog.isVisible() and _run_busy_for(dialog):
+                _button(dialog, 'clear-all').click()
+                _wait_idle(dialog)
+            if dialog.isVisible():
+                dialog.reject()
+
+    try:
+        _run(_CLEAR, drive)
+    finally:
+        dialog_mod._ASK_HOLD = old_hold
+    assert killed == []
+
+
+def test_close_during_a_cut_returns_nothing(monkeypatch):
+    import weedlines_dialog as dialog_mod
+
+    killed = []
+    real_spawn = dialog_mod._spawn_ask
+
+    def wrapped(request, hold, pausing, cancelled):
+        proc, conn = real_spawn(request, hold, pausing, cancelled)
+        if request.get('kind') != 'solver':
+            return proc, conn
+
+        def deny(*_args, **_kwargs):
+            killed.append('kill')
+            raise AssertionError('child killed')
+
+        proc.terminate = deny
+        proc.kill = deny
+        return proc, conn
+
+    monkeypatch.setattr(dialog_mod, '_spawn_ask', wrapped)
+    old_hold = dialog_mod._ASK_HOLD
+    dialog_mod._ASK_HOLD = 8000000
+
+    def drive(dialog):
+        _set_mode(dialog, 'island-hop')
+        assert _visible_steps(dialog) == ['step-cut']
+        _button(dialog, 'start').click()
+        assert _status(dialog).text().startswith('working')
+        assert _spinner(dialog).isVisible() is True
+        _button(dialog, 'close').click()
+        assert dialog.isVisible() is True
+
+    try:
+        result = _run(_CLEAR, drive)
+    finally:
+        dialog_mod._ASK_HOLD = old_hold
+    assert result == (None, None, None)
+    assert killed == []

@@ -184,6 +184,7 @@ def _finish_start(dialog, mode, padding=None, spacing=None):
     start = _button(dialog, 'start')
     apply_btn = _button(dialog, 'apply')
     assert start.isEnabled() is True
+    assert start.text() == 'Start'
     done = {'error': None}
     start.click()
     log = dialog.findChild(QtWidgets.QPlainTextEdit)
@@ -194,7 +195,11 @@ def _finish_start(dialog, mode, padding=None, spacing=None):
         if apply_btn.isEnabled():
             apply_btn.click()
             return
-        running = (not start.isVisible()) or (not start.isEnabled())
+        status = dialog.findChild(QtWidgets.QLabel, 'status')
+        text = '' if status is None else status.text()
+        running = (
+            text.startswith('working') or text.startswith('paused')
+            or not start.isEnabled())
         if not running and ticks['n'] > 5:
             text = log.toPlainText() if log is not None else ''
             done['error'] = 'no cuts\n' + text
@@ -504,12 +509,9 @@ def _release_solver(dialog):
     if resume:
         resume[0].click()
     else:
-        cancel = [
-            button for button in dialog.findChildren(QtWidgets.QPushButton)
-            if button.isVisible() and button.text().startswith('Cancel')
-        ]
-        if cancel:
-            cancel[0].click()
+        clear = dialog.findChild(QtWidgets.QPushButton, 'clear-all')
+        if clear is not None and clear.isVisible() and clear.isEnabled():
+            clear.click()
     try:
         _pump_until(lambda: not _run_busy(dialog), timeout=20)
     except AssertionError:
@@ -692,7 +694,7 @@ def test_clear_while_paused_cancels_and_does_not_freeze(monkeypatch):
             timer.timeout.connect(mark)
             timer.start(0)
             holder['fire'] = timer
-            _click_prefix(dialog, 'Cancel')
+            _button(dialog, 'clear-all').click()
             QtWidgets.QApplication.instance().processEvents()
             assert fired and fired[0][0] < 0.5 and fired[0][1] is True
             _pump_until(lambda: not _run_busy(dialog))
@@ -701,7 +703,10 @@ def test_clear_while_paused_cancels_and_does_not_freeze(monkeypatch):
             assert 'Algorithm cancelled.' in text
             assert killed == []
             assert _button(dialog, 'apply').isEnabled() is False
+            assert _button(dialog, 'start').text() == 'Start'
             assert _button(dialog, 'start').isEnabled() is True
+            status = dialog.findChild(QtWidgets.QLabel, 'status')
+            assert status is not None and status.text() == 'ready'
             assert dialog.isVisible() is True
             dialog.reject()
         finally:

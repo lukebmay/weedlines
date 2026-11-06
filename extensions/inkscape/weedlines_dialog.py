@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """Interactive Weedlines dialog for the Inkscape extension.
 
-Start / Pause / Resume / Cancel, scrolling stdout+stderr log (keeps
-Inkscape from showing the "additional data" popup), and a live preview
-of the subject, the weed area, and accepted cuts. Pause is cooperative
-so you can inspect the preview mid-run, then resume.
+Start / Restart / Pause / Clear All, one status, a spinner, and a
+scrolling stdout+stderr log (keeps Inkscape from showing the
+"additional data" popup). The preview shows the subject, the weed
+area, and accepted cuts. Pause is cooperative so you can inspect
+the preview mid-run, then resume.
 """
 from __future__ import division
 
@@ -31,6 +32,11 @@ _IMPORT_SENTENCE = (
     'Run Extensions → Weedlines → Import last result to place the arrows.')
 _SURROUND_MODE = 'Surround and Conquer'
 _CUT_MODES = ('frame', 'grid', 'island-hop')
+_STEP_TITLES = {
+    'frame': 'Frame',
+    'grid': 'Grid',
+    'island-hop': 'Island hop',
+}
 # Quarter inch. The user-unit count is this divided by the document scale.
 _QUARTER_INCH = 0.25
 # Inkscape's linear display units. Percent and em are not lengths.
@@ -495,6 +501,7 @@ def _ask_solver(request, conn, pausing, cancelled):
     ))
 
     def on_phase(name):
+        conn.send(('phase', str(name)))
         conn.send(('log', '[phase] %s\n' % name))
 
     def on_seg(seg):
@@ -749,7 +756,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     *ready*, when given, is called with the dialog once the window is
     shown. The figure check, the subject and weed area, and any arrow
     paths finish after the window is visible and before that call.
-    The surround is not asked until Start Algorithm. That ask uses
+    The surround is not asked until Start. That ask uses
     the same spawn target. This thread builds the paths and paints
     them. It does not run the surround or a solver on this thread.
     """
@@ -784,7 +791,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     shown_unit = _display_unit_name(dialog.display_unit)
     if not _UNIT_INCHES.get(shown_unit):
         shown_unit = 'px'
-    dialog.resize(720, 640)
+    dialog.resize(720, 760)
     # WindowModal: don't freeze every Qt window in a multi-app session;
     # when hosted inside Inkscape's process this still blocks that app.
     dialog.setWindowModality(QtCore.Qt.WindowModal)
@@ -817,9 +824,6 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     join_spin.setDecimals(4)
     join_spin.setSingleStep(0.1)
     join_spin.setEnabled(False)
-    change_btn = QtWidgets.QPushButton('Change surround')
-    change_btn.setObjectName('change-surround')
-    change_btn.setEnabled(False)
     pad_label = QtWidgets.QLabel('Padding')
     pad_label.setObjectName('padding-label')
     pad_spin = QtWidgets.QDoubleSpinBox()
@@ -851,7 +855,6 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     form.addRow('Display unit', unit_box)
     form.addRow(distance_label, distance_spin)
     form.addRow(join_label, join_spin)
-    form.addRow(change_btn)
     form.addRow(pad_label, pad_spin)
     form.addRow(space_label, space_spin)
     form.addRow(collar_label, collar_spin)
@@ -879,29 +882,71 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     form.addRow('Default subject color', subject_edit)
     root.addLayout(form)
 
-    btn_row = QtWidgets.QHBoxLayout()
-    start_btn = QtWidgets.QPushButton('Start Algorithm')
+    def _step_line(name, title, mark):
+        widget = QtWidgets.QWidget()
+        widget.setObjectName(name)
+        layout = QtWidgets.QHBoxLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        label = QtWidgets.QLabel(title)
+        label.setObjectName(name + '-label')
+        stamp = QtWidgets.QLabel(mark)
+        stamp.setObjectName(name + '-mark')
+        layout.addWidget(label)
+        layout.addWidget(stamp)
+        layout.addStretch(1)
+        return widget, layout, label
+
+    cut_step, cut_layout, cut_label = _step_line('step-cut', 'Frame', 'current')
+    surround_step, surround_layout, _surround_label = _step_line(
+        'step-surround', 'Surround', 'current')
+    conquer_step, conquer_layout, _conquer_label = _step_line(
+        'step-conquer', 'Conquer', 'left')
+    conquer_btn = QtWidgets.QPushButton('Start')
+    conquer_btn.setObjectName('conquer-start')
+    conquer_btn.setEnabled(False)
+    conquer_layout.insertWidget(2, conquer_btn)
+    steps = QtWidgets.QVBoxLayout()
+    steps.addWidget(cut_step)
+    steps.addWidget(surround_step)
+    steps.addWidget(conquer_step)
+    root.addLayout(steps)
+
+    start_btn = QtWidgets.QPushButton('Start')
     start_btn.setObjectName('start')
     start_btn.setEnabled(False)
     pause_btn = QtWidgets.QPushButton('Pause')
+    pause_btn.setObjectName('pause')
     pause_btn.hide()
-    cancel_btn = QtWidgets.QPushButton('Cancel…')
-    cancel_btn.hide()
+    clear_btn = QtWidgets.QPushButton('Clear All')
+    clear_btn.setObjectName('clear-all')
+    clear_btn.setEnabled(False)
     apply_btn = QtWidgets.QPushButton('Apply')
     apply_btn.setObjectName('apply')
     apply_btn.setEnabled(False)
     close_btn = QtWidgets.QPushButton('Close')
-    btn_row.addWidget(start_btn)
+    close_btn.setObjectName('close')
+    btn_row = QtWidgets.QHBoxLayout()
     btn_row.addWidget(pause_btn)
-    btn_row.addWidget(cancel_btn)
+    btn_row.addWidget(clear_btn)
     btn_row.addStretch(1)
     btn_row.addWidget(apply_btn)
     btn_row.addWidget(close_btn)
     root.addLayout(btn_row)
 
-    status_label = QtWidgets.QLabel('')
+    status_row = QtWidgets.QHBoxLayout()
+    spinner = QtWidgets.QProgressBar()
+    spinner.setObjectName('spinner')
+    spinner.setRange(0, 0)
+    spinner.setTextVisible(False)
+    spinner.setFixedSize(18, 18)
+    spinner.hide()
+    status_label = QtWidgets.QLabel('ready')
+    status_label.setObjectName('status')
+    status_label.setTextFormat(QtCore.Qt.PlainText)
     status_label.setStyleSheet('color: #c0c0c0;')
-    root.addWidget(status_label)
+    status_row.addWidget(spinner)
+    status_row.addWidget(status_label, stretch=1)
+    root.addLayout(status_row)
 
     log_label = QtWidgets.QLabel('Algorithm output (stdout / stderr)')
     root.addWidget(log_label)
@@ -925,6 +970,8 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     splitter.addWidget(view)
     splitter.setStretchFactor(0, 0)
     splitter.setStretchFactor(1, 1)
+    splitter.setChildrenCollapsible(False)
+    splitter.setMinimumHeight(72 + 180)
     splitter.setSizes([90, 400])
     root.addWidget(splitter, stretch=1)
 
@@ -959,6 +1006,20 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         'solved_pad': None,
         'accepted': False,
         'surround_started': False,
+        'surround_finished': False,
+        'cut_started': {
+            'frame': False,
+            'grid': False,
+            'island-hop': False,
+        },
+        'cut_finished': {
+            'frame': False,
+            'grid': False,
+            'island-hop': False,
+        },
+        'phase': None,
+        'aborting': False,
+        'run_mode': None,
         'surround_paths': [],
         'surround_args': [],
         'surround_inflight': None,
@@ -1006,6 +1067,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     dialog.focus_mark = None
     dialog.focus_named = None
     dialog.ask_name = None
+    dialog.last_phase = None
     # Baselines for committed options. Opening values are not edits.
     state['history_lengths'] = dict(state['lengths'])
     state['history_mode'] = mode_box.currentIndex()
@@ -1046,30 +1108,84 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     # QApplication often emits the Wayland warning during construction above.
     drain_platform_lines()
 
+    def _current_started():
+        if _in_surround():
+            return bool(state['surround_started'])
+        return bool(state['cut_started'].get(mode_box.currentData()))
+
+    def _current_finished():
+        if _in_surround():
+            return bool(state['surround_finished'])
+        return bool(state['cut_finished'].get(mode_box.currentData()))
+
+    def _render_status():
+        # A phase from the library stays in this one status. It is not a step.
+        if state.get('aborting'):
+            status_label.setText('ready')
+            spinner.setVisible(False)
+            return
+        if not state['busy']:
+            if _current_finished():
+                status_label.setText('done')
+            else:
+                status_label.setText('ready')
+            spinner.setVisible(False)
+            return
+        text = 'paused' if state['paused'] else 'working'
+        phase = state.get('phase')
+        if phase:
+            text = '%s: %s' % (text, phase)
+        status_label.setText(text)
+        spinner.setVisible(not state['paused'])
+
+    def _sync_start_button():
+        start_btn.setText('Restart' if _current_started() else 'Start')
+        start_btn.setEnabled((not state['busy']) and not blocked)
+        conquer_btn.setEnabled(False)
+        _render_status()
+
+    def _end_abort():
+        state['cancel'].clear()
+        state['pause'].clear()
+        state['aborting'] = False
+        state['phase'] = None
+
+    def _place_start(home, home_layout):
+        if start_btn.parentWidget() is home:
+            return
+        previous = start_btn.parentWidget()
+        if previous is not None and previous.layout() is not None:
+            previous.layout().removeWidget(start_btn)
+        home_layout.insertWidget(2, start_btn)
+        start_btn.setVisible(True)
+
+    def _show_steps():
+        surround = _in_surround()
+        if surround:
+            _place_start(surround_step, surround_layout)
+        else:
+            cut_label.setText(
+                _STEP_TITLES.get(mode_box.currentData(), 'Frame'))
+            _place_start(cut_step, cut_layout)
+        cut_step.setVisible(not surround)
+        surround_step.setVisible(surround)
+        conquer_step.setVisible(surround)
+        start_btn.setVisible(True)
+
     def set_controls(busy, paused=False):
         state['busy'] = busy
         state['paused'] = bool(paused) if busy else False
-        start_btn.setVisible(not busy)
-        start_btn.setEnabled((not busy) and not blocked)
+        if not busy:
+            state['phase'] = None
+            state['aborting'] = False
+        start_btn.setVisible(True)
         pause_btn.setVisible(busy)
         pause_btn.setEnabled(busy and not state['cancel'].is_set())
         if busy and state['paused']:
             pause_btn.setText('Resume')
-            status_label.setText('Paused — inspect preview, then Resume or Cancel.')
-        elif busy:
-            pause_btn.setText('Pause')
-            status_label.setText('Running…')
         else:
             pause_btn.setText('Pause')
-            status_label.setText('')
-        cancel_btn.setVisible(busy)
-        cancel_btn.setEnabled(busy and not state['cancel'].is_set())
-        if state['cancel'].is_set() and busy:
-            cancel_btn.setText('Cancelling…')
-            cancel_btn.setEnabled(False)
-            pause_btn.setEnabled(False)
-        else:
-            cancel_btn.setText('Cancel…')
+        clear_btn.setEnabled(not state.get('opening'))
         locked = _form_locked()
         mode_box.setEnabled(not locked)
         pad_spin.setEnabled(not busy)
@@ -1083,6 +1199,8 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         subject_edit.setEnabled(not busy)
         apply_btn.setEnabled((not busy) and state['result'] is not None)
         _arm_surround_controls()
+        _show_steps()
+        _sync_start_button()
 
     def _fit():
         rect = scene.itemsBoundingRect()
@@ -1196,7 +1314,6 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         distance_spin.setVisible(show)
         join_label.setVisible(show)
         join_spin.setVisible(show)
-        change_btn.setVisible(show)
 
     def _show_mode_knobs():
         # Hiding keeps the value.
@@ -1216,7 +1333,6 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         live = not _form_locked()
         distance_spin.setEnabled(live)
         join_spin.setEnabled(live)
-        change_btn.setEnabled(live)
 
     def _surround_due():
         return (
@@ -1264,31 +1380,36 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         })
 
     def on_start():
-        if state['busy'] or blocked or state.get('ask'):
+        if (state['busy'] or blocked or state.get('ask')
+                or state.get('aborting')):
             return
+        state['cancel'].clear()
+        state['pause'].clear()
+        state['phase'] = None
         if _in_surround():
             # Start asks for the surround. It does not run a solver.
-            state['cancel'].clear()
-            state['pause'].clear()
             state['surround_started'] = True
+            state['surround_finished'] = False
             state['surround_paths'] = []
-            _ask_surrounds()
             refresh_preview()
+            if not _ask_surrounds():
+                state['surround_started'] = False
+                set_controls(False)
             return
         clear_weed_items()
         state['work'] = None
         state['result'] = None
         state['error'] = None
-        state['cancel'].clear()
-        state['pause'].clear()
         state['seg_q'].clear()
         apply_btn.setEnabled(False)
-        log_view.clear()
-        append_log('Starting %s…\n' % mode_box.currentData())
-        set_controls(True, paused=False)
-        refresh_preview()
-
         mode = mode_box.currentData()
+        state['run_mode'] = mode
+        if mode in state['cut_started']:
+            state['cut_started'][mode] = True
+            state['cut_finished'][mode] = False
+        log_view.clear()
+        append_log('Starting %s…\n' % mode)
+        refresh_preview()
         padding = state['lengths']['padding']
         spacing = state['lengths']['spacing']
         collar = state['lengths']['collar']
@@ -1307,6 +1428,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
             'elements': elements,
             'rule': rule,
         }):
+            state['cut_started'][mode] = False
             set_controls(False)
             append_log('Error: solver did not start\n')
 
@@ -1323,7 +1445,8 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
                 mp_cancel.set()
 
     def on_pause_toggle():
-        if not state['busy'] or state['cancel'].is_set():
+        if (not state['busy'] or state['cancel'].is_set()
+                or state.get('aborting')):
             return
         if state['pause'].is_set():
             state['pause'].clear()
@@ -1335,23 +1458,45 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
             set_controls(True, paused=True)
         _sync_worker_flags()
 
-    def on_cancel():
+    def _drop_visit_lines():
+        state['result'] = None
+        state['accepted'] = False
+        state['error'] = None
+        state['work'] = None
+        state['seg_q'].clear()
+        clear_weed_items()
+        state['surround_paths'] = []
+        state['surround_started'] = False
+        state['surround_finished'] = False
+        state['surround_inflight'] = None
+        for key in state['cut_started']:
+            state['cut_started'][key] = False
+            state['cut_finished'][key] = False
+        apply_btn.setEnabled(False)
+        refresh_preview()
+
+    def on_clear():
+        # Lines go now. A running child is not killed; it sees cancel.
+        _drop_visit_lines()
+        start_btn.setText('Start')
         if not state['busy'] and not state.get('ask'):
+            _end_abort()
+            set_controls(False)
             return
-        # Wake a paused worker so it can see cancel. Do not kill it.
+        state['aborting'] = True
         state['pause'].clear()
+        state['paused'] = False
         state['cancel'].set()
         _sync_worker_flags()
         append_log('Cancel requested — stopping algorithm…\n')
-        if state.get('ask') == 'surround':
-            # Clear All returns this step to the wait. The child is not killed.
-            state['surround_started'] = False
-            state['surround_paths'] = []
-            refresh_preview()
-        set_controls(True, paused=False)
-        cancel_btn.setEnabled(False)
-        cancel_btn.setText('Cancelling…')
+        pause_btn.setText('Pause')
         pause_btn.setEnabled(False)
+        start_btn.setEnabled(False)
+        _render_status()
+
+    def on_conquer():
+        # Conquer is not specified, so this step emits no cuts.
+        return
 
     def on_apply():
         if state['result'] is None or state['busy']:
@@ -1444,6 +1589,8 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
             _show_surround_controls()
             _show_mode_knobs()
             _arm_surround_controls()
+            _show_steps()
+            _sync_start_button()
             return
         if _solver_running() or state.get('ask') not in (None, 'surround'):
             return
@@ -1451,6 +1598,8 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         _show_surround_controls()
         _show_mode_knobs()
         _arm_surround_controls()
+        _show_steps()
+        _sync_start_button()
         if state['surround_started'] and not blocked and _in_surround():
             if state.get('ask'):
                 return
@@ -1473,19 +1622,10 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
             return
         _ask_surrounds()
 
-    def _on_change_surround():
-        if _solver_running() or not _in_surround():
-            return
-        if state.get('ask') not in (None, 'surround'):
-            return
-        state['surround_started'] = False
-        state['surround_paths'] = []
-        _arm_surround_controls()
-        refresh_preview()
-
     start_btn.clicked.connect(on_start)
     pause_btn.clicked.connect(on_pause_toggle)
-    cancel_btn.clicked.connect(on_cancel)
+    clear_btn.clicked.connect(on_clear)
+    conquer_btn.clicked.connect(on_conquer)
     apply_btn.clicked.connect(on_apply)
     close_btn.clicked.connect(on_close)
     return_btn.clicked.connect(on_return)
@@ -1565,7 +1705,6 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     _remember_length('spacing', space_spin, None)
     _remember_length('collar', collar_spin, None)
     unit_box.currentIndexChanged.connect(_on_unit)
-    change_btn.clicked.connect(_on_change_surround)
     for _edit in (light_edit, dark_edit, weed_edit, subject_edit):
         _edit.editingFinished.connect(
             lambda edit=_edit: _commit_color(edit))
@@ -1751,16 +1890,18 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
 
     hint = QtWidgets.QLabel(
         'Builds weed cuts only (no cutter travel planning). '
-        'Pause freezes the algorithm so you can inspect the live preview, '
-        'then Resume or Cancel. '
+        'Pause holds the run so you can inspect the live preview, '
+        'then Resume. Clear All discards the lines from this visit. '
         'After Apply, use Extensions → Weedlines → Import last result '
         'in Inkscape — that brings back the design and cuts together at '
         'the original size and position.')
+    hint.setObjectName('hint')
     hint.setWordWrap(True)
     root.addWidget(hint)
 
     _show_surround_controls()
     _show_mode_knobs()
+    _show_steps()
 
     def _conn_pending(conn):
         try:
@@ -1780,7 +1921,14 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
             outline, line = mark
             if outline or line:
                 dialog.focus_named = mark
+        elif kind == 'phase':
+            state['phase'] = msg[1]
+            dialog.last_phase = msg[1]
+            if state['busy'] and not state.get('aborting'):
+                _render_status()
         elif kind == 'segment':
+            if state.get('aborting') or state['cancel'].is_set():
+                return
             state['seg_q'].append(msg[1])
         elif kind == 'keep':
             path = _unpack_path(msg[2], msg[3])
@@ -1982,6 +2130,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
             raise RuntimeError(inbox['error'])
         if inbox.get('cancelled'):
             append_log('Cancelled.\n')
+            _end_abort()
             state['opening'] = False
             set_controls(False)
             return
@@ -2006,6 +2155,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
             append_log('Cancelled.\n')
             if not state.get('opening'):
                 state['swapped'] = not state['swapped']
+            _end_abort()
             _set_ask(None)
             state['opening'] = False
             set_controls(False)
@@ -2041,10 +2191,10 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
             append_log('Cancelled.\n')
             state['surround_paths'] = []
             state['surround_started'] = False
+            state['surround_finished'] = False
             state['surround_inflight'] = None
-            state['cancel'].clear()
-            state['pause'].clear()
             refresh_preview()
+            _end_abort()
             _set_ask(None)
             set_controls(False)
             _follow_surround()
@@ -2065,6 +2215,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         for elements, rule in inbox.get('surrounds') or []:
             paths.append(_unpack_path(elements, rule))
         state['surround_paths'] = paths
+        state['surround_finished'] = True
         refresh_preview()
         _set_ask(None)
         set_controls(False)
@@ -2072,6 +2223,9 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
 
     def _paint_solver_segments():
         """Line items for accepted segments. This thread owns the scene."""
+        if state.get('aborting') or state['cancel'].is_set():
+            state['seg_q'].clear()
+            return
         if state.get('ask') != 'solver' or not state['seg_q']:
             return
         if state['work'] is None and state['solved_keep'] is not None:
@@ -2102,15 +2256,27 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         if state.get('close_when_done'):
             state['result'] = None
             state['accepted'] = False
+            _end_abort()
             _set_ask(None)
             set_controls(False)
             dialog.reject()
             return
-        if inbox.get('cancelled'):
+        if (inbox.get('cancelled') or state['cancel'].is_set()
+                or state.get('aborting')):
             append_log('Algorithm cancelled.\n')
             state['result'] = None
+            state['accepted'] = False
+            mode = state.get('run_mode')
+            if mode in state['cut_started']:
+                state['cut_started'][mode] = False
+                state['cut_finished'][mode] = False
+            clear_weed_items()
+            state['work'] = None
+            state['seg_q'].clear()
+            _end_abort()
             _set_ask(None)
             set_controls(False)
+            refresh_preview()
             return
         if inbox.get('error'):
             append_log('Algorithm failed: %s\n' % inbox['error'])
@@ -2123,6 +2289,9 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
             state['result'] = _unpack_path(packed[0], packed[1])
         else:
             state['result'] = QPainterPath()
+        mode = state.get('run_mode')
+        if mode in state['cut_finished']:
+            state['cut_finished'][mode] = True
         _set_ask(None)
         set_controls(False)
         if state['result'] is None or state['result'].isEmpty():
@@ -2232,6 +2401,9 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     dialog.rejected.connect(_mark_closed)
 
     QtCore.QTimer.singleShot(0, _shown)
+
+    dialog.setMinimumHeight(dialog.sizeHint().height())
+    dialog.resize(720, max(760, dialog.sizeHint().height()))
 
     result_code = dialog.exec_()
     layer_name = layer_edit.text().strip() or 'Weed lines'

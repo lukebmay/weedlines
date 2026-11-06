@@ -364,6 +364,38 @@ def _pump_until(predicate, timeout=20):
     raise AssertionError('timed out')
 
 
+def _status(dialog):
+    label = dialog.findChild(QtWidgets.QLabel, 'status')
+    assert label is not None
+    return label
+
+
+def _spinner(dialog):
+    widget = dialog.findChild(QtWidgets.QProgressBar, 'spinner')
+    assert widget is not None
+    return widget
+
+
+def _visible_step_labels(dialog):
+    shown = []
+    for name in ('step-cut-label', 'step-surround-label', 'step-conquer-label'):
+        label = dialog.findChild(QtWidgets.QLabel, name)
+        assert label is not None, name
+        if label.isVisible():
+            shown.append(label.text())
+    return shown
+
+
+def _assert_no_retired(dialog):
+    assert dialog.findChild(QtWidgets.QPushButton, 'change-surround') is None
+    for button in dialog.findChildren(QtWidgets.QPushButton):
+        assert not button.text().startswith('Cancel'), button.text()
+        assert button.text() != 'Change surround'
+    hint = dialog.findChild(QtWidgets.QLabel, 'hint')
+    assert hint is not None
+    assert 'Cancel' not in hint.text()
+
+
 def _click_text(dialog, text):
     found = [
         button for button in dialog.findChildren(QtWidgets.QPushButton)
@@ -502,12 +534,18 @@ def test_clear_design_strokes_surrounds_and_follows_distance(monkeypatch):
         join = _join_spin(dialog)
         label = _distance_label(dialog)
         join_label = _join_label(dialog)
-        change = _button(dialog, 'change-surround')
+        _assert_no_retired(dialog)
         assert label.text() == 'Surround distance'
         assert join_label.text() == 'Join gap'
-        assert label.isVisible() and spin.isVisible() and change.isVisible()
+        assert label.isVisible() and spin.isVisible()
         assert join_label.isVisible() and join.isVisible()
-        assert change.text() == 'Change surround'
+        assert _visible_step_labels(dialog) == ['Surround', 'Conquer']
+        conquer = _button(dialog, 'conquer-start')
+        assert conquer.text() == 'Start'
+        assert conquer.isEnabled() is False
+        assert _status(dialog).text() == 'ready'
+        assert _spinner(dialog).isVisible() is False
+        assert _button(dialog, 'start').text() == 'Start'
         assert spin.value() == pytest.approx(_FIVE_PERCENT)
         assert spin.minimum() == 0.0
         assert spin.value() != pytest.approx(0.05 * 80.0)
@@ -533,12 +571,18 @@ def test_clear_design_strokes_surrounds_and_follows_distance(monkeypatch):
             assert spin.isVisible() is False
             assert join_label.isVisible() is False
             assert join.isVisible() is False
-            assert change.isVisible() is False
+            assert _visible_step_labels(dialog) == [{
+                'frame': 'Frame',
+                'grid': 'Grid',
+                'island-hop': 'Island hop',
+            }[mode]]
+            assert _button(dialog, 'conquer-start').isVisible() is False
             assert spin.value() == pytest.approx(_FIVE_PERCENT)
             assert join.value() == pytest.approx(6.35)
         _set_mode(dialog, _SURROUND)
         assert calls == []
-        assert label.isVisible() and join_label.isVisible() and change.isVisible()
+        assert label.isVisible() and join_label.isVisible()
+        assert _visible_step_labels(dialog) == ['Surround', 'Conquer']
 
         _named_spin(dialog, 'padding').setValue(9.0)
         _named_spin(dialog, 'spacing').setValue(12.0)
@@ -552,6 +596,10 @@ def test_clear_design_strokes_surrounds_and_follows_distance(monkeypatch):
         assert dialog.surround_args[0][0] == pytest.approx(_FIVE_PERCENT)
         assert dialog.surround_args[0][1] == pytest.approx(6.35)
         assert dialog.worker_calls.count('surrounds') == 1
+        assert _button(dialog, 'start').text() == 'Restart'
+        assert _status(dialog).text() == 'done'
+        assert _spinner(dialog).isVisible() is False
+        assert _visible_step_labels(dialog) == ['Surround', 'Conquer']
         paths = real(subject, _FIVE_PERCENT, 6.35)
         assert spin.isEnabled() is True
         assert join.isEnabled() is True
@@ -619,7 +667,7 @@ def test_clear_design_strokes_surrounds_and_follows_distance(monkeypatch):
         assert spin.isVisible() is False
         assert join_label.isVisible() is False
         assert join.isVisible() is False
-        assert change.isVisible() is False
+        assert _visible_step_labels(dialog) == ['Frame']
         assert _WEED not in _pen_colors(dialog)
         assert spin.value() == pytest.approx(0.0)
         assert join.value() == pytest.approx(0.0)
@@ -632,12 +680,16 @@ def test_clear_design_strokes_surrounds_and_follows_distance(monkeypatch):
         assert dialog.surround_args[-1][1] == pytest.approx(0.0)
         assert spin.value() == pytest.approx(0.0)
         assert join.value() == pytest.approx(0.0)
-        assert label.isVisible() and spin.isVisible() and change.isVisible()
+        assert label.isVisible() and spin.isVisible()
         assert join_label.isVisible() and join.isVisible()
+        assert _visible_step_labels(dialog) == ['Surround', 'Conquer']
         _assert_strokes(dialog, real(swapped, 0.0, 0.0), _WEED)
 
         asked = len(dialog.surround_args)
-        change.click()
+        _button(dialog, 'clear-all').click()
+        assert _button(dialog, 'start').text() == 'Start'
+        assert _status(dialog).text() == 'ready'
+        assert _spinner(dialog).isVisible() is False
         assert calls == []
         assert len(dialog.surround_args) == asked
         assert spin.value() == pytest.approx(0.0)
@@ -736,7 +788,7 @@ def test_defect_paints_no_surround_and_disables_start(monkeypatch):
         assert spin.value() == pytest.approx(3.0)
         assert join.value() == pytest.approx(0.0)
         _button(dialog, 'swap').click()
-        _button(dialog, 'change-surround').click()
+        _assert_no_retired(dialog)
         start.click()
         assert start.isEnabled() is False
         assert _button(dialog, 'apply').isEnabled() is False
@@ -775,7 +827,6 @@ def test_start_paints_without_a_solver_or_a_result(monkeypatch, tmp_path):
     def drive(dialog):
         spin = _distance_spin(dialog)
         join = _join_spin(dialog)
-        change = _button(dialog, 'change-surround')
         apply_btn = _button(dialog, 'apply')
         assert calls == []
         assert dialog.surround_args == []
@@ -795,7 +846,10 @@ def test_start_paints_without_a_solver_or_a_result(monkeypatch, tmp_path):
         assert apply_btn.isEnabled() is False
         assert spin.isEnabled() is True
         assert join.isEnabled() is True
-        assert change.isEnabled() is True
+        assert _button(dialog, 'start').text() == 'Restart'
+        assert _status(dialog).text() == 'done'
+        assert _spinner(dialog).isVisible() is False
+        assert 'solver' not in dialog.worker_calls
         shown = real(subject, spin.value(), join.value())
         _assert_strokes(dialog, shown, _WEED)
         apply_btn.click()
@@ -813,7 +867,9 @@ def test_start_paints_without_a_solver_or_a_result(monkeypatch, tmp_path):
 
         kept_distance = spin.value()
         kept_join = join.value()
-        change.click()
+        _button(dialog, 'clear-all').click()
+        assert _button(dialog, 'start').text() == 'Start'
+        assert _status(dialog).text() == 'ready'
         assert calls == []
         assert len(dialog.surround_args) == 1
         assert spin.value() == pytest.approx(kept_distance)
@@ -951,27 +1007,27 @@ def test_clear_all_discards_the_surround_and_does_not_kill(monkeypatch):
     old_hold = dialog_mod._ASK_HOLD
     dialog_mod._ASK_HOLD = 8000000
 
-    def _cancel(dialog):
-        found = [
-            button for button in dialog.findChildren(QtWidgets.QPushButton)
-            if button.isVisible() and button.text().startswith('Cancel')
-        ]
-        assert len(found) == 1
-        found[0].click()
-
     def drive(dialog):
+        color = dialog.findChild(QtWidgets.QLineEdit, 'weed-line-color')
+        assert color is not None
         _button(dialog, 'start').click()
         _pump_until(
-            lambda: any(
-                button.isVisible() and button.text().startswith('Cancel')
-                for button in dialog.findChildren(QtWidgets.QPushButton)),
+            lambda: _status(dialog).text().startswith('working'),
             timeout=5)
-        _cancel(dialog)
+        assert _spinner(dialog).isVisible() is True
+        assert _button(dialog, 'start').text() == 'Restart'
+        assert _button(dialog, 'start').isEnabled() is False
+        _button(dialog, 'clear-all').click()
         _wait_idle(dialog)
         assert killed == []
         assert _WEED not in _pen_colors(dialog)
         assert dialog.isVisible() is True
+        assert _button(dialog, 'start').text() == 'Start'
         assert _button(dialog, 'start').isEnabled() is True
+        assert _status(dialog).text() == 'ready'
+        assert _spinner(dialog).isVisible() is False
+        assert _mode_box(dialog).currentData() == _SURROUND
+        assert color.property('color') == '#FF0000'
         assert _button(dialog, 'apply').isEnabled() is False
         asked = len(dialog.surround_args)
         _distance_spin(dialog).setValue(4.0)
@@ -1020,6 +1076,10 @@ def test_pause_holds_the_surround_until_resume(monkeypatch):
             _button(dialog, 'start').click()
             _pump_until(lambda: bool(paused), timeout=10)
             assert paused == [True]
+            assert _status(dialog).text().startswith('paused')
+            assert _spinner(dialog).isVisible() is False
+            assert _button(dialog, 'start').text() == 'Restart'
+            assert _button(dialog, 'start').isEnabled() is False
             assert dialog.isVisible() is True
             _pump_until(
                 lambda: dialog.worker_calls.count('surrounds') >= 1,
@@ -1035,6 +1095,9 @@ def test_pause_holds_the_surround_until_resume(monkeypatch):
             _wait_idle(dialog)
             assert _WEED in _pen_colors(dialog)
             assert _button(dialog, 'apply').isEnabled() is False
+            assert _status(dialog).text() == 'done'
+            assert _spinner(dialog).isVisible() is False
+            assert _button(dialog, 'start').text() == 'Restart'
             assert dialog.isVisible() is True
         finally:
             if dialog.isVisible() and _run_busy(dialog):
@@ -1274,3 +1337,58 @@ def test_dropdown_rejects_percent_and_em(unit):
         display_unit=unit,
         user_unit_scale=1.0 / 25.4,
     )
+
+
+def test_conquer_start_does_not_cut_and_restart_repeats(monkeypatch):
+    import weedlib
+    calls, real = _watch(monkeypatch)
+    cuts = []
+
+    def refuse(*_args, **_kwargs):
+        cuts.append('cut')
+        raise AssertionError('generate_weeds ran')
+
+    monkeypatch.setattr(weedlib, 'generate_weeds', refuse)
+
+    def drive(dialog):
+        _assert_no_retired(dialog)
+        assert _visible_step_labels(dialog) == ['Surround', 'Conquer']
+        mark = dialog.findChild(QtWidgets.QLabel, 'step-conquer-mark')
+        assert mark is not None and mark.text() == 'left' and mark.isVisible()
+        conquer = _button(dialog, 'conquer-start')
+        assert conquer.isEnabled() is False
+        asked = list(dialog.worker_calls)
+        conquer.click()
+        assert list(dialog.worker_calls) == asked
+        assert dialog.solver_keeps == []
+        assert cuts == []
+        assert calls == []
+
+        _button(dialog, 'start').click()
+        _wait_idle(dialog)
+        assert cuts == []
+        assert calls == []
+        assert 'solver' not in dialog.worker_calls
+        assert _button(dialog, 'start').text() == 'Restart'
+        assert _status(dialog).text() == 'done'
+        assert _spinner(dialog).isVisible() is False
+        assert _visible_step_labels(dialog) == ['Surround', 'Conquer']
+        paths = real(
+            _regions(_CLEAR, swap=False).subject,
+            _distance_spin(dialog).value(),
+            _join_spin(dialog).value())
+        _assert_strokes(dialog, paths, _WEED)
+        asked_n = len(dialog.surround_args)
+        _button(dialog, 'start').click()
+        _wait_idle(dialog)
+        assert len(dialog.surround_args) == asked_n + 1
+        assert cuts == []
+        assert calls == []
+        assert 'solver' not in dialog.worker_calls
+        assert _status(dialog).text() == 'done'
+        assert _button(dialog, 'start').text() == 'Restart'
+        _assert_strokes(dialog, paths, _WEED)
+        dialog.reject()
+
+    _run(_CLEAR, drive)
+    assert cuts == []
