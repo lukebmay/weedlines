@@ -2248,7 +2248,7 @@ def _progress_check(line=None, outline=None):
     _progress.check(outline=outline, line=line)
 
 
-def _add_seg(out, seg, min_cut, keep_path=None, rules=None):
+def _add_seg(out, seg, min_cut, keep_path=None, rules=None, report=True):
     if seg is None:
         return
     x0, y0, x1, y1 = seg
@@ -2280,7 +2280,9 @@ def _add_seg(out, seg, min_cut, keep_path=None, rules=None):
     out.moveTo(x0, y0)
     out.lineTo(x1, y1)
     _wdbg.log('emit.accept', seg=seg)
-    _progress.report_segment(seg)
+    # The seen copy is the same seal, not a second cut.
+    if report:
+        _progress.report_segment(seg)
 
 
 def _add_path_segs(out, path, min_cut, keep_path=None, rules=None):
@@ -5507,7 +5509,7 @@ def _agglomerate_islands(cluster, keep_fill, work, standoff, min_cut,
                 continue
             for seg in segs:
                 _add_seg(out, seg, 0.0, keep_path=keep_fill)
-                _add_seg(seen, seg, 0.0, keep_path=keep_fill)
+                _add_seg(seen, seg, 0.0, keep_path=keep_fill, report=False)
             if kind == 'satellite':
                 for i in groups[gi]:
                     if any(_is_stacked_satellite(cluster[i], h)
@@ -5662,7 +5664,7 @@ def _seal_divergent_corridors(cluster, keep_fill, work, standoff, min_cut,
                 if _seg_redundant(seen, seg) or _seg_crosses_path(seen, seg):
                     continue
                 _add_seg(out, seg, 0.0, keep_path=keep_fill)
-                _add_seg(seen, seg, 0.0, keep_path=keep_fill)
+                _add_seg(seen, seg, 0.0, keep_path=keep_fill, report=False)
     return out
 
 
@@ -6209,7 +6211,7 @@ def _seal_compact_islands(cluster, keep_fill, work, standoff, min_cut,
                 break
             # Emit onto *seen* first so firm rejects cannot leak into *out*.
             before_n = weed_path_stats(seen)['segments']
-            _add_seg(seen, picked, 0.0, keep_path=keep_fill)
+            _add_seg(seen, picked, 0.0, keep_path=keep_fill, report=False)
             if weed_path_stats(seen)['segments'] <= before_n:
                 break
             _add_seg(out, picked, 0.0, keep_path=keep_fill)
@@ -6390,7 +6392,7 @@ def _seal_frame_peninsulas(cluster, keep_fill, work, standoff, min_cut,
         if _seg_redundant(seen, seg) or _seg_crosses_path(seen, seg):
             continue
         _add_seg(out, seg, 0.0, keep_path=keep_fill)
-        _add_seg(seen, seg, 0.0, keep_path=keep_fill)
+        _add_seg(seen, seg, 0.0, keep_path=keep_fill, report=False)
     return out
 
 
@@ -6464,7 +6466,7 @@ def _leftover_hanging_gutters(cluster, keep_fill, work, standoff, min_cut,
             if _seg_redundant(seen, seg) or _seg_crosses_path(seen, seg):
                 continue
             _add_seg(out, seg, 0.0, keep_path=keep_fill)
-            _add_seg(seen, seg, 0.0, keep_path=keep_fill)
+            _add_seg(seen, seg, 0.0, keep_path=keep_fill, report=False)
     return out
 
 
@@ -6744,7 +6746,7 @@ def _cluster_bay_seals(cluster, keep_fill, work, standoff, min_cut,
             if _seg_redundant(seen, seg) or _seg_crosses_path(seen, seg):
                 continue
             _add_seg(out, seg, 0.0, keep_path=keep_fill)
-            _add_seg(seen, seg, 0.0, keep_path=keep_fill)
+            _add_seg(seen, seg, 0.0, keep_path=keep_fill, report=False)
     return out
 
 
@@ -7064,7 +7066,7 @@ def _body_pocket_seals(body, keep_fill, work, standoff, min_cut, container,
         if seg is None:
             continue
         _add_seg(out, seg, 0.0)
-        _add_seg(seen, seg, 0.0)
+        _add_seg(seen, seg, 0.0, report=False)
     return out
 
 

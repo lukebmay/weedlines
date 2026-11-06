@@ -22,12 +22,12 @@ paper the architecture with the story.
 
 | Seen | What happened | Rule |
 | --- | --- | --- |
-| 2026-11-05, `src/weedlib/solvers.py` | Some island-hop seals are reported twice. Two 30 by 20 rectangles at (0, 0) and (50, 0), padding 10, collar 4: the path has 19 segments and the hook receives 21. `(30, 0)–(50, 0)` comes from both `_add_seg` calls in `_agglomerate_islands`, and `(30, 20)–(50, 20)` from both in `_seal_frame_peninsulas`. One call writes the weed path and the other writes the `seen` copy. The returned path has each once. Reported. Not yet confirmed by a second agent. | [Run](./architecture/runtime.md). [_bugs](./plans/_bugs/plan.md). |
 
 ## Closed
 
 | Seen | What happened | Rule |
 | --- | --- | --- |
+| 2026-11-05, `src/weedlib/solvers.py` | Some island-hop seals were reported twice. Two 30 by 20 rectangles at (0, 0) and (50, 0), padding 10, collar 4, returned 19 segments and the hook received 21. Fixed. The `seen` copy does not report. The weed-path call still does. The path still has each seal once. | [Run](./architecture/runtime.md). [_bugs](./plans/_bugs/plan.md). |
 | 2026-11-05, `src/weedlib/solvers.py` | Island-hop hole splits were returned as weed lines and never reached the geometry hook. Fixed. The splits path is reported at the add, before the hug pass. On a 200 by 160 frame with a 180 by 140 hole, the hook receives the two splits once each, and the path still returns them. | [Run](./architecture/runtime.md). [island-segments](./plans/island-segments/plan.md). |
 | 2026-11-05, `src/weedlib/solvers.py` | Grid hatch lines were reported only when the finished path was published, so work-rectangle edges were reported again. Fixed. Hatch is reported when `_grid_in_region` returns, before connected-ends. Each work-rectangle edge is reported once. | [Run](./architecture/runtime.md). [segment-publish](./plans/segment-publish/plan.md). |
 | 2026-11-05, `tests/test_window_timing.py` | `test_hold_on_a_thread_blocks_the_gui_timer` failed when `processEvents` returned before the worker entered the non-yielding loop. The assert saw about 0 instead of more than 0.05. Fixed. The worker waits until just before `processEvents`, and that call has to both deliver the timer and take more than 0.05s. An immediate hold still fails. | [Run](./architecture/runtime.md). [_bugs](./plans/_bugs/plan.md). |

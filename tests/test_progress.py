@@ -516,3 +516,46 @@ def test_hole_splits_reach_the_geometry_hook():
     finally:
         solvers._drop_parallel_hugs = real_drop
         progress.clear()
+
+
+def test_island_hop_seals_reported_once():
+    """Two rectangles: each seal is reported once, and the path stays."""
+    pytest.importorskip('pyclipper')
+    QPainterPath, QRectF, _generate = _need_solver()
+    from weedlib.solvers import island_hop_weeds
+
+    keep = QPainterPath()
+    keep.addRect(QRectF(0, 0, 30, 20))
+    keep.addRect(QRectF(50, 0, 30, 20))
+    seen = []
+    progress.clear()
+    try:
+        progress.install(geometry=lambda seg: seen.append(tuple(seg)))
+        weed = island_hop_weeds(
+            keep, padding=[10, 10, 10, 10], collar=4)
+        returned = _path_segs(weed)
+        expected = (
+            (84.476, -6.631, 87.42, -2.991),
+            (87.42, -2.991, 88.0, 0.0),
+            (88.0, 0.0, 88.0, 20.0),
+            (88.0, 20.0, 86.631, 24.476),
+            (86.631, 24.476, 82.991, 27.42),
+            (82.991, 27.42, 80.0, 28.0),
+            (80.0, 28.0, 0.0, 28.0),
+            (0.0, 28.0, -4.476, 26.631),
+            (-4.476, 26.631, -7.42, 22.991),
+            (-7.42, 22.991, -8.0, 20.0),
+            (-8.0, 20.0, -8.0, 0.0),
+            (-8.0, 0.0, -6.631, -4.476),
+            (-6.631, -4.476, -2.991, -7.42),
+            (-2.991, -7.42, 0.0, -8.0),
+            (0.0, -8.0, 80.0, -8.0),
+            (80.0, -8.0, 84.476, -6.631),
+            (30.0, 20.0, 50.0, 20.0),
+            (30.0, 0.0, 50.0, 0.0),
+            (15.0, 0.0, 15.0, -8.0),
+        )
+        _segs_near(returned, expected)
+        _segs_near(seen, returned)
+    finally:
+        progress.clear()
