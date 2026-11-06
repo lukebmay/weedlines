@@ -22,6 +22,7 @@ paper the architecture with the story.
 
 | Seen | What happened | Rule |
 | --- | --- | --- |
+| 2026-11-06, `tests/test_window_return.py` | `test_clear_check_has_an_empty_line_and_start_works` is reported to time out with "start did not run". The empty-line asserts pass. The test patches `weedlib.generate_weeds` in the parent, and the solver runs in a spawned child, so `seen` stays empty. Not confirmed yet. | [Run](./architecture/runtime.md). [_bugs](./plans/_bugs/plan.md). |
 | 2026-11-06, `docs/user/surround.md` | The surround user doc says "Find **Join gap (mm)**." and "Until you set it, it is 6.35, a quarter of an inch." Line 49 says "Change **Surround distance** or **Join gap (mm)**." Confirmed. The window shows the join gap in the display unit, and the baseline is a quarter inch under the document scale, not a fixed 6.35. | [Boundary](./architecture/boundary.md). [surround-doc](./plans/surround-doc/plan.md). |
 | 2026-11-06, `docs/inkscape-extension.md` | Lines 81–82 say the padding, spacing, and collar spinners are labeled mm, and that the extension treats document user units as mm. Confirmed. The labels are "Padding", "Grid spacing", and "Collar (island-hop)". The library receives document user units. | [Boundary](./architecture/boundary.md). [surround-doc](./plans/surround-doc/plan.md). |
 
