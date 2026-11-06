@@ -11,7 +11,9 @@ try:
 except ImportError:
     pytest.skip("Qt cannot load", allow_module_level=True)
 
+from weedlib import figures, progress
 from weedlib.figures import classify_figures, subject_weed_regions
+from weedlib.progress import WeedCancelled
 from weedlib.svg_paths import svg_d_to_qpainterpath
 
 _OPEN = "M 5,6 L 15,6 L 15,20"
@@ -1205,6 +1207,330 @@ def test_bridged_rectangles_are_three_overlaps():
     assert zones == [1, 1, 1]
     assert wide.contains(QPointF(8.25, 2.0))
     assert not bridge.contains(QPointF(8.25, 2.0))
+
+
+def _two_squares():
+    return [
+        {
+            "id": "left",
+            "d": _SQUARE,
+            "closed": [True],
+            "fill": "#336699",
+        },
+        {
+            "id": "right",
+            "d": "M 20,0 L 30,0 L 30,10 L 20,10 Z",
+            "closed": [True],
+            "fill": "none",
+        },
+    ]
+
+
+def _has_point(points, x, y):
+    return any(
+        abs(point[0] - x) < 1e-6 and abs(point[1] - y) < 1e-6
+        for point in points
+    )
+
+
+def test_cancel_at_the_start_of_several_figures_raises():
+    returned = None
+    progress.clear()
+    try:
+        progress.install(cancel=lambda: True)
+        with pytest.raises(WeedCancelled):
+            returned = classify_figures(_two_squares())
+        assert returned is None
+    finally:
+        progress.clear()
+
+
+def test_host_records_a_check_before_several_figures_return():
+    seen = []
+    progress.clear()
+    try:
+        progress.install(
+            focus=lambda outline, line: seen.append((outline, line)))
+        result = classify_figures(_two_squares())
+        assert [figure.id for figure in result.figures] == ["left", "right"]
+        assert result.defects == []
+        assert seen
+        named = []
+        for outline, line in seen:
+            assert line is None
+            if outline is None:
+                continue
+            assert isinstance(outline, tuple)
+            assert not isinstance(outline, QPainterPath)
+            assert all(
+                isinstance(point, tuple) and len(point) == 2
+                for point in outline
+            )
+            assert not (
+                _has_point(outline, 0.0, 0.0)
+                and _has_point(outline, 20.0, 0.0)
+            )
+            named.append(outline)
+        assert any(_has_point(outline, 0.0, 0.0) for outline in named)
+        assert any(_has_point(outline, 20.0, 0.0) for outline in named)
+    finally:
+        progress.clear()
+
+
+def test_overlap_walk_records_a_check_while_marks_remain():
+    # The mark walk is the long stretch of one pair. A check
+    # before that walk, or after it, does not count.
+    seen = {
+        'in_walk': False,
+        'done': 0,
+        'limit': 0,
+        'walks': 0,
+        'during': 0,
+    }
+    real_groups = figures._linked_mark_groups
+    real_share = figures._marks_share_region
+
+    def wrap_groups(pieces, marks, closed, left, right):
+        limit = len(marks) if closed else max(len(marks) - 1, 0)
+        seen['limit'] = limit
+        seen['done'] = 0
+        seen['in_walk'] = True
+        if limit > 1:
+            seen['walks'] += 1
+        try:
+            return real_groups(pieces, marks, closed, left, right)
+        finally:
+            seen['in_walk'] = False
+
+    def wrap_share(pieces, start, end, wrapped, left, right):
+        if seen['in_walk']:
+            seen['done'] += 1
+        return real_share(pieces, start, end, wrapped, left, right)
+
+    def focus(outline, line):
+        if not seen['in_walk']:
+            return
+        if not 0 < seen['done'] < seen['limit']:
+            return
+        seen['during'] += 1
+        assert line is None
+        if outline is not None:
+            assert isinstance(outline, tuple)
+
+    figures._linked_mark_groups = wrap_groups
+    figures._marks_share_region = wrap_share
+    progress.clear()
+    try:
+        progress.install(focus=focus)
+        result = classify_figures([
+            {
+                "id": "left",
+                "d": _SQUARE,
+                "closed": [True],
+                "fill": "#336699",
+            },
+            {
+                "id": "right",
+                "d": "M 5,5 L 15,5 L 15,15 L 5,15 Z",
+                "closed": [True],
+                "fill": "none",
+            },
+        ])
+        assert seen['walks'] >= 1
+        assert seen['during'] >= 1
+        assert any(defect.kind == "overlap" for defect in result.defects)
+    finally:
+        figures._linked_mark_groups = real_groups
+        figures._marks_share_region = real_share
+        progress.clear()
+
+
+def test_self_overlap_checks_while_pieces_remain():
+    # The piece walk is the long stretch of one figure. A check
+    # before the first pair, or after the last, does not count.
+    seen = {
+        'in_walk': False,
+        'hits': 0,
+        'limit': 0,
+        'during': 0,
+    }
+    real_self = figures._self_overlap_defects
+    real_hits = figures._piece_hits
+
+    def wrap_self(subpaths):
+        pieces = []
+        for subpath in subpaths:
+            pieces.extend(figures._border_pieces(subpath))
+        count = len(pieces)
+        seen['limit'] = count * (count - 1) // 2
+        seen['hits'] = 0
+        seen['in_walk'] = True
+        try:
+            return real_self(subpaths)
+        finally:
+            seen['in_walk'] = False
+
+    def wrap_hits(left, right):
+        if seen['in_walk']:
+            seen['hits'] += 1
+        return real_hits(left, right)
+
+    def focus(outline, line):
+        if not seen['in_walk']:
+            return
+        if not 0 < seen['hits'] < seen['limit']:
+            return
+        seen['during'] += 1
+        assert line is None
+
+    figures._self_overlap_defects = wrap_self
+    figures._piece_hits = wrap_hits
+    progress.clear()
+    try:
+        progress.install(focus=focus)
+        result = classify_figures([{
+            "id": "square",
+            "d": _SQUARE,
+            "closed": [True],
+            "fill": "none",
+        }])
+        assert seen['limit'] > 1
+        assert seen['hits'] == seen['limit']
+        assert seen['during'] >= 1
+        assert result.defects == []
+    finally:
+        figures._self_overlap_defects = real_self
+        figures._piece_hits = real_hits
+        progress.clear()
+
+
+def _two_lenses():
+    left = QPainterPath()
+    left.addRect(0.0, 0.0, 10.0, 6.0)
+    left.addRect(20.0, 0.0, 10.0, 6.0)
+    right = QPainterPath()
+    right.addRect(4.0, 1.0, 10.0, 6.0)
+    right.addRect(24.0, 1.0, 10.0, 6.0)
+    return [
+        {
+            "id": "left",
+            "path": left,
+            "closed": [True, True],
+            "fill": "#336699",
+        },
+        {
+            "id": "right",
+            "path": right,
+            "closed": [True, True],
+            "fill": "none",
+        },
+    ]
+
+
+def test_region_merge_checks_while_a_comparison_remains():
+    # The merge after the crossings compares regions. A check
+    # before that merge, or after the last comparison, does not count.
+    seen = {
+        'in_merge': False,
+        'compares': 0,
+        'limit': 0,
+        'record': True,
+        'arm': False,
+        'cancel': False,
+        'during': 0,
+        'events': [],
+        'marks': [],
+    }
+    real_one = figures._one_point_per_region
+    real_meet = figures._meets_region
+    real_sets = figures._sample_sets_meet
+
+    def wrap_one(left, right, left_parts, right_parts, polygon_points):
+        seen['in_merge'] = True
+        try:
+            return real_one(
+                left, right, left_parts, right_parts, polygon_points,
+            )
+        finally:
+            seen['in_merge'] = False
+
+    def wrap_meet(point, target, samples, left, right):
+        if seen['in_merge']:
+            seen['compares'] += 1
+            if seen['record']:
+                seen['events'].append('compare')
+        return real_meet(point, target, samples, left, right)
+
+    def wrap_sets(first, second, left, right):
+        if seen['in_merge']:
+            seen['compares'] += 1
+            if seen['record']:
+                seen['events'].append('compare')
+        return real_sets(first, second, left, right)
+
+    def focus(outline, line):
+        if not seen['in_merge']:
+            return
+        if seen['record']:
+            seen['events'].append(('check', outline, line))
+        if not seen['arm']:
+            return
+        if not 0 < seen['compares'] < seen['limit']:
+            return
+        seen['during'] += 1
+        seen['marks'].append((outline, line))
+        seen['cancel'] = True
+
+    figures._one_point_per_region = wrap_one
+    figures._meets_region = wrap_meet
+    figures._sample_sets_meet = wrap_sets
+    progress.clear()
+    try:
+        progress.install(focus=focus, cancel=lambda: seen['cancel'])
+        result = classify_figures(_two_lenses())
+        compare_at = [
+            index for index, event in enumerate(seen['events'])
+            if event == 'compare'
+        ]
+        window = [
+            event for index, event in enumerate(seen['events'])
+            if (
+                isinstance(event, tuple)
+                and compare_at
+                and compare_at[0] < index < compare_at[-1]
+            )
+        ]
+        assert len(compare_at) > 1
+        assert window
+        assert all(
+            outline is None and line is None
+            for _kind, outline, line in window
+        )
+        assert sum(
+            defect.kind == "overlap" for defect in result.defects
+        ) == 2
+
+        seen['limit'] = len(compare_at)
+        seen['compares'] = 0
+        seen['record'] = False
+        seen['arm'] = True
+        seen['cancel'] = False
+        returned = None
+        with pytest.raises(WeedCancelled):
+            returned = classify_figures(_two_lenses())
+        assert returned is None
+        assert seen['during'] >= 1
+        assert 0 < seen['compares'] < seen['limit']
+        assert seen['marks']
+        assert all(
+            outline is None and line is None
+            for outline, line in seen['marks']
+        )
+    finally:
+        figures._one_point_per_region = real_one
+        figures._meets_region = real_meet
+        figures._sample_sets_meet = real_sets
+        progress.clear()
 
 
 def test_two_arm_outline_is_two_overlaps():

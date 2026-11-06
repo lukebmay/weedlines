@@ -5,6 +5,7 @@ from __future__ import division
 import math
 from dataclasses import dataclass
 
+from . import progress
 from .paths import join_painter_paths, split_painter_path
 from .qt import QPainterPath, QPointF, QRectF, QTransform, Qt
 from .solvers import _dedupe_closed_subpaths, _subpath_is_closed
@@ -196,9 +197,35 @@ def _lookup(record, name, default=None):
     return getattr(record, name, default)
 
 
+def _pieces_outline(pieces):
+    """On-curve points of one border, or None when it is not one outline."""
+    if not pieces:
+        return None
+    points = [pieces[0][1]]
+    for piece in pieces:
+        end = piece[-1]
+        if (
+            abs(end[0] - points[-1][0]) > 1e-12
+            or abs(end[1] - points[-1][1]) > 1e-12
+        ):
+            points.append(end)
+    if len(points) < 2:
+        return None
+    return points
+
+
+def _focus_outline(path):
+    """One subpath as plain points, or None. Not a cut."""
+    if path is None:
+        return None
+    return _pieces_outline(_border_pieces(path))
+
+
 def _without_twins(subpaths, kept_closed):
     kept = []
     for subpath in subpaths:
+        # The twin walk repeats the whole list. One check per subpath.
+        progress.check(outline=_focus_outline(subpath))
         if _subpath_is_closed(subpath):
             if not _is_new_outline(subpath, kept_closed):
                 continue
@@ -359,6 +386,8 @@ def _nest_depth(parent, index):
 
 
 def _overlap_defects(left, right, left_parts, right_parts):
+    # Two figures. Name neither outline.
+    progress.check()
     # Piece lists are reused for every chord of this pair. A later call
     # must not keep them: a freed path can reuse the id.
     _segment_borders.cache = {}
@@ -431,6 +460,8 @@ def _one_point_per_region(left, right, left_parts, right_parts, polygon_points):
         return []
     parent = list(range(total))
     for index in range(poly_count):
+        # One point. The chords against later points are the long stretch.
+        progress.check()
         for other in range(index + 1, poly_count):
             if _segment_in_both(
                 polygon_points[index], polygon_points[other], left, right,
@@ -439,12 +470,16 @@ def _one_point_per_region(left, right, left_parts, right_parts, polygon_points):
     for region_index, (target, samples) in enumerate(regions):
         node = poly_count + region_index
         for index, point in enumerate(polygon_points):
+            # One point against this region. Name neither figure.
+            progress.check()
             if _find_root(parent, index) == _find_root(parent, node):
                 continue
             if _meets_region(point, target, samples, left, right):
                 _unite(parent, index, node)
     for region_index in range(region_count):
         for other in range(region_index + 1, region_count):
+            # One region pair. Name neither figure.
+            progress.check()
             left_node = poly_count + region_index
             right_node = poly_count + other
             if _find_root(parent, left_node) == _find_root(parent, right_node):
@@ -657,9 +692,12 @@ def _linked_mark_groups(pieces, marks, closed, left, right):
     count = len(marks)
     if count == 0:
         return []
+    # One border. A check on every hit inside a mark is the long work.
+    outline = _pieces_outline(pieces)
     parent = list(range(count))
     limit = count if closed else count - 1
     for index in range(limit):
+        progress.check(outline=outline)
         nxt = (index + 1) % count
         if _marks_share_region(
             pieces, marks[index], marks[nxt], closed and nxt == 0,
@@ -1415,10 +1453,16 @@ def _self_overlap_defects(subpaths):
     # Neighbors are compared. A shared endpoint is not a crossing; the
     # hit tests drop it.
     pieces = []
+    named = []
     for subpath in subpaths:
-        pieces.extend(_border_pieces(subpath))
+        border = _border_pieces(subpath)
+        outline = _pieces_outline(border)
+        pieces.extend(border)
+        named.extend([outline] * len(border))
     points = []
     for left, piece in enumerate(pieces):
+        # One check per piece. A check on every pair is the long work.
+        progress.check(outline=named[left])
         points.extend(_self_piece_hits(piece))
         for other in pieces[left + 1:]:
             points.extend(_piece_hits(piece, other))
