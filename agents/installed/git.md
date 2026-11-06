@@ -62,7 +62,7 @@ If on a side branch: re-merge default regularly; refactor may defer product merg
 | Situation | Commit? | Push? |
 | --- | --- | --- |
 | Successful wrap-up on default | Yes | Yes if origin |
-| Solid slice of the work in progress | Yes | Same as a wrap-up, unless a project git file says not to push yet |
+| Solid slice of the work in progress | Yes | Same as a wrap-up. See Acceptance and push |
 | Side branch wrap-up | Yes | Push side; merge→default when gated |
 | User said don’t | No | No |
 | Secrets in diff | No | No |
@@ -70,6 +70,28 @@ If on a side branch: re-merge default regularly; refactor may defer product merg
 
 User veto always wins.
 
+## Acceptance and push (FIRM)
+
+Test the change you just made. Use the checks that change names.
+Do not use a full acceptance run as that test.
+
+Full acceptance is periodic. Run it after a large workload, about
+once or twice a week, or once at the end of a stretch of active
+development that is landing many changes. The product checks live
+in `agents/acceptance.md`. That run is not a gate on every commit.
+
+A push waits on acceptance only when the commit can change product
+behavior. That is code. Handbook, documentation, and any other
+change that cannot change product behavior do not wait. Push those
+when the slice is solid.
+
+A project git file may add a gate for code. It may not hold a
+handbook change, a documentation change, or another change that
+cannot change product behavior for an acceptance run.
+
 ## Merge side branch → default (when used)
 
-Gates: acceptance met · default merged into feature first · tests green · no serious doubt · no queue interference. Then merge and push default if origin works.
+Gates: the change's own checks passed · default merged into the
+feature first · tests for that change are green · no serious doubt ·
+no queue interference. Full acceptance follows the schedule above.
+Then merge and push default if origin works.

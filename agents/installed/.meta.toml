@@ -1,8 +1,8 @@
 schema = 1
 tool_version = "0.7.1"
-catalog_version = "0.9.0"
+catalog_version = "0.9.1"
 installed_at = "2026-10-27T21:08:00+00:00"
-updated_at = "2026-11-06T19:17:32+00:00"
+updated_at = "2026-11-06T22:13:52+00:00"
 
 [[files]]
 id = "always"
@@ -39,8 +39,8 @@ read_when = "Writing architecture, user docs, human-facing checklists, or choosi
 [[files]]
 id = "git"
 path = "git.md"
-version = "2.1.7"
-sha256 = "59f88f0006f131ba08a5e18e9388b9df2832e372bf812c66fdbfbb0ebde14437"
+version = "2.2.0"
+sha256 = "6f8e6f02da70b347425e20a84496702f0e865c1907b2a2a83fbbe149c46368c6"
 title = "Git"
 read_when = "Before any commit, push, branch, merge, rebase, or release-ladder work"
 
