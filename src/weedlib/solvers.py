@@ -226,12 +226,13 @@ def grid_weeds(keep_path, padding=None, spacing=DEFAULT_GRID_SPACING,
     weed = _grid_in_region(
         hatch_rect, keep_fill, spacing, invert_keep=True,
         keep_path=keep_path, rules=rules, grid_mode=True)
+    # Accepted hatch. A later pass may drop or shorten it.
+    _publish_path_segments(weed)
     surround = QPainterPath()
     surround.addRect(work)
     _add_path_segs(weed, surround, min_cut=1e-6)
     weed = _require_connected_ends(weed, keep_path, tol=2.5, work=work)
     weed = _clip_path_to_rect(weed, work)
-    _publish_path_segments(weed)
     return weed
 
 
