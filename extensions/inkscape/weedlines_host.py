@@ -69,6 +69,8 @@ def main(argv=None):
         width=doc_attrs.get('width'),
         height=doc_attrs.get('height'),
         view_box=doc_attrs.get('viewBox') or doc_attrs.get('viewbox'),
+        display_unit=doc_attrs.get('display_unit'),
+        user_unit_scale=doc_attrs.get('user_unit_scale'),
     )
     try:
         os.remove(job_path)

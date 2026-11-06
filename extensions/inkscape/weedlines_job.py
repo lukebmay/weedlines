@@ -54,8 +54,9 @@ def result_svg_file():
 def write_job(keep_d, defaults, doc_attrs=None, records=None):
     """Persist keep geometry, path records, and dialog defaults.
 
-    *doc_attrs* (width/height/viewBox) stay on the job so import can keep
-    the document size. *records* is one dict per path element.
+    *doc_attrs* (width/height/viewBox, the named display unit, and the
+    scale of one user unit) stay on the job so import can keep the
+    document size. *records* is one dict per path element.
     """
     job = {
         'version': 2,

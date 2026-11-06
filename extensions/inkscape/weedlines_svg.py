@@ -3,6 +3,7 @@
 from __future__ import division
 
 import os
+import re
 from xml.etree import ElementTree as ET
 
 SVG_NS = 'http://www.w3.org/2000/svg'
@@ -30,8 +31,135 @@ def result_svg_path():
     return os.path.join(cache_dir(), 'last_result.svg')
 
 
+# Inches in one of that unit. A unitless length is one px (1/96 inch).
+_INCHES_PER_UNIT = {
+    'px': 1.0 / 96.0,
+    'in': 1.0,
+    'pt': 1.0 / 72.0,
+    'pc': 12.0 / 72.0,
+    'mm': 1.0 / 25.4,
+    'cm': 10.0 / 25.4,
+    'm': 1000.0 / 25.4,
+    'km': 1000000.0 / 25.4,
+    'q': 0.25 / 25.4,
+    'ft': 12.0,
+    'yd': 36.0,
+    '': 1.0 / 96.0,
+}
+_LENGTH_RE = re.compile(
+    r'^\s*([-+]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][-+]?[0-9]+)?)\s*'
+    r'([A-Za-z%]*)\s*$'
+)
+_UNIT_ATTRS = (
+    'inkscape:document-units',
+    '{%s}document-units' % INK_NS,
+)
+
+
+def _element_get(node, key):
+    getter = getattr(node, 'get', None)
+    if not callable(getter):
+        return None
+    try:
+        return getter(key)
+    except Exception:
+        return None
+
+
+def _named_display_unit(svg):
+    """The unit the document names, or None.
+
+    ``document_unit`` is not used: it fills in px and creates a namedview.
+    """
+    for child in _children(svg):
+        tag = getattr(child, 'tag', None)
+        if isinstance(tag, str) and tag.endswith('namedview'):
+            unit = _unit_attr(child)
+            if unit:
+                return unit
+    return _unit_attr(svg)
+
+
+def _unit_attr(node):
+    for key in _UNIT_ATTRS:
+        val = _element_get(node, key)
+        if val is None:
+            continue
+        text = str(val).strip()
+        if text:
+            return text
+    return None
+
+
+def _children(node):
+    try:
+        return list(node)
+    except Exception:
+        return []
+
+
+def _length_inches(text):
+    if text is None:
+        return None
+    match = _LENGTH_RE.match(str(text))
+    if not match:
+        return None
+    try:
+        number = float(match.group(1))
+    except ValueError:
+        return None
+    factor = _INCHES_PER_UNIT.get(match.group(2).lower())
+    if factor is None:
+        return None
+    return number * factor
+
+
+def _viewbox_size(svg):
+    raw = _element_get(svg, 'viewBox') or _element_get(svg, 'viewbox')
+    if raw:
+        parts = [part for part in re.split(r'[,\s]+', str(raw).strip()) if part]
+        if len(parts) == 4:
+            try:
+                return float(parts[2]), float(parts[3])
+            except ValueError:
+                return None, None
+    getter = getattr(svg, 'get_viewbox', None)
+    if not callable(getter):
+        return None, None
+    try:
+        vb = getter()
+        if vb is not None and len(vb) == 4:
+            return float(vb[2]), float(vb[3])
+    except Exception:
+        return None, None
+    return None, None
+
+
+def _user_unit_scale(svg):
+    """Inches in one user unit. No absolute scale is one px."""
+    width_in = _length_inches(_element_get(svg, 'width'))
+    height_in = _length_inches(_element_get(svg, 'height'))
+    box_w, box_h = _viewbox_size(svg)
+    scales = []
+    if width_in and box_w:
+        scales.append(width_in / box_w)
+    if height_in and box_h:
+        scales.append(height_in / box_h)
+    if scales:
+        return max(scales)
+    scale = getattr(svg, 'scale', None)
+    if (isinstance(scale, (int, float)) and not isinstance(scale, bool)
+            and scale > 0):
+        return float(scale) / 96.0
+    return 1.0 / 96.0
+
+
 def doc_root_attrs(svg):
-    """Capture root sizing so the result SVG matches the Inkscape document."""
+    """Capture root sizing so the result SVG matches the Inkscape document.
+
+    ``display_unit`` is set only when the document names one.
+    ``user_unit_scale`` is inches per user unit.
+    """
     attrs = {}
     for key in ('width', 'height', 'viewBox', 'viewbox'):
         val = svg.get(key) if hasattr(svg, 'get') else None
@@ -60,6 +188,10 @@ def doc_root_attrs(svg):
                 attrs['height'] = str(h)
         except Exception:
             pass
+    unit = _named_display_unit(svg)
+    if unit:
+        attrs['display_unit'] = unit
+    attrs['user_unit_scale'] = _user_unit_scale(svg)
     return attrs
 
 

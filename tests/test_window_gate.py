@@ -386,13 +386,16 @@ def test_host_passes_records_not_the_union(tmp_path, monkeypatch):
     calls = []
 
     def fake(records, defaults=None, platform_lines=None, quit_app=True,
-             width=None, height=None, view_box=None, ready=None):
+             width=None, height=None, view_box=None, display_unit=None,
+             user_unit_scale=None, ready=None):
         calls.append({
             'records': records,
             'quit_app': quit_app,
             'width': width,
             'height': height,
             'view_box': view_box,
+            'display_unit': display_unit,
+            'user_unit_scale': user_unit_scale,
         })
         return None, None, None
 
@@ -406,6 +409,8 @@ def test_host_passes_records_not_the_union(tmp_path, monkeypatch):
             'width': '210mm',
             'height': '297mm',
             'viewBox': '0 0 210 297',
+            'display_unit': 'mm',
+            'user_unit_scale': 1.0 / 25.4,
         },
     }
     path = tmp_path / 'job.json'
@@ -417,6 +422,8 @@ def test_host_passes_records_not_the_union(tmp_path, monkeypatch):
         'width': '210mm',
         'height': '297mm',
         'view_box': '0 0 210 297',
+        'display_unit': 'mm',
+        'user_unit_scale': 1.0 / 25.4,
     }]
 
 
@@ -838,13 +845,16 @@ def test_inline_path_passes_records_not_the_union(monkeypatch):
     calls = []
 
     def fake(records, defaults=None, platform_lines=None, quit_app=True,
-             width=None, height=None, view_box=None, ready=None):
+             width=None, height=None, view_box=None, display_unit=None,
+             user_unit_scale=None, ready=None):
         calls.append({
             'records': records,
             'quit_app': quit_app,
             'width': width,
             'height': height,
             'view_box': view_box,
+            'display_unit': display_unit,
+            'user_unit_scale': user_unit_scale,
             'platform_lines': platform_lines,
         })
         return None, None, None
@@ -862,7 +872,33 @@ def test_inline_path_passes_records_not_the_union(monkeypatch):
     assert got['width'] == '100'
     assert got['height'] == '50'
     assert got['view_box'] == '0 0 100 50'
+    assert got['display_unit'] is None
+    assert got['user_unit_scale'] == pytest.approx(1.0 / 96.0)
     assert got['platform_lines'] is not None
+
+
+def test_dialog_holds_unit_and_scale_and_missing_unit_is_px():
+    def drive_named(dialog):
+        assert dialog.display_unit == 'mm'
+        assert dialog.user_unit_scale == pytest.approx(1.0 / 25.4)
+        dialog.reject()
+
+    _run(
+        _RECT_RECORDS,
+        drive_named,
+        width='210mm',
+        height='297mm',
+        view_box='0 0 210 297',
+        display_unit='mm',
+        user_unit_scale=1.0 / 25.4,
+    )
+
+    def drive_missing(dialog):
+        assert dialog.display_unit == 'px'
+        assert dialog.user_unit_scale == pytest.approx(1.0 / 96.0)
+        dialog.reject()
+
+    _run(_RECT_RECORDS, drive_missing)
 
 
 def test_detached_spawn_keeps_per_path_records(tmp_path, monkeypatch):

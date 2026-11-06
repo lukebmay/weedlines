@@ -645,7 +645,8 @@ def _spawn_ask(request, hold, pausing, cancelled):
 
 def run_weedlines_dialog(records, defaults=None, platform_lines=None,
                          quit_app=True, width=None, height=None,
-                         view_box=None, ready=None):
+                         view_box=None, display_unit=None,
+                         user_unit_scale=None, ready=None):
     """Show the weedlines UI. Returns ``(weed_path, layer_name, color)``.
 
     ``color`` is the weed-line color when Apply accepts, and None when
@@ -658,8 +659,10 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     the return line and its actions sit under the preview. Return to
     Inkscape closes without writing. The correction action writes
     those same arrow paths and leaves the window open. *width*,
-    *height*, and *view_box* are the document size. *defaults* may
-    include mode, padding, spacing, collar, layer_name. Missing or
+    *height*, and *view_box* are the document size. *display_unit*
+    is the unit the document names. An unset unit is px.
+    *user_unit_scale* is how many inches one user unit is. *defaults*
+    may include mode, padding, spacing, collar, layer_name. Missing or
     blank mode opens on Surround and Conquer. Start in that mode
     asks for the surround and paints it. It does not run a solver.
     Until that start, the window does not ask for a surround.
@@ -699,6 +702,11 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     dialog.doc_width = width
     dialog.doc_height = height
     dialog.doc_viewbox = view_box
+    dialog.display_unit = display_unit or 'px'
+    if user_unit_scale is None:
+        dialog.user_unit_scale = 1.0 / 96.0
+    else:
+        dialog.user_unit_scale = float(user_unit_scale)
     dialog.resize(720, 640)
     # WindowModal: don't freeze every Qt window in a multi-app session;
     # when hosted inside Inkscape's process this still blocks that app.

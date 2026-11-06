@@ -781,6 +781,8 @@ class WeedLinesEffect(object):
                     height=doc_attrs.get('height'),
                     view_box=(
                         doc_attrs.get('viewBox') or doc_attrs.get('viewbox')),
+                    display_unit=doc_attrs.get('display_unit'),
+                    user_unit_scale=doc_attrs.get('user_unit_scale'),
                 )
         finally:
             sys.stdout, sys.stderr = old_out, old_err

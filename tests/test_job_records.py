@@ -6,6 +6,8 @@ import importlib.util
 import os
 import re
 
+import pytest
+
 from weedlib.qt import QTransform
 
 
@@ -20,6 +22,7 @@ def _load(name, filename):
 
 EXT = _load('weedlines_ext_under_test', 'weedlines.py')
 JOB = _load('weedlines_job_under_test', 'weedlines_job.py')
+SVG = _load('weedlines_svg_under_test', 'weedlines_svg.py')
 
 _INK_LABEL = '{http://www.inkscape.org/namespaces/inkscape}label'
 
@@ -147,3 +150,41 @@ def test_read_job_returns_keep_d_and_document_size(tmp_path, monkeypatch):
     assert loaded['doc_attrs']['height'] == '297mm'
     assert loaded['doc_attrs']['viewBox'] == '0 0 210 297'
     assert loaded['records'] == records
+
+
+def _svg_naming(unit, width, height, view_box):
+    """Stand-in document. No Inkscape process."""
+    children = []
+    if unit:
+        children.append(_Node('sodipodi:namedview', {
+            'inkscape:document-units': unit,
+        }))
+    return _Node('svg', {
+        'width': width,
+        'height': height,
+        'viewBox': view_box,
+    }, children)
+
+
+def test_named_millimeter_document_stores_mm_and_its_inch_scale(
+        tmp_path, monkeypatch):
+    monkeypatch.setattr(JOB, 'cache_dir', lambda: str(tmp_path))
+    svg = _svg_naming('mm', '210mm', '297mm', '0 0 210 297')
+    doc = SVG.doc_root_attrs(svg)
+    path = JOB.write_job('M 0 0 L 1 0', {}, doc_attrs=doc, records=[])
+    loaded = JOB.read_job(path)['doc_attrs']
+    assert loaded['display_unit'] == 'mm'
+    assert loaded['user_unit_scale'] == pytest.approx(1.0 / 25.4)
+    assert loaded['width'] == '210mm'
+    assert loaded['viewBox'] == '0 0 210 297'
+
+
+def test_unnamed_document_stores_no_display_unit_and_one_px(
+        tmp_path, monkeypatch):
+    monkeypatch.setattr(JOB, 'cache_dir', lambda: str(tmp_path))
+    svg = _Node('svg')
+    doc = SVG.doc_root_attrs(svg)
+    path = JOB.write_job('M 0 0 L 1 0', {}, doc_attrs=doc, records=[])
+    loaded = JOB.read_job(path)['doc_attrs']
+    assert 'display_unit' not in loaded
+    assert loaded['user_unit_scale'] == pytest.approx(1.0 / 96.0)
