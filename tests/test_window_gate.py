@@ -6,6 +6,7 @@ import importlib.util
 import json
 import os
 import sys
+import time
 import types
 from collections import deque
 
@@ -331,12 +332,21 @@ def test_start_passes_the_subject_region(monkeypatch):
         holder = {}
 
         def drive(dialog, mode=mode):
-            holder['done'] = _finish_start(dialog, mode)
+            holder['dialog'] = dialog
+            _set_mode(dialog, mode)
+            _button(dialog, 'start').click()
+            # Empty island-hop still ran on the subject. Do not require cuts.
+            _pump_until(
+                lambda: dialog.worker_calls.count('solver') >= 1
+                and not _run_busy(dialog))
+            dialog.reject()
 
         _run(_NESTED_RECORDS, drive)
-        assert holder['done']['error'] is None, holder['done']['error']
-        assert seen[-1][0] == mode
-        _same_path(seen[-1][1], expected)
+        # The parent patch does not see the child. The worker does.
+        assert seen == []
+        keeps = holder['dialog'].solver_keeps
+        assert keeps[-1][0] == mode
+        _same_path(keeps[-1][1], expected)
 
 
 @pytest.mark.parametrize('mode', [
@@ -408,6 +418,411 @@ def test_host_passes_records_not_the_union(tmp_path, monkeypatch):
         'height': '297mm',
         'view_box': '0 0 210 297',
     }]
+
+
+def _preview_scene(dialog):
+    view = dialog.findChild(QtWidgets.QGraphicsView, 'preview')
+    assert view is not None
+    return view.scene()
+
+
+def _pen_names(dialog):
+    names = set()
+    for item in _preview_scene(dialog).items():
+        pen = getattr(item, 'pen', None)
+        if not callable(pen):
+            continue
+        color = pen().color()
+        if color.alpha() == 0:
+            continue
+        names.add(color.name().lower())
+    return names
+
+
+def _button_text(dialog, text):
+    found = [
+        button for button in dialog.findChildren(QtWidgets.QPushButton)
+        if button.text() == text
+    ]
+    assert len(found) == 1, text
+    return found[0]
+
+
+def _click_prefix(dialog, prefix):
+    found = [
+        button for button in dialog.findChildren(QtWidgets.QPushButton)
+        if button.isVisible() and button.text().startswith(prefix)
+    ]
+    assert len(found) == 1, prefix
+    found[0].click()
+
+
+def _run_busy(dialog):
+    start = dialog.findChild(QtWidgets.QPushButton, 'start')
+    if start is None or not start.isVisible():
+        return True
+    for button in dialog.findChildren(QtWidgets.QPushButton):
+        if not button.isVisible():
+            continue
+        if button.text() in ('Pause', 'Resume', 'Cancelling…'):
+            return True
+        if button.text().startswith('Cancel'):
+            return True
+    return False
+
+
+def _pump_until(predicate, timeout=20):
+    app = QtWidgets.QApplication.instance()
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return
+        app.processEvents(QtCore.QEventLoop.AllEvents, 30)
+    raise AssertionError('timed out')
+
+
+def _log_text(dialog):
+    log = dialog.findChild(QtWidgets.QPlainTextEdit)
+    assert log is not None
+    return log.toPlainText()
+
+
+def _release_solver(dialog):
+    if not dialog.isVisible() or not _run_busy(dialog):
+        return
+    resume = [
+        button for button in dialog.findChildren(QtWidgets.QPushButton)
+        if button.isVisible() and button.text() == 'Resume'
+    ]
+    if resume:
+        resume[0].click()
+    else:
+        cancel = [
+            button for button in dialog.findChildren(QtWidgets.QPushButton)
+            if button.isVisible() and button.text().startswith('Cancel')
+        ]
+        if cancel:
+            cancel[0].click()
+    try:
+        _pump_until(lambda: not _run_busy(dialog), timeout=20)
+    except AssertionError:
+        pass
+    if dialog.isVisible():
+        dialog.reject()
+
+
+def test_solver_hold_lets_a_timer_fire_and_logs_the_run(monkeypatch):
+    """A CPU hold in the solver child does not stop paint or the log."""
+    import weedlines_dialog as dialog_mod
+
+    fired = []
+    holder = {}
+    real_spawn = dialog_mod._spawn_ask
+
+    def wrapped(request, hold, pausing, cancelled):
+        proc, conn = real_spawn(request, hold, pausing, cancelled)
+        if request.get('kind') != 'solver':
+            return proc, conn
+        assert hold
+        assert proc._start_method == 'spawn'
+        dialog = holder['dialog']
+        timer = QtCore.QTimer(dialog)
+        timer.setSingleShot(True)
+
+        def mark():
+            apply_btn = _button(dialog, 'apply')
+            fired.append(
+                dialog.isVisible() and proc.is_alive()
+                and not apply_btn.isEnabled())
+
+        timer.timeout.connect(mark)
+        timer.start(0)
+        holder['timer'] = timer
+        return proc, conn
+
+    monkeypatch.setattr(dialog_mod, '_spawn_ask', wrapped)
+    old_hold = dialog_mod._ASK_HOLD
+    old_trace = dialog_mod._ASK_TRACE
+    dialog_mod._ASK_HOLD = 8000000
+    dialog_mod._ASK_TRACE = 'solver-stdio-marker'
+
+    def drive(dialog):
+        holder['dialog'] = dialog
+        try:
+            _set_mode(dialog, 'frame')
+            _button(dialog, 'start').click()
+            _pump_until(lambda: bool(fired), timeout=10)
+            assert fired == [True]
+            assert dialog.isVisible() is True
+            _pump_until(lambda: _button(dialog, 'apply').isEnabled())
+            text = _log_text(dialog)
+            assert text.count('solver-stdio-marker') >= 2
+            assert '[phase]' in text
+            assert 'hold' in text.splitlines()
+            dialog.reject()
+        finally:
+            _release_solver(dialog)
+
+    try:
+        _run(_RECT_RECORDS, drive)
+    finally:
+        dialog_mod._ASK_HOLD = old_hold
+        dialog_mod._ASK_TRACE = old_trace
+
+
+def test_pause_blocks_and_resume_continues_the_same_run(monkeypatch):
+    import weedlines_dialog as dialog_mod
+
+    paused = []
+    holder = {}
+    real_spawn = dialog_mod._spawn_ask
+
+    def wrapped(request, hold, pausing, cancelled):
+        proc, conn = real_spawn(request, hold, pausing, cancelled)
+        if request.get('kind') != 'solver':
+            return proc, conn
+        dialog = holder['dialog']
+        timer = QtCore.QTimer(dialog)
+        timer.setSingleShot(True)
+
+        def mark():
+            if dialog.isVisible() and proc.is_alive():
+                _click_prefix(dialog, 'Pause')
+                paused.append(proc.is_alive())
+
+        timer.timeout.connect(mark)
+        timer.start(0)
+        holder['timer'] = timer
+        return proc, conn
+
+    monkeypatch.setattr(dialog_mod, '_spawn_ask', wrapped)
+    old_hold = dialog_mod._ASK_HOLD
+    dialog_mod._ASK_HOLD = 8000000
+
+    def drive(dialog):
+        holder['dialog'] = dialog
+        try:
+            _set_mode(dialog, 'frame')
+            _button(dialog, 'start').click()
+            _pump_until(lambda: bool(paused), timeout=10)
+            assert paused == [True]
+            _pump_until(lambda: dialog.worker_calls.count('solver') >= 1)
+            assert '#ff0000' not in _pen_names(dialog)
+            assert _run_busy(dialog) is True
+            assert dialog.isVisible() is True
+            app = QtWidgets.QApplication.instance()
+            for _ in range(4):
+                app.processEvents(QtCore.QEventLoop.AllEvents, 50)
+            assert dialog.worker_calls.count('solver') == 1
+            assert '#ff0000' not in _pen_names(dialog)
+            _click_prefix(dialog, 'Resume')
+            _pump_until(lambda: _button(dialog, 'apply').isEnabled())
+            assert dialog.worker_calls.count('solver') == 1
+            assert '#ff0000' in _pen_names(dialog)
+            assert dialog.isVisible() is True
+            dialog.reject()
+        finally:
+            _release_solver(dialog)
+
+    try:
+        _run(_RECT_RECORDS, drive)
+    finally:
+        dialog_mod._ASK_HOLD = old_hold
+
+
+def test_clear_while_paused_cancels_and_does_not_freeze(monkeypatch):
+    import weedlines_dialog as dialog_mod
+
+    killed = []
+    holder = {}
+    real_spawn = dialog_mod._spawn_ask
+
+    def wrapped(request, hold, pausing, cancelled):
+        proc, conn = real_spawn(request, hold, pausing, cancelled)
+        if request.get('kind') != 'solver':
+            return proc, conn
+
+        def deny(*_args, **_kwargs):
+            killed.append('kill')
+            raise AssertionError('child killed')
+
+        proc.terminate = deny
+        proc.kill = deny
+        dialog = holder['dialog']
+        timer = QtCore.QTimer(dialog)
+        timer.setSingleShot(True)
+
+        def mark():
+            if dialog.isVisible() and proc.is_alive():
+                _click_prefix(dialog, 'Pause')
+                holder['paused'] = True
+
+        timer.timeout.connect(mark)
+        timer.start(0)
+        holder['timer'] = timer
+        return proc, conn
+
+    monkeypatch.setattr(dialog_mod, '_spawn_ask', wrapped)
+    old_hold = dialog_mod._ASK_HOLD
+    dialog_mod._ASK_HOLD = 8000000
+
+    def drive(dialog):
+        holder['dialog'] = dialog
+        try:
+            _set_mode(dialog, 'frame')
+            _button(dialog, 'start').click()
+            _pump_until(lambda: holder.get('paused') is True, timeout=10)
+            _pump_until(lambda: dialog.worker_calls.count('solver') >= 1)
+            assert _run_busy(dialog) is True
+            fired = []
+            timer = QtCore.QTimer(dialog)
+            timer.setSingleShot(True)
+            started = time.monotonic()
+
+            def mark():
+                fired.append((time.monotonic() - started, dialog.isVisible()))
+
+            timer.timeout.connect(mark)
+            timer.start(0)
+            holder['fire'] = timer
+            _click_prefix(dialog, 'Cancel')
+            QtWidgets.QApplication.instance().processEvents()
+            assert fired and fired[0][0] < 0.5 and fired[0][1] is True
+            _pump_until(lambda: not _run_busy(dialog))
+            text = _log_text(dialog)
+            assert 'Cancelled.' in text
+            assert 'Algorithm cancelled.' in text
+            assert killed == []
+            assert _button(dialog, 'apply').isEnabled() is False
+            assert _button(dialog, 'start').isEnabled() is True
+            assert dialog.isVisible() is True
+            dialog.reject()
+        finally:
+            _release_solver(dialog)
+
+    try:
+        _run(_RECT_RECORDS, drive)
+    finally:
+        dialog_mod._ASK_HOLD = old_hold
+    assert killed == []
+
+
+def test_close_does_not_join_and_keeps_pumping(monkeypatch):
+    import weedlines_dialog as dialog_mod
+
+    killed = []
+    procs = []
+    real_spawn = dialog_mod._spawn_ask
+
+    def wrapped(request, hold, pausing, cancelled):
+        proc, conn = real_spawn(request, hold, pausing, cancelled)
+        if request.get('kind') != 'solver':
+            return proc, conn
+
+        def deny(*_args, **_kwargs):
+            killed.append('kill')
+            raise AssertionError('child killed')
+
+        proc.terminate = deny
+        proc.kill = deny
+        procs.append(proc)
+        return proc, conn
+
+    monkeypatch.setattr(dialog_mod, '_spawn_ask', wrapped)
+    old_hold = dialog_mod._ASK_HOLD
+    dialog_mod._ASK_HOLD = 100000000
+
+    def drive(dialog):
+        try:
+            _set_mode(dialog, 'frame')
+            _button(dialog, 'start').click()
+            assert procs and procs[-1].is_alive()
+            fired = []
+            timer = QtCore.QTimer(dialog)
+            timer.setSingleShot(True)
+            timer.timeout.connect(lambda: fired.append(dialog.isVisible()))
+            timer.start(0)
+            started = time.monotonic()
+            _button_text(dialog, 'Close').click()
+            elapsed = time.monotonic() - started
+            assert elapsed < 0.3
+            assert dialog.isVisible() is True
+            assert procs[-1].is_alive() is True
+            app = QtWidgets.QApplication.instance()
+            app.processEvents()
+            assert fired == [True]
+            deadline = time.monotonic() + 15
+            while dialog.isVisible() and time.monotonic() < deadline:
+                app.processEvents(QtCore.QEventLoop.AllEvents, 50)
+            assert dialog.isVisible() is False
+            assert killed == []
+        finally:
+            _release_solver(dialog)
+
+    try:
+        result = _run(_RECT_RECORDS, drive)
+    finally:
+        dialog_mod._ASK_HOLD = old_hold
+    assert result == (None, None, None)
+    assert killed == []
+
+
+def test_solver_forwards_a_named_focus_and_does_not_paint_it():
+    def drive(dialog):
+        dialog.focus_mark = None
+        dialog.focus_named = None
+        try:
+            _set_mode(dialog, 'grid')
+            space = dialog.findChild(QtWidgets.QDoubleSpinBox, 'spacing')
+            assert space is not None
+            space.setValue(20.0)
+            _button(dialog, 'start').click()
+            _pump_until(lambda: _button(dialog, 'apply').isEnabled())
+            mark = dialog.focus_named
+            assert isinstance(mark, tuple) and len(mark) == 2
+            _outline, line = mark
+            assert isinstance(line, tuple) and len(line) == 2
+            assert all(
+                isinstance(point, tuple) and len(point) == 2 for point in line)
+            assert '#7a5cff' not in _pen_names(dialog)
+            assert '#15803d' not in _pen_names(dialog)
+            dialog.reject()
+        finally:
+            _release_solver(dialog)
+
+    _run(_RECT_RECORDS, drive)
+
+
+@requires_clipper
+def test_deliberate_log_level_survives(monkeypatch):
+    def once(level):
+        monkeypatch.setenv('WEEDLINES_LOG', level)
+        holder = {}
+
+        def drive(dialog):
+            try:
+                _set_mode(dialog, 'island-hop')
+                _button(dialog, 'start').click()
+                _pump_until(
+                    lambda: _button(dialog, 'apply').isEnabled()
+                    or not _run_busy(dialog),
+                    timeout=30)
+                holder['text'] = _log_text(dialog)
+                dialog.reject()
+            finally:
+                _release_solver(dialog)
+
+        _run(_RECT_RECORDS, drive)
+        return holder['text']
+
+    quiet = once('0')
+    assert '[phase]' in quiet
+    assert 'phase.enter' not in quiet
+    assert 'DEBUG weedlib:' not in quiet
+    loud = once('2')
+    assert '[phase]' in loud
+    assert 'phase.enter' in loud
+    assert 'DEBUG weedlib:' in loud
 
 
 def _refuse_spawn(path):

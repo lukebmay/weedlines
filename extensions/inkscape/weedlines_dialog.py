@@ -156,42 +156,6 @@ def _checker_type(QtWidgets, QtGui, QtCore):
     return _CheckerItem
 
 
-class _StreamToQueue(object):
-    """File-like object that appends written text to a thread-safe deque."""
-
-    def __init__(self, queue, mirror=None):
-        self._queue = queue
-        self._mirror = mirror
-        self._buf = ''
-
-    def write(self, data):
-        if not data:
-            return 0
-        if self._mirror is not None:
-            try:
-                self._mirror.write(data)
-            except Exception:
-                pass
-        self._buf += data
-        while '\n' in self._buf:
-            line, self._buf = self._buf.split('\n', 1)
-            self._queue.append(line + '\n')
-        return len(data)
-
-    def flush(self):
-        if self._buf:
-            self._queue.append(self._buf)
-            self._buf = ''
-        if self._mirror is not None:
-            try:
-                self._mirror.flush()
-            except Exception:
-                pass
-
-    def isatty(self):
-        return False
-
-
 class _QueueLogHandler(logging.Handler):
     def __init__(self, queue):
         logging.Handler.__init__(self)
@@ -232,6 +196,16 @@ def _burn_hold(hold):
             count += 1
     finally:
         sys.setswitchinterval(interval)
+
+
+class _ConnLog(object):
+    """Queue stand-in: each record is one log message."""
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    def append(self, text):
+        self._conn.send(('log', text))
 
 
 class _ConnStream(object):
@@ -379,6 +353,7 @@ def _empty_inbox():
         'fills': [],
         'arrows': [],
         'surrounds': [],
+        'result': None,
         'error': None,
         'cancelled': False,
     }
@@ -389,6 +364,114 @@ def _send_call(conn, name, swap=None):
         conn.send(('call', name))
     else:
         conn.send(('call', name, bool(swap)))
+
+
+def _arm_solver_log(conn):
+    """Same ``WEEDLINES_LOG`` setup the solver used in-process.
+
+    A deliberate ``0`` or ``2`` is left alone. Unset becomes ``1``.
+    The weedlib handler sends lines on the channel. Stdout and stderr
+    are already that channel.
+    """
+    handler = _QueueLogHandler(_ConnLog(conn))
+    handler.setFormatter(logging.Formatter(
+        '%(levelname)s %(name)s: %(message)s'))
+    weed_log = logging.getLogger('weedlib')
+    removed = []
+    for existing in list(weed_log.handlers):
+        if isinstance(existing, logging.StreamHandler) and existing is not handler:
+            weed_log.removeHandler(existing)
+            removed.append(existing)
+    weed_log.addHandler(handler)
+    weed_log.setLevel(logging.DEBUG)
+    weed_log.propagate = False
+    prev = os.environ.get('WEEDLINES_LOG') or os.environ.get('INKCUT_WEED_DEBUG')
+    if not prev:
+        os.environ['WEEDLINES_LOG'] = '1'
+    return weed_log, handler, removed, prev
+
+
+def _disarm_solver_log(weed_log, handler, removed, prev):
+    weed_log.removeHandler(handler)
+    for existing in removed:
+        weed_log.addHandler(existing)
+    if not prev:
+        os.environ.pop('WEEDLINES_LOG', None)
+        os.environ.pop('INKCUT_WEED_DEBUG', None)
+
+
+def _ask_solver(request, conn, pausing, cancelled):
+    """One frame, grid, or island-hop run. Plain messages back. No window."""
+    from weedlib import generate_weeds
+    from weedlib import progress as weed_progress
+    from weedlib.progress import WeedCancelled
+
+    mode = request.get('mode') or 'frame'
+    try:
+        padding = [float(value) for value in (request.get('padding') or ())]
+    except (TypeError, ValueError):
+        padding = []
+    try:
+        spacing = float(request.get('spacing', 0.0))
+    except (TypeError, ValueError):
+        spacing = 0.0
+    try:
+        collar = float(request.get('collar', 0.0))
+    except (TypeError, ValueError):
+        collar = 0.0
+    keep = _unpack_path(
+        request.get('elements') or [], request.get('rule') or 'odd')
+    elements, rule = _pack_path(keep)
+    conn.send(('keep', str(mode), elements, rule))
+    conn.send(('call', 'solver'))
+
+    def on_phase(name):
+        conn.send(('log', '[phase] %s\n' % name))
+
+    def on_seg(seg):
+        if cancelled.is_set():
+            raise WeedCancelled('weed generation cancelled')
+        try:
+            x0, y0, x1, y1 = seg
+        except (TypeError, ValueError):
+            return
+        conn.send(('segment', (float(x0), float(y0), float(x1), float(y1))))
+
+    def on_focus(outline, line):
+        conn.send(('focus', outline, line))
+
+    weed_log, handler, removed, prev = _arm_solver_log(conn)
+    weed_progress.install(
+        progress=on_phase,
+        cancel=lambda: cancelled.is_set(),
+        pause=lambda: pausing.is_set(),
+        geometry=on_seg,
+        focus=on_focus,
+    )
+    try:
+        path = generate_weeds(
+            keep,
+            mode=mode,
+            padding=padding,
+            spacing=spacing,
+            collar=collar,
+        )
+        if cancelled.is_set():
+            raise WeedCancelled('weed generation cancelled')
+        if path is None:
+            conn.send(('result', [], 'odd'))
+        else:
+            packed, packed_rule = _pack_path(path)
+            conn.send(('result', packed, packed_rule))
+    except WeedCancelled:
+        conn.send(('log', 'Cancelled.\n'))
+        raise
+    except Exception as exc:
+        conn.send(('log', 'Error: %s\n' % exc))
+        raise
+    finally:
+        weed_progress.clear()
+        _disarm_solver_log(weed_log, handler, removed, prev)
 
 
 def _ask_classify(request, conn):
@@ -495,6 +578,8 @@ def _run_geometry_ask(request, conn, pausing, cancelled):
             _ask_subject(request, conn)
         elif kind == 'surround':
             _ask_surround(request, conn)
+        elif kind == 'solver':
+            _ask_solver(request, conn, pausing, cancelled)
         else:
             conn.send(('error', 'unknown ask'))
     except WeedCancelled:
@@ -511,12 +596,21 @@ def _geometry_worker(request, hold, conn, pausing, cancelled):
     The window already has a QApplication, so the parent starts this
     with spawn, not fork. A nested function cannot be the target.
     """
-    _burn_hold(hold)
     old_out, old_err = sys.stdout, sys.stderr
     stream = _ConnStream(conn)
     sys.stdout = stream
     sys.stderr = stream
     try:
+        # The hold is the CPU loop. Its stderr line is part of this log.
+        if request.get('kind') == 'solver':
+            try:
+                hold_n = int(hold)
+            except (TypeError, ValueError):
+                hold_n = 0
+            if hold_n > 0:
+                sys.stderr.write('hold\n')
+                sys.stderr.flush()
+        _burn_hold(hold)
         _run_geometry_ask(request, conn, pausing, cancelled)
     finally:
         try:
@@ -583,9 +677,8 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     the same spawn target. This thread builds the paths and paints
     them. It does not run the surround or a solver on this thread.
     """
-    from weedlib import generate_weeds, padded_work_rect
+    from weedlib import padded_work_rect
     from weedlib.arrows import ArrowPath
-    from weedlib.progress import WeedCancelled
     from weedlib.qt import QPainterPath, load_widgets
     from weedlines_job import write_correction_result
 
@@ -759,7 +852,6 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         'pause': threading.Event(),  # set => paused (worker blocks)
         'result': None,
         'error': None,
-        'log_q': deque(),
         'seg_q': deque(),
         'weed_items': [],
         'preview_items': [],
@@ -770,7 +862,6 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         'solved_keep': None,
         'solved_pad': None,
         'accepted': False,
-        'thread': None,
         'surround_started': False,
         'surround_paths': [],
         'surround_args': [],
@@ -795,11 +886,16 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         'mp_pause': None,
         'mp_cancel': None,
         'inbox': None,
+        'solver_keeps': [],
+        'last_fit': 0.0,
+        'close_when_done': False,
     }
     dialog.worker_calls = state['calls']
     dialog.worker_swaps = state['swaps']
     dialog.surround_args = state['surround_args']
+    dialog.solver_keeps = state['solver_keeps']
     dialog.focus_mark = None
+    dialog.focus_named = None
     dialog.ask_name = None
     CheckerItem = _checker_type(QtWidgets, QtGui, QtCore)
 
@@ -808,8 +904,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         dialog.ask_name = kind
 
     def _solver_running():
-        thread = state.get('thread')
-        return thread is not None and thread.is_alive()
+        return state.get('ask') == 'solver'
 
     def _form_locked():
         # Distance, join, swap, and mode stay live during a surround
@@ -1072,135 +1167,20 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         keep = QPainterPath(state['regions'].subject)
         state['solved_keep'] = keep
         state['solved_pad'] = [padding, padding, padding, padding]
-
-        def work():
-            from weedlib import progress as weed_progress
-            log_q = state['log_q']
-            seg_q = state['seg_q']
-            old_out, old_err = sys.stdout, sys.stderr
-            sys.stdout = _StreamToQueue(log_q)
-            sys.stderr = _StreamToQueue(log_q)
-            handler = _QueueLogHandler(log_q)
-            handler.setFormatter(logging.Formatter(
-                '%(levelname)s %(name)s: %(message)s'))
-            weed_log = logging.getLogger('weedlib')
-            # Avoid double lines: debug.py also installs a StreamHandler to
-            # stderr, and we redirect stderr into the same queue.
-            removed_handlers = []
-            for h in list(weed_log.handlers):
-                if isinstance(h, logging.StreamHandler) and h is not handler:
-                    weed_log.removeHandler(h)
-                    removed_handlers.append(h)
-            weed_log.addHandler(handler)
-            weed_log.setLevel(logging.DEBUG)
-            weed_log.propagate = False
-            prev_dbg = os.environ.get('WEEDLINES_LOG') or os.environ.get(
-                'INKCUT_WEED_DEBUG')
-            if not prev_dbg:
-                os.environ['WEEDLINES_LOG'] = '1'
-
-            def on_phase(name):
-                log_q.append('[phase] %s\n' % name)
-
-            def on_seg(seg):
-                if state['cancel'].is_set():
-                    raise WeedCancelled('weed generation cancelled')
-                seg_q.append(seg)
-
-            weed_progress.install(
-                progress=on_phase,
-                cancel=lambda: state['cancel'].is_set(),
-                pause=lambda: state['pause'].is_set(),
-                geometry=on_seg,
-            )
-            try:
-                path = generate_weeds(
-                    keep,
-                    mode=mode,
-                    padding=[padding] * 4,
-                    spacing=spacing,
-                    collar=collar,
-                )
-                if state['cancel'].is_set():
-                    raise WeedCancelled('weed generation cancelled')
-                state['result'] = path if path is not None else QPainterPath()
-            except WeedCancelled as exc:
-                state['error'] = exc
-                state['result'] = None
-                log_q.append('Cancelled.\n')
-            except Exception as exc:
-                state['error'] = exc
-                state['result'] = None
-                log_q.append('Error: %s\n' % exc)
-            finally:
-                weed_progress.clear()
-                sys.stdout = old_out
-                sys.stderr = old_err
-                weed_log.removeHandler(handler)
-                for h in removed_handlers:
-                    weed_log.addHandler(h)
-                if not prev_dbg:
-                    os.environ.pop('WEEDLINES_LOG', None)
-                    os.environ.pop('INKCUT_WEED_DEBUG', None)
-
-        thread = threading.Thread(target=work)
-        thread.daemon = True
-        state['thread'] = thread
-        thread.start()
-
-        last_fit = [0.0]
-
-        def pump():
-            drain_platform_lines()
-            while state['log_q']:
-                append_log(state['log_q'].popleft())
-            added = False
-            if (state['seg_q'] and state['work'] is None
-                    and state['solved_keep'] is not None):
-                state['work'] = padded_work_rect(
-                    state['solved_keep'], state['solved_pad'])
-                refresh_preview()
-            weed_pen = _line_pen(QtGui, QtCore, weed_edit.property('color'))
-            for _ in range(200):
-                if not state['seg_q']:
-                    break
-                seg = state['seg_q'].popleft()
-                try:
-                    x0, y0, x1, y1 = seg
-                except Exception:
-                    continue
-                item = scene.addLine(x0, y0, x1, y1, weed_pen)
-                item.setZValue(20)
-                state['weed_items'].append(item)
-                added = True
-            if added and (time.time() - last_fit[0]) > 0.4:
-                view.fitInView(
-                    scene.itemsBoundingRect(), QtCore.Qt.KeepAspectRatio)
-                last_fit[0] = time.time()
-
-            if thread.is_alive() or state['seg_q'] or state['log_q']:
-                QtCore.QTimer.singleShot(50, pump)
-                return
-            drain_platform_lines()
-
+        state['last_fit'] = 0.0
+        state['close_when_done'] = False
+        elements, rule = _pack_path(keep)
+        if not _begin_ask({
+            'kind': 'solver',
+            'mode': mode,
+            'padding': [padding, padding, padding, padding],
+            'spacing': spacing,
+            'collar': collar,
+            'elements': elements,
+            'rule': rule,
+        }):
             set_controls(False)
-            if state['error'] is not None:
-                if isinstance(state['error'], WeedCancelled):
-                    append_log('Algorithm cancelled.\n')
-                else:
-                    append_log('Algorithm failed: %s\n' % state['error'])
-                apply_btn.setEnabled(False)
-                return
-            if state['result'] is None or state['result'].isEmpty():
-                append_log('No weed cuts produced.\n')
-                apply_btn.setEnabled(False)
-                return
-            append_log('Done. Review cuts, then Apply.\n')
-            view.fitInView(
-                scene.itemsBoundingRect(), QtCore.Qt.KeepAspectRatio)
-            apply_btn.setEnabled(True)
-
-        QtCore.QTimer.singleShot(50, pump)
+            append_log('Error: solver did not start\n')
 
     def _sync_worker_flags():
         mp_pause = state.get('mp_pause')
@@ -1252,16 +1232,19 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         dialog.accept()
 
     def on_close():
-        # Drop a figure-check result that arrives after Close. Do not
-        # join that child on this thread, and do not kill it.
+        # Drop a late result. Do not join or kill the child. A solver
+        # keeps pumping until the next progress check ends the run.
         state['drop'] = True
         state['pause'].clear()
         state['cancel'].set()
         _sync_worker_flags()
-        if state['busy']:
-            thread = state.get('thread')
-            if thread is not None and thread.is_alive():
-                thread.join(2.0)
+        proc = state.get('proc')
+        if (state.get('ask') == 'solver' and proc is not None
+                and proc.is_alive()):
+            state['close_when_done'] = True
+            append_log('Cancel requested — stopping algorithm…\n')
+            set_controls(True, paused=False)
+            return
         dialog.reject()
 
     def on_return():
@@ -1402,8 +1385,16 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
             mark = (msg[1], msg[2])
             state['focus'] = mark
             dialog.focus_mark = mark
+            outline, line = mark
+            if outline or line:
+                dialog.focus_named = mark
         elif kind == 'segment':
             state['seg_q'].append(msg[1])
+        elif kind == 'keep':
+            path = _unpack_path(msg[2], msg[3])
+            state['solver_keeps'].append((msg[1], path))
+        elif kind == 'result':
+            inbox['result'] = (msg[1], msg[2])
         elif kind == 'call':
             state['calls'].append(msg[1])
             if msg[1] == 'subject' and len(msg) > 2:
@@ -1667,6 +1658,71 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         set_controls(False)
         _follow_surround()
 
+    def _paint_solver_segments():
+        """Line items for accepted segments. This thread owns the scene."""
+        if state.get('ask') != 'solver' or not state['seg_q']:
+            return
+        if state['work'] is None and state['solved_keep'] is not None:
+            state['work'] = padded_work_rect(
+                state['solved_keep'], state['solved_pad'])
+            refresh_preview()
+        weed_pen = _line_pen(QtGui, QtCore, weed_edit.property('color'))
+        added = False
+        for _ in range(200):
+            if not state['seg_q']:
+                break
+            seg = state['seg_q'].popleft()
+            try:
+                x0, y0, x1, y1 = seg
+            except (TypeError, ValueError):
+                continue
+            item = scene.addLine(x0, y0, x1, y1, weed_pen)
+            item.setZValue(20)
+            state['weed_items'].append(item)
+            added = True
+        if added and (time.time() - state.get('last_fit', 0.0)) > 0.4:
+            rect = scene.itemsBoundingRect()
+            if not rect.isNull():
+                view.fitInView(rect, QtCore.Qt.KeepAspectRatio)
+            state['last_fit'] = time.time()
+
+    def _after_solver(inbox):
+        if state.get('close_when_done'):
+            state['result'] = None
+            state['accepted'] = False
+            _set_ask(None)
+            set_controls(False)
+            dialog.reject()
+            return
+        if inbox.get('cancelled'):
+            append_log('Algorithm cancelled.\n')
+            state['result'] = None
+            _set_ask(None)
+            set_controls(False)
+            return
+        if inbox.get('error'):
+            append_log('Algorithm failed: %s\n' % inbox['error'])
+            state['result'] = None
+            _set_ask(None)
+            set_controls(False)
+            return
+        packed = inbox.get('result')
+        if packed:
+            state['result'] = _unpack_path(packed[0], packed[1])
+        else:
+            state['result'] = QPainterPath()
+        _set_ask(None)
+        set_controls(False)
+        if state['result'] is None or state['result'].isEmpty():
+            append_log('No weed cuts produced.\n')
+            apply_btn.setEnabled(False)
+            return
+        append_log('Done. Review cuts, then Apply.\n')
+        rect = scene.itemsBoundingRect()
+        if not rect.isNull():
+            view.fitInView(rect, QtCore.Qt.KeepAspectRatio)
+        apply_btn.setEnabled(True)
+
     def _finish_ask(token):
         if state.get('ask_token') != token:
             return
@@ -1690,7 +1746,10 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
                 pass
         if not state.get('ask_done') and not inbox.get('error'):
             if not inbox.get('cancelled'):
-                inbox['error'] = 'figure check stopped'
+                if kind == 'solver':
+                    inbox['error'] = 'solver stopped'
+                else:
+                    inbox['error'] = 'figure check stopped'
         try:
             if kind == 'classify':
                 _set_ask(None)
@@ -1699,6 +1758,8 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
                 _after_subject(inbox)
             elif kind == 'surround':
                 _after_surround(inbox)
+            elif kind == 'solver':
+                _after_solver(inbox)
         except Exception as exc:
             _fail_ask(exc)
 
@@ -1706,6 +1767,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         token = state.get('pump_token')
         if token is None or state.get('ask_token') != token:
             return
+        drain_platform_lines()
         conn = state.get('conn')
         if conn is not None:
             while _conn_pending(conn):
@@ -1714,13 +1776,21 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
                 except EOFError:
                     inbox = state.get('inbox')
                     if inbox is not None and not inbox.get('error'):
-                        inbox['error'] = 'figure check stopped'
+                        if state.get('ask') == 'solver':
+                            inbox['error'] = 'solver stopped'
+                        else:
+                            inbox['error'] = 'figure check stopped'
                     state['ask_done'] = True
                     break
                 _take_message(msg)
                 if msg[0] == 'done':
                     break
         if state.get('ask_token') != token:
+            return
+        if state.get('ask') == 'solver':
+            _paint_solver_segments()
+        if state.get('ask') == 'solver' and state['seg_q']:
+            QtCore.QTimer.singleShot(15, _pump_ask)
             return
         proc = state.get('proc')
         alive = proc is not None and proc.is_alive()
