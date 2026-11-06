@@ -456,3 +456,63 @@ def test_pocket_search_checks_while_it_runs():
     finally:
         solvers._body_pocket_seals = real
         progress.clear()
+
+
+def _path_segs(path):
+    segs = []
+    x0 = y0 = None
+    for i in range(path.elementCount()):
+        element = path.elementAt(i)
+        if element.isMoveTo():
+            x0, y0 = element.x, element.y
+            continue
+        if x0 is not None:
+            segs.append((x0, y0, element.x, element.y))
+        x0, y0 = element.x, element.y
+    return segs
+
+
+def _segs_near(got, want, tol=1e-6):
+    assert len(got) == len(want)
+    for left, right in zip(got, want):
+        assert len(left) == len(right) == 4
+        for a, b in zip(left, right):
+            assert abs(a - b) <= tol, (got, want)
+
+
+def test_hole_splits_reach_the_geometry_hook():
+    """Hole splits are reported once, before parallel hugs are dropped."""
+    pytest.importorskip('pyclipper')
+    QPainterPath, QRectF, _generate = _need_solver()
+    from weedlib import solvers
+    from weedlib.solvers import island_hop_weeds
+
+    keep = QPainterPath()
+    keep.addRect(QRectF(0, 0, 200, 160))
+    keep.addRect(QRectF(10, 10, 180, 140))
+    seen = []
+    at_drop = []
+    real_drop = solvers._drop_parallel_hugs
+
+    def wrap_drop(weed_path, keep_path, min_cut):
+        at_drop.append(list(seen))
+        return real_drop(weed_path, keep_path, min_cut)
+
+    solvers._drop_parallel_hugs = wrap_drop
+    progress.clear()
+    try:
+        progress.install(geometry=lambda seg: seen.append(tuple(seg)))
+        weed = island_hop_weeds(
+            keep, padding=[8, 8, 8, 8], collar=4)
+        returned = _path_segs(weed)
+        # Clip refine stops just short of the hole edge at y=150.
+        expected = (
+            (70.0, 10.0, 70.0, 150.0),
+            (130.0, 10.0, 130.0, 150.0),
+        )
+        _segs_near(returned, expected)
+        assert seen == returned
+        assert at_drop and at_drop[0] == returned
+    finally:
+        solvers._drop_parallel_hugs = real_drop
+        progress.clear()

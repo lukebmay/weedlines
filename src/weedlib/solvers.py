@@ -530,8 +530,11 @@ def enclosure_weeds(keep_path,
         hole = QPainterPath(node['path'])
         if hole.isEmpty():
             continue
-        out.addPath(_hole_internal_splits(
-            hole, keep_fill, max_chunk, min_cut))
+        splits = _hole_internal_splits(
+            hole, keep_fill, max_chunk, min_cut)
+        out.addPath(splits)
+        # Accepted splits. A later pass may drop or shorten them.
+        _publish_path_segments(splits)
 
     # Drop hugs / slivers / needless optionals, then require connected ends.
     # Hugs vs keep fill (land outline), not raw design subpaths.
