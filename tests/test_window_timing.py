@@ -326,12 +326,31 @@ def test_hold_on_a_thread_blocks_the_gui_timer():
     timer = QtCore.QTimer()
     timer.setSingleShot(True)
     timer.timeout.connect(lambda: fired.append(True))
-    timer.start(0)
-    worker = threading.Thread(target=lambda: _burn_hold(20000000))
+    # The worker stays out of the loop until this thread is inside
+    # processEvents. One call can still return before that loop starts.
+    ready = threading.Event()
+
+    def run():
+        ready.wait()
+        _burn_hold(20000000)
+
+    worker = threading.Thread(target=run)
     worker.start()
-    started = time.monotonic()
-    app.processEvents()
-    blocked = time.monotonic() - started
+    blocked = 0.0
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        del fired[:]
+        timer.start(0)
+        ready.set()
+        started = time.monotonic()
+        app.processEvents()
+        elapsed = time.monotonic() - started
+        if elapsed > blocked:
+            blocked = elapsed
+        if fired and elapsed > 0.05:
+            break
+        if not worker.is_alive():
+            break
     worker.join(timeout=5)
     assert worker.is_alive() is False
     assert fired == [True]
