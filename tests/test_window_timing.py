@@ -11,7 +11,7 @@ import pytest
 
 try:
     from weedlib.qt import load_widgets
-    QtCore, _QtGui, QtWidgets = load_widgets()
+    QtCore, QtGui, QtWidgets = load_widgets()
 except Exception as exc:
     pytest.skip('Qt cannot load: %s' % exc, allow_module_level=True)
 
@@ -121,6 +121,83 @@ def _brush_hex(item):
     if brush.style() == QtCore.Qt.NoBrush:
         return None
     return brush.color().name().lower()
+
+
+_KIND_ORDER = (
+    ('dangling', 'dangling ends'),
+    ('overlap', 'figure overlaps'),
+    ('self-overlap', 'self-overlaps'),
+)
+_SWATCH = '\u2588'
+
+
+def _arrow_colors(records):
+    import weedlib.arrows as arrow_mod
+    import weedlib.figures as figures
+
+    check = figures.classify_figures(records)
+    regions = figures.subject_weed_regions(check.figures, swap=False)
+    grouped = {}
+    for defect in check.defects:
+        grouped.setdefault(defect.kind, []).append(defect.target)
+    colors = {}
+    for kind, _word in _KIND_ORDER:
+        targets = grouped.get(kind)
+        if not targets:
+            continue
+        batch = arrow_mod.build_arrow_paths(kind, targets, regions.bounds)
+        assert batch, kind
+        colors[kind] = batch[0].color
+    return colors
+
+
+def _assert_return_swatches(line, colors, sentence):
+    assert colors
+    assert line.textFormat() == QtCore.Qt.RichText
+    assert line.styleSheet() == ''
+    doc = QtGui.QTextDocument()
+    doc.setHtml(line.text())
+    chars = []
+    block = doc.begin()
+    while block.isValid():
+        it = block.begin()
+        while not it.atEnd():
+            frag = it.fragment()
+            text = frag.text()
+            if text:
+                fmt = frag.charFormat()
+                for ch in text:
+                    chars.append((ch, fmt))
+            it += 1
+        block = block.next()
+    present = [kind for kind, _word in _KIND_ORDER if kind in colors]
+    swatches = []
+    plain = []
+    for ch, fmt in chars:
+        colored = (
+            fmt.hasProperty(QtGui.QTextFormat.ForegroundBrush)
+            or fmt.hasProperty(QtGui.QTextFormat.BackgroundBrush))
+        if ch == _SWATCH:
+            assert fmt.hasProperty(QtGui.QTextFormat.ForegroundBrush)
+            assert not fmt.hasProperty(QtGui.QTextFormat.BackgroundBrush)
+            swatches.append(fmt.foreground().color().name().lower())
+            continue
+        assert not colored
+        plain.append(ch)
+    assert swatches == [colors[kind].lower() for kind in present]
+    assert colors['self-overlap'].upper() == '#00E5FF'
+    assert swatches[present.index('self-overlap')] == '#00e5ff'
+    assert '#00E5FF' in line.text()
+    assert ' '.join(''.join(plain).split()) == sentence
+    full = ''.join(ch for ch, _fmt in chars)
+    cursor = 0
+    for kind in present:
+        word = dict(_KIND_ORDER)[kind]
+        at = full.find(word, cursor)
+        assert at >= 2, word
+        assert full[at - 1] == ' '
+        assert full[at - 2] == _SWATCH
+        cursor = at + len(word)
 
 
 def _library_arrows(records):
@@ -273,6 +350,7 @@ def test_clear_surround_waits_until_start(monkeypatch):
 
 def test_defect_asks_once_after_the_window_is_visible(monkeypatch):
     expected = _library_arrows(_DEFECTS)
+    colors = _arrow_colors(_DEFECTS)
     assert len(expected) >= 3
     parent, surrounds, _real_surrounds, _real_classify, _real_subject = _watch(
         monkeypatch)
@@ -299,7 +377,8 @@ def test_defect_asks_once_after_the_window_is_visible(monkeypatch):
             assert _pen_hex(shafts[0]) == arrow.color.lower()
             assert _brush_hex(heads[0]) == arrow.color.lower()
         line = dialog.findChild(QtWidgets.QLabel, 'return-line')
-        assert line is not None and line.text() == _ALL_KINDS
+        assert line is not None
+        _assert_return_swatches(line, colors, _ALL_KINDS)
         correction = dialog.findChild(QtWidgets.QPushButton, 'return-arrows')
         assert correction is not None
         assert correction.text() == _ARROW

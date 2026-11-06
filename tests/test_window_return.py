@@ -12,7 +12,7 @@ import pytest
 
 try:
     from weedlib.qt import QPainterPath, load_widgets
-    QtCore, _QtGui, QtWidgets = load_widgets()
+    QtCore, QtGui, QtWidgets = load_widgets()
 except Exception as exc:
     pytest.skip('Qt cannot load: %s' % exc, allow_module_level=True)
 
@@ -39,6 +39,12 @@ _LABELS = {
     'overlap': 'Figure overlaps',
     'self-overlap': 'Self-overlaps',
 }
+_KIND_ORDER = (
+    ('dangling', 'dangling ends'),
+    ('overlap', 'figure overlaps'),
+    ('self-overlap', 'self-overlaps'),
+)
+_SWATCH = '\u2588'
 
 _OPEN_TRI = 'M 0,0 L 10,0 L 10,10'
 _BLOCK = 'M 8,-2 L 14,-2 L 14,4 L 8,4 Z'
@@ -93,6 +99,95 @@ def _line(dialog):
     widget = dialog.findChild(QtWidgets.QLabel, 'return-line')
     assert widget is not None
     return widget
+
+
+def _line_chars(line):
+    doc = QtGui.QTextDocument()
+    doc.setHtml(line.text())
+    chars = []
+    block = doc.begin()
+    while block.isValid():
+        it = block.begin()
+        while not it.atEnd():
+            frag = it.fragment()
+            text = frag.text()
+            if text:
+                fmt = frag.charFormat()
+                for ch in text:
+                    chars.append((ch, fmt))
+            it += 1
+        block = block.next()
+    return chars
+
+
+def _has_ink(fmt):
+    return (
+        fmt.hasProperty(QtGui.QTextFormat.ForegroundBrush)
+        or fmt.hasProperty(QtGui.QTextFormat.BackgroundBrush))
+
+
+def _label_ink(dialog, line):
+    for label in dialog.findChildren(QtWidgets.QLabel):
+        if label is line or label.styleSheet():
+            continue
+        if not label.text():
+            continue
+        return label.palette().color(QtGui.QPalette.WindowText).name()
+    raise AssertionError('no label color to compare')
+
+
+def _assert_swatches(dialog, records, sentence):
+    """Each present kind has its arrow color before the name.
+
+    The names stay in the label color. The sentence without the
+    swatches is the same line as before.
+    """
+    line = _line(dialog)
+    colors = {}
+    for kind, batch in _expected_arrow_batches(records):
+        assert batch, kind
+        colors[kind] = batch[0].color
+        for arrow in batch:
+            assert arrow.color == batch[0].color
+    assert colors
+    assert line.textFormat() == QtCore.Qt.RichText
+    assert line.styleSheet() == ''
+    assert (
+        line.palette().color(QtGui.QPalette.WindowText).name()
+        == _label_ink(dialog, line))
+    present = [kind for kind, _word in _KIND_ORDER if kind in colors]
+    chars = _line_chars(line)
+    swatches = []
+    plain = []
+    for ch, fmt in chars:
+        if ch == _SWATCH:
+            assert fmt.hasProperty(QtGui.QTextFormat.ForegroundBrush)
+            assert not fmt.hasProperty(QtGui.QTextFormat.BackgroundBrush)
+            swatches.append(fmt.foreground().color().name().lower())
+            continue
+        assert not _has_ink(fmt), ch
+        plain.append(ch)
+    assert swatches == [colors[kind].lower() for kind in present]
+    if 'self-overlap' in colors:
+        assert colors['self-overlap'].upper() == '#00E5FF'
+        assert swatches[present.index('self-overlap')] == '#00e5ff'
+        assert '#00E5FF' in line.text()
+    assert ' '.join(''.join(plain).split()) == sentence
+    full = ''.join(ch for ch, _fmt in chars)
+    cursor = 0
+    for kind in present:
+        word = dict(_KIND_ORDER)[kind]
+        at = full.find(word, cursor)
+        assert at >= 2, word
+        assert full[at - 1] == ' '
+        assert full[at - 2] == _SWATCH
+        cursor = at + len(word)
+    for _kind, word in _KIND_ORDER:
+        if word in sentence:
+            assert word in full
+        else:
+            assert word not in line.text()
+            assert word not in full
 
 
 def _view(dialog):
@@ -236,7 +331,7 @@ def test_defect_line_and_actions_sit_under_the_preview():
         line = _line(dialog)
         plain = _one(dialog, _PLAIN)
         arrows = _one(dialog, _ARROW)
-        assert line.text() == _ALL_KINDS
+        _assert_swatches(dialog, _DEFECTS, _ALL_KINDS)
         assert plain.text() == _PLAIN
         assert arrows.text() == _ARROW
         assert view.height() > 0
@@ -264,13 +359,13 @@ def test_defect_line_and_actions_sit_under_the_preview():
 
 def test_line_names_only_the_kinds_present():
     def drive_one(dialog):
-        assert _line(dialog).text() == _DANGLING_ONLY
+        _assert_swatches(dialog, _OPEN, _DANGLING_ONLY)
         assert 'figure overlaps' not in _line(dialog).text()
         assert 'self-overlaps' not in _line(dialog).text()
         dialog.reject()
 
     def drive_two(dialog):
-        assert _line(dialog).text() == _TWO_KINDS
+        _assert_swatches(dialog, _TWO, _TWO_KINDS)
         assert 'figure overlaps' not in _line(dialog).text()
         dialog.reject()
 

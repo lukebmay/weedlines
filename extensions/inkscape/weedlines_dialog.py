@@ -48,12 +48,47 @@ _LENGTH_LIMITS = {
 }
 
 
-def _defect_line(defects):
-    """Name each defect kind that is present. Empty when the check is clear."""
+def _kind_swatch(color):
+    """A square in the arrow color. Empty when the color is not a hex."""
+    shown = _hex_color(color)
+    if not shown:
+        return ''
+    # The name that follows this span is not given a color.
+    return '<span style="color:%s;">&#9608;</span>' % shown
+
+
+def _arrow_colors(arrow_paths):
+    """Kind to the color on the arrow the library returned."""
+    colors = {}
+    for kind, batch in (arrow_paths or {}).items():
+        if not batch:
+            continue
+        color = batch[0].color
+        if _hex_color(color) is None:
+            continue
+        colors[kind] = color
+    return colors
+
+
+def _defect_line(defects, colors=None):
+    """Name each defect kind that is present. Empty when the check is clear.
+
+    ``colors`` maps a kind to that arrow's color. A swatch of the
+    color precedes the name. The name itself is not colored.
+    """
     present = set()
     for defect in defects or ():
         present.add(defect.kind)
-    names = [word for kind, word in _KIND_WORDS if kind in present]
+    names = []
+    for kind, word in _KIND_WORDS:
+        if kind not in present:
+            continue
+        color = None if not colors else colors.get(kind)
+        swatch = _kind_swatch(color) if color else ''
+        if swatch:
+            names.append('%s %s' % (swatch, word))
+        else:
+            names.append(word)
     if not names:
         return ''
     if len(names) == 1:
@@ -1360,6 +1395,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         if not arrows:
             return
         write_correction_result(arrows, doc_attrs=_doc_attrs())
+        return_line.setTextFormat(QtCore.Qt.PlainText)
         return_line.setText(_IMPORT_SENTENCE)
 
     def _commit_color(edit):
@@ -1847,6 +1883,19 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         QtCore.QTimer.singleShot(0, _pump_ask)
         return True
 
+    def _show_return_line():
+        # The import sentence replaces this line. A later subject
+        # ask must not put the defect names back.
+        if return_line.text() == _IMPORT_SENTENCE:
+            return
+        defects = () if check is None else check.defects
+        text = _defect_line(defects, _arrow_colors(state.get('arrow_paths')))
+        if '<' in text:
+            return_line.setTextFormat(QtCore.Qt.RichText)
+        else:
+            return_line.setTextFormat(QtCore.Qt.PlainText)
+        return_line.setText(text)
+
     def _store_classify(inbox):
         nonlocal check, blocked
         plain_figures = []
@@ -1866,7 +1915,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         state['plain_figures'] = plain_figures
         state['plain_defects'] = plain_defects
         blocked = bool(defects)
-        return_line.setText(_defect_line(defects))
+        _show_return_line()
         if blocked and not state.get('arrows_button'):
             arrows_btn = QtWidgets.QPushButton(
                 'Return to Inkscape with correction arrows')
@@ -1898,6 +1947,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
                 color)
             arrow_paths.setdefault(kind, []).append(arrow)
         state['arrow_paths'] = arrow_paths
+        _show_return_line()
         if state.get('opening'):
             # Setting the spin is not a surround ask.
             initial_distance = _surround_distance(bounds)
