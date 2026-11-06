@@ -22,12 +22,13 @@ paper the architecture with the story.
 
 | Seen | What happened | Rule |
 | --- | --- | --- |
-| 2026-11-05, `src/weedlib/solvers.py` | Grid hatch lines are not reported until `grid_weeds` publishes the path after the connected-ends pass. The work-rectangle edges are reported when they are accepted and again at that publish. Confirmed. The progress-check edits did not cause it. | [Run](./architecture/runtime.md). [segment-publish](./plans/segment-publish/plan.md). |
+| 2026-11-05, `src/weedlib/solvers.py` | Island-hop hole splits are returned as weed lines and never reach the geometry hook. `enclosure_weeds` adds `_hole_internal_splits` with `out.addPath`. On a 200 by 160 frame with a 180 by 140 hole, padding 8, collar 4, the path has 2 segments and the hook receives 0. Confirmed. The grid publish edit did not cause it. | [Run](./architecture/runtime.md). [island-segments](./plans/island-segments/plan.md). |
 
 ## Closed
 
 | Seen | What happened | Rule |
 | --- | --- | --- |
+| 2026-11-05, `src/weedlib/solvers.py` | Grid hatch lines were reported only when the finished path was published, so work-rectangle edges were reported again. Fixed. Hatch is reported when `_grid_in_region` returns, before connected-ends. Each work-rectangle edge is reported once. | [Run](./architecture/runtime.md). [segment-publish](./plans/segment-publish/plan.md). |
 | 2026-11-05, `tests/test_window_timing.py` | `test_hold_on_a_thread_blocks_the_gui_timer` failed when `processEvents` returned before the worker entered the non-yielding loop. The assert saw about 0 instead of more than 0.05. Fixed. The worker waits until just before `processEvents`, and that call has to both deliver the timer and take more than 0.05s. An immediate hold still fails. | [Run](./architecture/runtime.md). [_bugs](./plans/_bugs/plan.md). |
 | 2026-11-04, `extensions/inkscape/weedlines_dialog.py` | The figure check, the surround, and frame, grid, and island-hop ran on the GUI thread or on a thread in that process, so the window could not paint. Fixed. They run in the spawned geometry process. Close does not join that work. The OS dialog was not reproduced. | [Run](./architecture/runtime.md). [responsive-run](./plans/responsive-run/plan.md). |
 | 2026-11-05, `extensions/inkscape/weedlines_dialog.py` | `test_untouched_apply_returns_the_initial_color` and `test_apply_returns_the_changed_weed_line_color` failed on `d08fccd`. Start on the default Surround and Conquer mode paints a surround and leaves Apply disabled, so the dialog returns `(None, None, None)`. Fixed. The color checks open on frame, which returns cuts. | [Run](./architecture/runtime.md). [_bugs](./plans/_bugs/plan.md). |
