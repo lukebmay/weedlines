@@ -31,8 +31,21 @@ _IMPORT_SENTENCE = (
     'Run Extensions → Weedlines → Import last result to place the arrows.')
 _SURROUND_MODE = 'Surround and Conquer'
 _CUT_MODES = ('frame', 'grid', 'island-hop')
-# Quarter-inch baseline, passed through as document user units.
-_JOIN_GAP = 6.35
+# Quarter inch. The user-unit count is this divided by the document scale.
+_QUARTER_INCH = 0.25
+# Inkscape's linear display units. Percent and em are not lengths.
+# q, yd, and km stay off this list. They remain SVG length units.
+_DISPLAY_UNITS = (
+    'px', 'in', 'ft', 'mm', 'cm', 'm', 'pt', 'pc',
+)
+# Solver counts, in document user units. The spin shows them converted.
+_LENGTH_LIMITS = {
+    'padding': (0.0, 200.0),
+    'spacing': (1.0, 200.0),
+    'collar': (0.0, 50.0),
+    'distance': (0.0, 1000000.0),
+    'join': (0.0, 1000000.0),
+}
 
 
 def _defect_line(defects):
@@ -104,6 +117,22 @@ def _surround_distance(bounds):
     if side <= 0.0:
         return 0.0
     return 0.05 * side
+
+
+def _display_unit_name(name):
+    """An absolute display length, or px when *name* is not one."""
+    key = str(name or '').strip().lower()
+    if key in _DISPLAY_UNITS:
+        return key
+    return 'px'
+
+
+def _to_display(user_units, scale, inches):
+    return float(user_units) * float(scale) / float(inches)
+
+
+def _to_user(shown, scale, inches):
+    return float(shown) * float(inches) / float(scale)
 
 
 def _with_work_region(weed_area, work, QPainterPath, Qt):
@@ -423,7 +452,12 @@ def _ask_solver(request, conn, pausing, cancelled):
         request.get('elements') or [], request.get('rule') or 'odd')
     elements, rule = _pack_path(keep)
     conn.send(('keep', str(mode), elements, rule))
-    conn.send(('call', 'solver'))
+    conn.send((
+        'call', 'solver',
+        [float(value) for value in padding],
+        float(spacing),
+        float(collar),
+    ))
 
     def on_phase(name):
         conn.send(('log', '[phase] %s\n' % name))
@@ -661,7 +695,11 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     those same arrow paths and leaves the window open. *width*,
     *height*, and *view_box* are the document size. *display_unit*
     is the unit the document names. An unset unit is px.
-    *user_unit_scale* is how many inches one user unit is. *defaults*
+    *user_unit_scale* is how many inches one user unit is. Lengths
+    on the form are shown in that display unit. Padding, spacing,
+    the collar, the surround distance, and the join gap still reach
+    the library in document user units. The join gap starts at a
+    quarter inch in those units. *defaults*
     may include mode, padding, spacing, collar, layer_name. Missing or
     blank mode opens on Surround and Conquer. Start in that mode
     asks for the surround and paints it. It does not run a solver.
@@ -684,6 +722,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     from weedlib.arrows import ArrowPath
     from weedlib.qt import QPainterPath, load_widgets
     from weedlines_job import write_correction_result
+    from weedlines_svg import _INCHES_PER_UNIT as _UNIT_INCHES
 
     QtCore, QtGui, QtWidgets = load_widgets()
     defaults = dict(defaults or {})
@@ -707,6 +746,9 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         dialog.user_unit_scale = 1.0 / 96.0
     else:
         dialog.user_unit_scale = float(user_unit_scale)
+    shown_unit = _display_unit_name(dialog.display_unit)
+    if not _UNIT_INCHES.get(shown_unit):
+        shown_unit = 'px'
     dialog.resize(720, 640)
     # WindowModal: don't freeze every Qt window in a multi-app session;
     # when hosted inside Inkscape's process this still blocks that app.
@@ -727,46 +769,54 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
             mode_box.setCurrentIndex(i)
             break
     distance_label = QtWidgets.QLabel('Surround distance')
+    distance_label.setObjectName('surround-distance-label')
     distance_spin = QtWidgets.QDoubleSpinBox()
     distance_spin.setObjectName('surround-distance')
     distance_spin.setDecimals(4)
     distance_spin.setSingleStep(0.1)
-    distance_spin.setRange(0.0, 1000000.0)
-    distance_spin.setValue(0.0)
     distance_spin.setEnabled(False)
-    join_label = QtWidgets.QLabel('Join gap (mm)')
+    join_label = QtWidgets.QLabel('Join gap')
+    join_label.setObjectName('join-gap-label')
     join_spin = QtWidgets.QDoubleSpinBox()
     join_spin.setObjectName('join-gap')
     join_spin.setDecimals(4)
     join_spin.setSingleStep(0.1)
-    join_spin.setRange(0.0, 1000000.0)
-    join_spin.setValue(_JOIN_GAP)
     join_spin.setEnabled(False)
     change_btn = QtWidgets.QPushButton('Change surround')
     change_btn.setObjectName('change-surround')
     change_btn.setEnabled(False)
+    pad_label = QtWidgets.QLabel('Padding')
+    pad_label.setObjectName('padding-label')
     pad_spin = QtWidgets.QDoubleSpinBox()
     pad_spin.setObjectName('padding')
-    pad_spin.setRange(0.0, 200.0)
-    pad_spin.setDecimals(2)
-    pad_spin.setValue(float(defaults.get('padding', 4.0)))
+    pad_spin.setDecimals(4)
+    space_label = QtWidgets.QLabel('Grid spacing')
+    space_label.setObjectName('spacing-label')
     space_spin = QtWidgets.QDoubleSpinBox()
     space_spin.setObjectName('spacing')
-    space_spin.setRange(1.0, 200.0)
-    space_spin.setDecimals(2)
-    space_spin.setValue(float(defaults.get('spacing', 25.0)))
+    space_spin.setDecimals(4)
+    collar_label = QtWidgets.QLabel('Collar (island-hop)')
+    collar_label.setObjectName('collar-label')
     collar_spin = QtWidgets.QDoubleSpinBox()
-    collar_spin.setRange(0.0, 50.0)
-    collar_spin.setDecimals(2)
-    collar_spin.setValue(float(defaults.get('collar', 4.0)))
+    collar_spin.setDecimals(4)
     layer_edit = QtWidgets.QLineEdit(str(defaults.get('layer_name', 'Weed lines')))
+    unit_box = QtWidgets.QComboBox()
+    unit_box.setObjectName('display-unit')
+    for _name in _DISPLAY_UNITS:
+        if _name in _UNIT_INCHES:
+            unit_box.addItem(_name, _name)
+    _unit_index = unit_box.findData(shown_unit)
+    if _unit_index < 0:
+        _unit_index = unit_box.findData('px')
+    unit_box.setCurrentIndex(_unit_index)
     form.addRow('Mode', mode_box)
+    form.addRow('Display unit', unit_box)
     form.addRow(distance_label, distance_spin)
     form.addRow(join_label, join_spin)
     form.addRow(change_btn)
-    form.addRow('Padding (mm)', pad_spin)
-    form.addRow('Grid spacing (mm)', space_spin)
-    form.addRow('Collar (mm, island-hop)', collar_spin)
+    form.addRow(pad_label, pad_spin)
+    form.addRow(space_label, space_spin)
+    form.addRow(collar_label, collar_spin)
     form.addRow('Output layer', layer_edit)
 
     def _color_edit(name, initial):
@@ -895,6 +945,18 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         'mp_cancel': None,
         'inbox': None,
         'solver_keeps': [],
+        'solver_args': [],
+        'lengths': {
+            'padding': float(defaults.get('padding', 4.0)),
+            'spacing': float(defaults.get('spacing', 25.0)),
+            'collar': float(defaults.get('collar', 4.0)),
+            'distance': 0.0,
+            'join': _QUARTER_INCH / dialog.user_unit_scale,
+        },
+        'limits': dict(_LENGTH_LIMITS),
+        'unit': shown_unit,
+        'unit_inches': _UNIT_INCHES[shown_unit],
+        'applying_unit': False,
         'last_fit': 0.0,
         'close_when_done': False,
     }
@@ -902,6 +964,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     dialog.worker_swaps = state['swaps']
     dialog.surround_args = state['surround_args']
     dialog.solver_keeps = state['solver_keeps']
+    dialog.solver_args = state['solver_args']
     dialog.focus_mark = None
     dialog.focus_named = None
     dialog.ask_name = None
@@ -1111,9 +1174,9 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         distance, join_gap, swap = asked
         if bool(state['swapped']) != bool(swap):
             return True
-        if abs(float(distance_spin.value()) - float(distance)) > 1e-9:
+        if abs(state['lengths']['distance'] - float(distance)) > 1e-9:
             return True
-        if abs(float(join_spin.value()) - float(join_gap)) > 1e-9:
+        if abs(state['lengths']['join'] - float(join_gap)) > 1e-9:
             return True
         return False
 
@@ -1126,8 +1189,8 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
             return False
         if state.get('ask'):
             return False
-        distance = float(distance_spin.value())
-        join_gap = float(join_spin.value())
+        distance = state['lengths']['distance']
+        join_gap = state['lengths']['join']
         if distance < 0.0:
             distance = 0.0
         if join_gap < 0.0:
@@ -1169,9 +1232,9 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         refresh_preview()
 
         mode = mode_box.currentData()
-        padding = float(pad_spin.value())
-        spacing = float(space_spin.value())
-        collar = float(collar_spin.value())
+        padding = state['lengths']['padding']
+        spacing = state['lengths']['spacing']
+        collar = state['lengths']['collar']
         keep = QPainterPath(state['regions'].subject)
         state['solved_keep'] = keep
         state['solved_pad'] = [padding, padding, padding, padding]
@@ -1359,8 +1422,69 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     return_btn.clicked.connect(on_return)
     swap_btn.clicked.connect(_on_swap)
     mode_box.currentIndexChanged.connect(_on_mode)
-    distance_spin.valueChanged.connect(_on_surround_length)
-    join_spin.valueChanged.connect(_on_surround_length)
+
+    def _show_lengths():
+        """Show stored user-unit lengths in the current display unit."""
+        scale = dialog.user_unit_scale
+        inches = state['unit_inches']
+        suffix = ' ' + state['unit']
+        spins = (
+            ('distance', distance_spin),
+            ('join', join_spin),
+            ('padding', pad_spin),
+            ('spacing', space_spin),
+            ('collar', collar_spin),
+        )
+        state['applying_unit'] = True
+        try:
+            for key, spin in spins:
+                shown = _to_display(state['lengths'][key], scale, inches)
+                lo, hi = state['limits'][key]
+                shown_lo = _to_display(lo, scale, inches)
+                shown_hi = _to_display(hi, scale, inches)
+                if shown_lo > shown_hi:
+                    shown_lo, shown_hi = shown_hi, shown_lo
+                # A count the user-unit range allows must survive the spin.
+                shown_lo = min(shown_lo, shown)
+                shown_hi = max(shown_hi, shown)
+                spin.blockSignals(True)
+                spin.setSuffix(suffix)
+                spin.setRange(shown_lo, shown_hi)
+                if spin.maximum() < shown:
+                    spin.setMaximum(shown)
+                if spin.minimum() > shown:
+                    spin.setMinimum(shown)
+                spin.setValue(shown)
+                spin.blockSignals(False)
+        finally:
+            state['applying_unit'] = False
+
+    def _remember_length(key, spin, follow):
+        def edited(_value):
+            if state.get('applying_unit'):
+                return
+            state['lengths'][key] = _to_user(
+                spin.value(), dialog.user_unit_scale, state['unit_inches'])
+            if follow is not None:
+                follow()
+        spin.valueChanged.connect(edited)
+
+    def _on_unit(_index=None):
+        name = unit_box.currentData()
+        inches = _UNIT_INCHES.get(name)
+        if not inches:
+            return
+        state['unit'] = name
+        state['unit_inches'] = inches
+        _show_lengths()
+
+    _show_lengths()
+    _remember_length('distance', distance_spin, _on_surround_length)
+    _remember_length('join', join_spin, _on_surround_length)
+    _remember_length('padding', pad_spin, None)
+    _remember_length('spacing', space_spin, None)
+    _remember_length('collar', collar_spin, None)
+    unit_box.currentIndexChanged.connect(_on_unit)
     change_btn.clicked.connect(_on_change_surround)
     for _edit in (light_edit, dark_edit, weed_edit, subject_edit):
         _edit.editingFinished.connect(
@@ -1409,6 +1533,12 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
                 state['swaps'].append(bool(msg[2]))
             elif msg[1] == 'surrounds' and len(msg) >= 4:
                 state['surround_args'].append((float(msg[2]), float(msg[3])))
+            elif msg[1] == 'solver' and len(msg) >= 5:
+                state['solver_args'].append((
+                    [float(value) for value in msg[2]],
+                    float(msg[3]),
+                    float(msg[4]),
+                ))
         elif kind == 'figure':
             inbox['figures'].append(msg[1:])
         elif kind == 'defect':
@@ -1547,10 +1677,10 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         if state.get('opening'):
             # Setting the spin is not a surround ask.
             initial_distance = _surround_distance(bounds)
-            distance_spin.blockSignals(True)
-            distance_spin.setRange(0.0, max(1000000.0, initial_distance))
-            distance_spin.setValue(initial_distance)
-            distance_spin.blockSignals(False)
+            hi = state['limits']['distance'][1]
+            state['limits']['distance'] = (0.0, max(hi, initial_distance))
+            state['lengths']['distance'] = initial_distance
+            _show_lengths()
 
     def _fail_ask(exc):
         _set_ask(None)

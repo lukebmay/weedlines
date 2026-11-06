@@ -65,6 +65,9 @@ def _run(records, drive, **kwargs):
     app = QtWidgets.QApplication.instance()
     if app is None:
         QtWidgets.QApplication([])
+    # A one-millimeter document, unless the test names another scale.
+    kwargs.setdefault('display_unit', 'mm')
+    kwargs.setdefault('user_unit_scale', 1.0 / 25.4)
 
     def ready(dialog):
         timer = QtCore.QTimer(dialog)

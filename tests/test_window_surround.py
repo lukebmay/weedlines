@@ -22,6 +22,7 @@ if _EXT_DIR not in sys.path:
 
 from weedlib.figures import classify_figures, subject_weed_regions  # noqa: E402
 from weedlines_dialog import run_weedlines_dialog  # noqa: E402
+from weedlines_svg import _INCHES_PER_UNIT  # noqa: E402
 
 _SURROUND = 'Surround and Conquer'
 _LIGHT = '#e6e6e6'
@@ -83,7 +84,7 @@ def _distance_spin(dialog):
 def _join_label(dialog):
     found = [
         label for label in dialog.findChildren(QtWidgets.QLabel)
-        if label.text() == 'Join gap (mm)'
+        if label.text() == 'Join gap'
     ]
     assert len(found) == 1
     return found[0]
@@ -91,6 +92,26 @@ def _join_label(dialog):
 
 def _join_spin(dialog):
     return _named_spin(dialog, 'join-gap')
+
+
+def _display_box(dialog):
+    widget = dialog.findChild(QtWidgets.QComboBox, 'display-unit')
+    assert widget is not None
+    return widget
+
+
+def _set_display_unit(dialog, unit):
+    box = _display_box(dialog)
+    index = box.findData(unit)
+    assert index >= 0, unit
+    box.setCurrentIndex(index)
+    return box
+
+
+def _length_label(dialog, name):
+    widget = dialog.findChild(QtWidgets.QLabel, name)
+    assert widget is not None, name
+    return widget
 
 
 def _named_spin(dialog, name):
@@ -119,6 +140,9 @@ def _run(records, drive, **kwargs):
     app = QtWidgets.QApplication.instance()
     if app is None:
         QtWidgets.QApplication([])
+    # A one-millimeter document, unless the test names another scale.
+    kwargs.setdefault('display_unit', 'mm')
+    kwargs.setdefault('user_unit_scale', 1.0 / 25.4)
 
     def ready(dialog):
         timer = QtCore.QTimer(dialog)
@@ -364,7 +388,7 @@ def test_clear_design_strokes_surrounds_and_follows_distance(monkeypatch):
         join_label = _join_label(dialog)
         change = _button(dialog, 'change-surround')
         assert label.text() == 'Surround distance'
-        assert join_label.text() == 'Join gap (mm)'
+        assert join_label.text() == 'Join gap'
         assert label.isVisible() and spin.isVisible() and change.isVisible()
         assert join_label.isVisible() and join.isVisible()
         assert change.text() == 'Change surround'
@@ -576,7 +600,7 @@ def test_defect_paints_no_surround_and_disables_start(monkeypatch):
         join = _join_spin(dialog)
         assert label.isVisible() and spin.isVisible()
         assert join_label.isVisible() and join.isVisible()
-        assert join_label.text() == 'Join gap (mm)'
+        assert join_label.text() == 'Join gap'
         assert join.value() == pytest.approx(6.35)
         assert join.minimum() == 0.0
         start = _button(dialog, 'start')
@@ -953,3 +977,184 @@ def test_surround_forwards_focus_and_does_not_paint_it():
         dialog.reject()
 
     _run(_CLEAR, drive)
+
+
+_LENGTH_LABELS = (
+    ('surround-distance-label', 'Surround distance'),
+    ('join-gap-label', 'Join gap'),
+    ('padding-label', 'Padding'),
+    ('spacing-label', 'Grid spacing'),
+    ('collar-label', 'Collar (island-hop)'),
+)
+
+
+def _assert_length_labels(dialog):
+    for name, text in _LENGTH_LABELS:
+        label = _length_label(dialog, name)
+        assert label.text() == text
+
+
+def test_display_unit_converts_lengths_without_clamping():
+    def drive(dialog):
+        box = _display_box(dialog)
+        assert box.currentData() == 'mm'
+        assert box.findData('%') < 0
+        assert box.findData('em') < 0
+        assert box.findText('%') < 0
+        assert box.findText('em') < 0
+        _assert_length_labels(dialog)
+        join = _join_spin(dialog)
+        pad = _named_spin(dialog, 'padding')
+        space = _named_spin(dialog, 'spacing')
+        assert join.suffix().strip() == 'mm'
+        assert pad.suffix().strip() == 'mm'
+        assert join.value() == pytest.approx(6.35)
+        assert pad.value() == pytest.approx(4.0)
+        assert space.value() == pytest.approx(25.0)
+
+        pad.setValue(200.0)
+        _set_display_unit(dialog, 'px')
+        shown_pad = 200.0 * 96.0 / 25.4
+        assert pad.value() == pytest.approx(shown_pad, abs=1e-3)
+        assert pad.value() > 200.0
+        _assert_length_labels(dialog)
+        assert pad.suffix().strip() == 'px'
+
+        _set_display_unit(dialog, 'in')
+        assert space.value() == pytest.approx(25.0 / 25.4, abs=1e-3)
+        assert space.value() < 1.0
+        assert join.value() == pytest.approx(0.25)
+        assert pad.value() == pytest.approx(200.0 / 25.4, abs=1e-3)
+        assert join.suffix().strip() == 'in'
+        assert pad.suffix().strip() == 'in'
+        _assert_length_labels(dialog)
+
+        _button(dialog, 'start').click()
+        _wait_idle(dialog)
+        assert len(dialog.surround_args) == 1
+        distance, join_gap = dialog.surround_args[0]
+        assert distance == pytest.approx(_FIVE_PERCENT)
+        assert join_gap == pytest.approx(6.35)
+        assert _distance_spin(dialog).value() == pytest.approx(
+            _FIVE_PERCENT / 25.4, abs=1e-3)
+        assert join.value() == pytest.approx(0.25)
+        dialog.reject()
+
+    _run(_CLEAR, drive)
+
+
+def test_no_scale_join_gap_is_a_quarter_inch_in_px():
+    def drive(dialog):
+        box = _display_box(dialog)
+        assert box.currentData() == 'px'
+        join = _join_spin(dialog)
+        assert join.value() == pytest.approx(24.0)
+        assert join.value() != pytest.approx(6.35)
+        _button(dialog, 'start').click()
+        _wait_idle(dialog)
+        assert len(dialog.surround_args) == 1
+        distance, join_gap = dialog.surround_args[0]
+        assert distance == pytest.approx(_FIVE_PERCENT)
+        assert join_gap == pytest.approx(24.0)
+        assert join_gap != pytest.approx(6.35)
+        dialog.reject()
+
+    _run(_CLEAR, drive, display_unit=None, user_unit_scale=None)
+
+
+def test_centimeter_scale_join_gap_is_not_the_millimeter_count():
+    scale = 1.0 / 2.54
+    expected = 0.25 / scale
+
+    def drive(dialog):
+        assert _display_box(dialog).currentData() == 'cm'
+        join = _join_spin(dialog)
+        assert join.value() == pytest.approx(expected)
+        assert join.value() != pytest.approx(6.35)
+        _button(dialog, 'start').click()
+        _wait_idle(dialog)
+        distance, join_gap = dialog.surround_args[0]
+        assert distance == pytest.approx(_FIVE_PERCENT)
+        assert join_gap == pytest.approx(expected)
+        assert join_gap != pytest.approx(6.35)
+        dialog.reject()
+
+    _run(_CLEAR, drive, display_unit='cm', user_unit_scale=scale)
+
+
+def test_padding_converts_on_screen_and_stays_for_the_solver():
+    def drive(dialog):
+        pad = _named_spin(dialog, 'padding')
+        space = _named_spin(dialog, 'spacing')
+        collar = _collar(dialog)
+        assert pad.value() == pytest.approx(4.0 / 25.4, abs=1e-3)
+        assert pad.value() != pytest.approx(4.0)
+        assert space.value() == pytest.approx(25.0 / 25.4, abs=1e-3)
+        assert space.value() != pytest.approx(25.0)
+        assert collar.value() == pytest.approx(4.0 / 25.4, abs=1e-3)
+        assert collar.value() != pytest.approx(4.0)
+        assert pad.suffix().strip() == 'in'
+        _set_mode(dialog, 'frame')
+        assert _button(dialog, 'start').isEnabled() is True
+        _button(dialog, 'start').click()
+        _pump_until(lambda: bool(dialog.solver_args))
+        padding, spacing, collar_arg = dialog.solver_args[-1]
+        assert padding == pytest.approx([4.0, 4.0, 4.0, 4.0])
+        assert spacing == pytest.approx(25.0)
+        assert collar_arg == pytest.approx(4.0)
+        dialog.reject()
+
+    _run(
+        _CLEAR,
+        drive,
+        display_unit='in',
+        user_unit_scale=1.0 / 25.4,
+        defaults={'padding': 4.0},
+    )
+
+
+_LINEAR_UNITS = ('px', 'in', 'ft', 'mm', 'cm', 'm', 'pt', 'pc')
+
+
+@pytest.mark.parametrize('unit', ('yd', 'q', 'km'))
+def test_dropdown_rejects_yd_q_and_km(unit):
+    def drive(dialog):
+        box = _display_box(dialog)
+        assert dialog.display_unit == unit
+        assert box.currentData() == 'px'
+        choices = [box.itemData(index) for index in range(box.count())]
+        labels = [box.itemText(index) for index in range(box.count())]
+        assert unit not in choices
+        assert unit not in labels
+        assert 'yd' not in choices and 'q' not in choices
+        assert 'km' not in choices
+        assert tuple(choices) == _LINEAR_UNITS
+        assert unit in _INCHES_PER_UNIT
+        assert _join_spin(dialog).value() == pytest.approx(24.0)
+        dialog.reject()
+
+    _run(
+        _CLEAR,
+        drive,
+        display_unit=unit,
+        user_unit_scale=1.0 / 25.4,
+    )
+
+
+@pytest.mark.parametrize('unit', ('%', 'em'))
+def test_dropdown_rejects_percent_and_em(unit):
+    def drive(dialog):
+        box = _display_box(dialog)
+        assert box.currentData() == 'px'
+        assert box.findData(unit) < 0
+        assert box.findData('%') < 0
+        assert box.findData('em') < 0
+        assert _join_spin(dialog).value() == pytest.approx(24.0)
+        dialog.reject()
+
+    _run(
+        _CLEAR,
+        drive,
+        display_unit=unit,
+        user_unit_scale=1.0 / 25.4,
+    )
