@@ -347,6 +347,25 @@ def test_plain_return_writes_nothing_and_closes(tmp_path, monkeypatch):
     assert list(tmp_path.iterdir()) == []
 
 
+def _expected_arrow_batches(records):
+    import weedlib.arrows as arrow_mod
+    from weedlib.figures import classify_figures, subject_weed_regions
+
+    check = classify_figures(records)
+    regions = subject_weed_regions(check.figures, swap=False)
+    grouped = {}
+    for defect in check.defects:
+        grouped.setdefault(defect.kind, []).append(defect.target)
+    batches = []
+    for kind in ('dangling', 'overlap', 'self-overlap'):
+        targets = grouped.get(kind)
+        if not targets:
+            continue
+        batches.append((
+            kind, arrow_mod.build_arrow_paths(kind, targets, regions.bounds)))
+    return batches
+
+
 def test_arrow_return_writes_the_preview_paths_and_stays_open(
         tmp_path, monkeypatch):
     import weedlib.arrows as arrow_mod
@@ -354,6 +373,8 @@ def test_arrow_return_writes_the_preview_paths_and_stays_open(
     import weedlines_svg as SVG
     from weedlib.svg_paths import qpainterpath_to_svg_d
 
+    expected = _expected_arrow_batches(_DEFECTS)
+    assert expected
     opened = _forbid_message_box(monkeypatch)
     monkeypatch.setattr(JOB, 'cache_dir', lambda: str(tmp_path))
     built = []
@@ -364,6 +385,7 @@ def test_arrow_return_writes_the_preview_paths_and_stays_open(
         built.append((kind, batch))
         return batch
 
+    # A parent patch does not see the child. The preview is the proof.
     monkeypatch.setattr(arrow_mod, 'build_arrow_paths', wrapped)
     written = {}
     real_write = JOB.write_correction_result
@@ -377,17 +399,18 @@ def test_arrow_return_writes_the_preview_paths_and_stays_open(
     holder = {}
 
     def drive(dialog):
-        assert built, 'preview built no arrows'
-        painted = len(built)
+        assert built == []
+        calls = list(dialog.worker_calls)
         items = _path_items(_view(dialog).scene())
-        for _kind, batch in built:
+        for _kind, batch in expected:
             for arrow in batch:
                 shaft = _take_path(items, arrow.shaft)
                 head = _take_path(items, arrow.head)
                 assert _pen_hex(shaft) == arrow.color.lower()
                 assert _brush_hex(head) == arrow.color.lower()
         _one(dialog, _ARROW).click()
-        assert len(built) == painted
+        assert built == []
+        assert list(dialog.worker_calls) == calls
         assert dialog.isVisible() is True
         assert _line(dialog).text() == _IMPORT
         start = _button(dialog, 'start')
@@ -402,8 +425,13 @@ def test_arrow_return_writes_the_preview_paths_and_stays_open(
         ]
         assert boxes == []
         assert opened == []
-        for kind, batch in built:
-            assert written['arrows'][kind] is batch
+        for kind, batch in expected:
+            written_batch = written['arrows'][kind]
+            assert len(written_batch) == len(batch)
+            for got, arrow in zip(written_batch, batch):
+                assert _same_path(got.shaft, arrow.shaft)
+                assert _same_path(got.head, arrow.head)
+                assert got.color.lower() == arrow.color.lower()
         svg_path = tmp_path / 'last_result.svg'
         holder['svg'] = svg_path.read_text(encoding='utf-8')
         _one(dialog, _PLAIN).click()
@@ -432,9 +460,9 @@ def test_arrow_return_writes_the_preview_paths_and_stays_open(
     assert payload.get('doc_attrs') == written['doc']
     groups = SVG.load_correction_svg_groups(str(svg_path))
     assert [group.get(_INK_LABEL) for group in groups] == [
-        _LABELS[kind] for kind, _batch in built
+        _LABELS[kind] for kind, _batch in expected
     ]
-    for (kind, batch), group in zip(built, groups):
+    for (kind, batch), group in zip(expected, groups):
         shafts, heads = _group_paths(group)
         assert shafts == [
             qpainterpath_to_svg_d(arrow.shaft, close_subpaths=False)

@@ -10,6 +10,7 @@ from __future__ import division
 
 import logging
 import math
+import multiprocessing
 import os
 import sys
 import threading
@@ -203,6 +204,325 @@ class _QueueLogHandler(logging.Handler):
             pass
 
 
+# Plain value the next ask passes to the spawn target. Unset does nothing.
+_ASK_HOLD = None
+# Plain text the child writes to stdout and stderr. Unset writes nothing.
+_ASK_TRACE = None
+
+
+def _burn_hold(hold):
+    """Tight loop before a library call. Unset hold returns immediately.
+
+    The switch interval keeps this loop from yielding the interpreter,
+    so the same loop on a thread in this process cannot service the GUI.
+    """
+    if hold is None or hold is False:
+        return
+    try:
+        limit = int(hold)
+    except (TypeError, ValueError):
+        return
+    if limit <= 0:
+        return
+    interval = sys.getswitchinterval()
+    sys.setswitchinterval(1.0e9)
+    try:
+        count = 0
+        while count < limit:
+            count += 1
+    finally:
+        sys.setswitchinterval(interval)
+
+
+class _ConnStream(object):
+    """File-like object that sends each line as a log message."""
+
+    def __init__(self, conn):
+        self._conn = conn
+        self._buf = ''
+
+    def write(self, data):
+        if not data:
+            return 0
+        if not isinstance(data, str):
+            data = data.decode('utf-8', 'replace')
+        self._buf += data
+        while '\n' in self._buf:
+            line, self._buf = self._buf.split('\n', 1)
+            self._conn.send(('log', line + '\n'))
+        return len(data)
+
+    def flush(self):
+        if self._buf:
+            self._conn.send(('log', self._buf))
+            self._buf = ''
+
+    def isatty(self):
+        return False
+
+
+def _plain_int(value):
+    if callable(value):
+        value = value()
+    number = getattr(value, 'value', None)
+    if number is not None and not callable(number):
+        try:
+            return int(number)
+        except (TypeError, ValueError):
+            pass
+    return int(value)
+
+
+def _path_elements(path):
+    if path is None:
+        return []
+    elements = []
+    count = path.elementCount()
+    for index in range(count):
+        element = path.elementAt(index)
+        kind = element.type
+        if callable(kind):
+            kind = kind()
+        x = element.x() if callable(element.x) else element.x
+        y = element.y() if callable(element.y) else element.y
+        elements.append((_plain_int(kind), float(x), float(y)))
+    return elements
+
+
+def _rule_code(path):
+    from weedlib.qt import Qt
+    if path is None:
+        return 'odd'
+    rule = path.fillRule()
+    if callable(rule):
+        rule = rule()
+    if rule == Qt.WindingFill:
+        return 'wind'
+    return 'odd'
+
+
+def _pack_path(path):
+    if path is None:
+        return ([], 'odd')
+    return (_path_elements(path), _rule_code(path))
+
+
+def _unpack_path(elements, rule):
+    from weedlib.qt import QPainterPath, Qt
+    path = QPainterPath()
+    if not elements:
+        return path
+    move = _plain_int(QPainterPath.MoveToElement)
+    line = _plain_int(QPainterPath.LineToElement)
+    curve = _plain_int(QPainterPath.CurveToElement)
+    data = _plain_int(QPainterPath.CurveToDataElement)
+    index = 0
+    count = len(elements)
+    while index < count:
+        kind, x, y = elements[index]
+        if kind == move:
+            path.moveTo(x, y)
+            index += 1
+        elif kind == line:
+            path.lineTo(x, y)
+            index += 1
+        elif kind == curve:
+            points = [(x, y)]
+            nxt = index + 1
+            while nxt < count and elements[nxt][0] == data:
+                points.append((elements[nxt][1], elements[nxt][2]))
+                nxt += 1
+            if len(points) == 2:
+                path.quadTo(
+                    points[0][0], points[0][1], points[1][0], points[1][1])
+            elif len(points) == 3:
+                path.cubicTo(
+                    points[0][0], points[0][1],
+                    points[1][0], points[1][1],
+                    points[2][0], points[2][1])
+            else:
+                raise ValueError('path element is not plain coordinates')
+            index = nxt
+        else:
+            raise ValueError('path element is not plain coordinates')
+    if rule == 'wind':
+        path.setFillRule(Qt.WindingFill)
+    else:
+        path.setFillRule(Qt.OddEvenFill)
+    return path
+
+
+def _point_xy(point):
+    x = getattr(point, 'x', None)
+    y = getattr(point, 'y', None)
+    if x is not None and y is not None:
+        if callable(x):
+            x, y = x(), y()
+        return float(x), float(y)
+    x, y = point
+    return float(x), float(y)
+
+
+def _box_tuple(rect):
+    return (
+        float(rect.x()), float(rect.y()),
+        float(rect.width()), float(rect.height()))
+
+
+def _empty_inbox():
+    return {
+        'figures': [],
+        'defects': [],
+        'subject': None,
+        'weed': None,
+        'bounds': None,
+        'fills': [],
+        'arrows': [],
+        'error': None,
+        'cancelled': False,
+    }
+
+
+def _send_call(conn, name, swap=None):
+    if swap is None:
+        conn.send(('call', name))
+    else:
+        conn.send(('call', name, bool(swap)))
+
+
+def _ask_classify(request, conn):
+    from weedlib.figures import classify_figures
+    _send_call(conn, 'classify')
+    check = classify_figures(request.get('records') or [])
+    for figure in check.figures:
+        elements, rule = _pack_path(figure.path)
+        conn.send(('figure', figure.id, figure.fill, elements, rule))
+    for defect in check.defects:
+        x, y = _point_xy(defect.target)
+        conn.send(('defect', defect.kind, x, y))
+
+
+def _ask_subject(request, conn):
+    from weedlib.arrows import build_arrow_paths
+    from weedlib.figures import Figure, _painted_parts, subject_weed_regions
+    from weedlib.paths import split_painter_path
+    _send_call(conn, 'subject', bool(request.get('swap')))
+    figures = []
+    for item in request.get('figures') or []:
+        figures.append(Figure(
+            id=item.get('id'),
+            path=_unpack_path(item.get('elements') or [], item.get('rule') or 0),
+            fill=item.get('fill'),
+        ))
+    regions = subject_weed_regions(figures, bool(request.get('swap')))
+    elements, rule = _pack_path(regions.subject)
+    conn.send(('path', 'subject', elements, rule))
+    elements, rule = _pack_path(regions.weed_area)
+    conn.send(('path', 'weed', elements, rule))
+    conn.send(('bounds',) + _box_tuple(regions.bounds))
+    subject = regions.subject
+    for figure in figures:
+        interior = _painted_parts(split_painter_path(figure.path))
+        if subject is None:
+            part = interior
+        else:
+            part = interior.intersected(subject)
+        elements, rule = _pack_path(part)
+        conn.send(('fill', figure.fill, elements, rule))
+    grouped = {}
+    for defect in request.get('defects') or []:
+        grouped.setdefault(defect.get('kind'), []).append(
+            (defect.get('x'), defect.get('y')))
+    for kind in _ARROW_KINDS:
+        targets = grouped.get(kind)
+        if not targets:
+            continue
+        _send_call(conn, 'arrows')
+        batch = build_arrow_paths(kind, targets, regions.bounds)
+        for arrow in batch:
+            shaft, shaft_rule = _pack_path(arrow.shaft)
+            head, head_rule = _pack_path(arrow.head)
+            conn.send((
+                'arrow', kind, arrow.color,
+                shaft, shaft_rule, head, head_rule))
+
+
+def _run_geometry_ask(request, conn, pausing, cancelled):
+    from weedlib.progress import WeedCancelled
+    from weedlib import progress as weed_progress
+
+    def on_focus(outline, line):
+        conn.send(('focus', outline, line))
+
+    weed_progress.install(
+        pause=lambda: pausing.is_set(),
+        cancel=lambda: cancelled.is_set(),
+        focus=on_focus,
+    )
+    try:
+        trace = request.get('trace')
+        if trace:
+            sys.stdout.write('%s\n' % trace)
+            sys.stderr.write('%s\n' % trace)
+        kind = request.get('kind')
+        if kind == 'classify':
+            _ask_classify(request, conn)
+        elif kind == 'subject':
+            _ask_subject(request, conn)
+        else:
+            conn.send(('error', 'unknown ask'))
+    except WeedCancelled:
+        conn.send(('cancelled',))
+    except Exception as exc:
+        conn.send(('error', '%s' % exc))
+    finally:
+        weed_progress.clear()
+
+
+def _geometry_worker(request, hold, conn, pausing, cancelled):
+    """Spawn target. One ask, as messages. No window.
+
+    The window already has a QApplication, so the parent starts this
+    with spawn, not fork. A nested function cannot be the target.
+    """
+    _burn_hold(hold)
+    old_out, old_err = sys.stdout, sys.stderr
+    stream = _ConnStream(conn)
+    sys.stdout = stream
+    sys.stderr = stream
+    try:
+        _run_geometry_ask(request, conn, pausing, cancelled)
+    finally:
+        try:
+            stream.flush()
+        except Exception:
+            pass
+        sys.stdout = old_out
+        sys.stderr = old_err
+        try:
+            conn.send(('done',))
+        except Exception:
+            pass
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def _spawn_ask(request, hold, pausing, cancelled):
+    """Start one ask in its own interpreter. Returns ``(process, conn)``."""
+    ctx = multiprocessing.get_context('spawn')
+    parent_conn, child_conn = ctx.Pipe(duplex=False)
+    proc = ctx.Process(
+        target=_geometry_worker,
+        args=(request, hold, child_conn, pausing, cancelled),
+        daemon=True,
+    )
+    proc.start()
+    child_conn.close()
+    return proc, parent_conn
+
+
 def run_weedlines_dialog(records, defaults=None, platform_lines=None,
                          quit_app=True, width=None, height=None,
                          view_box=None, ready=None):
@@ -236,10 +556,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     The surround is not asked until Start Algorithm.
     """
     from weedlib import build_surrounds, generate_weeds, padded_work_rect
-    from weedlib.arrows import build_arrow_paths
-    from weedlib.figures import (
-        _painted_parts, classify_figures, subject_weed_regions)
-    from weedlib.paths import split_painter_path
+    from weedlib.arrows import ArrowPath
     from weedlib.progress import WeedCancelled
     from weedlib.qt import QPainterPath, load_widgets
     from weedlines_job import write_correction_result
@@ -287,6 +604,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     distance_spin.setSingleStep(0.1)
     distance_spin.setRange(0.0, 1000000.0)
     distance_spin.setValue(0.0)
+    distance_spin.setEnabled(False)
     join_label = QtWidgets.QLabel('Join gap (mm)')
     join_spin = QtWidgets.QDoubleSpinBox()
     join_spin.setObjectName('join-gap')
@@ -294,8 +612,10 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     join_spin.setSingleStep(0.1)
     join_spin.setRange(0.0, 1000000.0)
     join_spin.setValue(_JOIN_GAP)
+    join_spin.setEnabled(False)
     change_btn = QtWidgets.QPushButton('Change surround')
     change_btn.setObjectName('change-surround')
+    change_btn.setEnabled(False)
     pad_spin = QtWidgets.QDoubleSpinBox()
     pad_spin.setObjectName('padding')
     pad_spin.setRange(0.0, 200.0)
@@ -330,6 +650,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
 
     swap_btn = QtWidgets.QPushButton('Swap subject and weed area')
     swap_btn.setObjectName('swap')
+    swap_btn.setEnabled(False)
     form.addRow(swap_btn)
     light_edit = _color_edit('checkerboard-light', '#E6E6E6')
     dark_edit = _color_edit('checkerboard-dark', '#CFCFCF')
@@ -426,7 +747,28 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         'surround_paths': [],
         'regions_swap': None,
         'asked': False,
+        'calls': [],
+        'swaps': [],
+        'focus': None,
+        'fill_parts': [],
+        'arrow_paths': {},
+        'plain_figures': [],
+        'plain_defects': [],
+        'ask': None,
+        'ask_seq': 0,
+        'ask_token': None,
+        'closed_token': None,
+        'opening': True,
+        'drop': False,
+        'proc': None,
+        'conn': None,
+        'mp_pause': None,
+        'mp_cancel': None,
+        'inbox': None,
     }
+    dialog.worker_calls = state['calls']
+    dialog.worker_swaps = state['swaps']
+    dialog.focus_mark = None
     CheckerItem = _checker_type(QtWidgets, QtGui, QtCore)
 
     def append_log(text):
@@ -499,22 +841,33 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         item.setZValue(z_value)
         state['preview_items'].append(item)
 
+    class _Defect(object):
+        def __init__(self, kind, target):
+            self.kind = kind
+            self.target = target
+
+    class _Check(object):
+        def __init__(self, defects):
+            self.defects = defects
+            self.figures = []
+
+    class _Regions(object):
+        def __init__(self, subject, weed_area, bounds):
+            self.subject = subject
+            self.weed_area = weed_area
+            self.bounds = bounds
+
     def _ensure_regions():
-        # One subject_weed_regions per swap. The open asks share it.
-        if (state['regions'] is not None
-                and state['regions_swap'] == state['swapped']):
-            return state['regions']
-        regions = subject_weed_regions(
-            check.figures, swap=state['swapped'])
-        state['regions'] = regions
-        state['regions_swap'] = state['swapped']
-        return regions
+        # Applied by the subject ask. A color change does not ask again.
+        return state.get('regions')
 
     def refresh_preview():
         for item in state['preview_items']:
             scene.removeItem(item)
         state['preview_items'] = []
         regions = _ensure_regions()
+        if regions is None:
+            return
         light = light_edit.property('color')
         dark = dark_edit.property('color')
         weed_color = weed_edit.property('color')
@@ -532,25 +885,16 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
             painted = QPainterPath(subject)
             painted.setFillRule(QtCore.Qt.OddEvenFill)
             _fill(painted, subject_color, 10)
-        for figure in check.figures:
-            solid = _hex_color(figure.fill)
-            if solid is None or subject is None:
-                continue
-            # Painted interior. Odd-even of the whole path drops a crossing lens.
-            interior = _painted_parts(split_painter_path(figure.path))
-            part = interior.intersected(subject)
-            if part.isEmpty():
+        for fill, part in state.get('fill_parts') or []:
+            solid = _hex_color(fill)
+            if solid is None or part is None or part.isEmpty():
                 continue
             _fill(part, solid, 11)
-        grouped = {}
-        for defect in check.defects:
-            grouped.setdefault(defect.kind, []).append(defect.target)
         arrow_paths = {}
         for kind in _ARROW_KINDS:
-            targets = grouped.get(kind)
-            if not targets:
+            batch = list((state.get('arrow_paths') or {}).get(kind) or [])
+            if not batch:
                 continue
-            batch = build_arrow_paths(kind, targets, regions.bounds)
             arrow_paths[kind] = batch
             for arrow in batch:
                 shaft = scene.addPath(
@@ -608,6 +952,8 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         if blocked or not state['surround_started'] or not _in_surround():
             return
         regions = _ensure_regions()
+        if regions is None:
+            return
         distance = float(distance_spin.value())
         join_gap = float(join_spin.value())
         if distance < 0.0:
@@ -618,7 +964,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
             build_surrounds(regions.subject, distance, join_gap))
 
     def on_start():
-        if state['busy'] or blocked:
+        if state['busy'] or blocked or state.get('ask'):
             return
         if _in_surround():
             # Start asks for the surround. It does not run a solver.
@@ -776,6 +1122,18 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
 
         QtCore.QTimer.singleShot(50, pump)
 
+    def _sync_worker_flags():
+        mp_pause = state.get('mp_pause')
+        if mp_pause is not None:
+            if state['pause'].is_set():
+                mp_pause.set()
+            else:
+                mp_pause.clear()
+        if state['cancel'].is_set():
+            mp_cancel = state.get('mp_cancel')
+            if mp_cancel is not None:
+                mp_cancel.set()
+
     def on_pause_toggle():
         if not state['busy'] or state['cancel'].is_set():
             return
@@ -787,13 +1145,15 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
             state['pause'].set()
             append_log('Paused — worker waiting; inspect preview.\n')
             set_controls(True, paused=True)
+        _sync_worker_flags()
 
     def on_cancel():
-        if not state['busy']:
+        if not state['busy'] and not state.get('ask'):
             return
-        # Wake a paused worker so it can see cancel
+        # Wake a paused worker so it can see cancel. Do not kill it.
         state['pause'].clear()
         state['cancel'].set()
+        _sync_worker_flags()
         append_log('Cancel requested — stopping algorithm…\n')
         set_controls(True, paused=False)
         cancel_btn.setEnabled(False)
@@ -807,9 +1167,13 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         dialog.accept()
 
     def on_close():
+        # Drop a figure-check result that arrives after Close. Do not
+        # join that child on this thread, and do not kill it.
+        state['drop'] = True
+        state['pause'].clear()
+        state['cancel'].set()
+        _sync_worker_flags()
         if state['busy']:
-            state['pause'].clear()
-            state['cancel'].set()
             thread = state.get('thread')
             if thread is not None and thread.is_alive():
                 thread.join(2.0)
@@ -857,15 +1221,18 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         refresh_preview()
 
     def _on_swap():
-        if state['busy']:
+        if state['busy'] or state.get('ask') or state.get('opening'):
             return
         state['swapped'] = not state['swapped']
-        if state['surround_started'] and not blocked and _in_surround():
-            _ask_surrounds()
-        refresh_preview()
+        if not _begin_ask(_subject_request()):
+            state['swapped'] = not state['swapped']
+            return
+        app_loop = QtWidgets.QApplication.instance()
+        while state.get('ask') and dialog.isVisible():
+            app_loop.processEvents(QtCore.QEventLoop.AllEvents, 50)
 
     def _on_mode(_index=None):
-        if state['busy']:
+        if state['busy'] or state.get('ask'):
             return
         had_surrounds = bool(state['surround_paths'])
         _show_surround_controls()
@@ -882,14 +1249,14 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     def _on_surround_length(value=None):
         if isinstance(value, str):
             return
-        if (state['busy'] or blocked or not state['surround_started']
-                or not _in_surround()):
+        if (state['busy'] or state.get('ask') or blocked
+                or not state['surround_started'] or not _in_surround()):
             return
         _ask_surrounds()
         refresh_preview()
 
     def _on_change_surround():
-        if state['busy'] or not _in_surround():
+        if state['busy'] or state.get('ask') or not _in_surround():
             return
         state['surround_started'] = False
         state['surround_paths'] = []
@@ -923,42 +1290,303 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
 
     _show_surround_controls()
 
-    def _shown():
-        # exec_ has shown the dialog. Classify, then ready.
-        # Setting the spins here is not a surround ask.
-        nonlocal check, blocked
-        if state['asked']:
-            return
-        state['asked'] = True
+    def _conn_pending(conn):
         try:
-            check = classify_figures(records)
-            blocked = bool(check.defects)
-            return_line.setText(_defect_line(check.defects))
-            if blocked:
-                arrows_btn = QtWidgets.QPushButton(
-                    'Return to Inkscape with correction arrows')
-                arrows_btn.setObjectName('return-arrows')
-                return_row.insertWidget(1, arrows_btn)
-                arrows_btn.clicked.connect(on_return_arrows)
-                # setParent from the layout hides a widget added after show.
-                arrows_btn.show()
-            regions = _ensure_regions()
-            initial_distance = _surround_distance(regions.bounds)
+            return conn.poll()
+        except (EOFError, OSError):
+            return False
+
+    def _take_message(msg):
+        kind = msg[0]
+        inbox = state.get('inbox')
+        if kind == 'log':
+            append_log(msg[1])
+        elif kind == 'focus':
+            mark = (msg[1], msg[2])
+            state['focus'] = mark
+            dialog.focus_mark = mark
+        elif kind == 'segment':
+            state['seg_q'].append(msg[1])
+        elif kind == 'call':
+            state['calls'].append(msg[1])
+            if msg[1] == 'subject':
+                state['swaps'].append(bool(msg[2]))
+        elif kind == 'figure':
+            inbox['figures'].append(msg[1:])
+        elif kind == 'defect':
+            inbox['defects'].append(msg[1:])
+        elif kind == 'path':
+            inbox[msg[1]] = (msg[2], msg[3])
+        elif kind == 'bounds':
+            inbox['bounds'] = msg[1:]
+        elif kind == 'fill':
+            inbox['fills'].append((msg[1], msg[2], msg[3]))
+        elif kind == 'arrow':
+            inbox['arrows'].append(msg[1:])
+        elif kind == 'cancelled':
+            inbox['cancelled'] = True
+        elif kind == 'error':
+            inbox['error'] = msg[1]
+        elif kind == 'done':
+            state['ask_done'] = True
+
+    def _reap_proc(proc):
+        if proc is None:
+            return
+        if not proc.is_alive():
+            proc.join(0)
+            close = getattr(proc, 'close', None)
+            if close is not None:
+                close()
+            return
+
+        def once():
+            if proc.is_alive():
+                QtCore.QTimer.singleShot(50, once)
+                return
+            proc.join(0)
+            close = getattr(proc, 'close', None)
+            if close is not None:
+                close()
+
+        QtCore.QTimer.singleShot(0, once)
+
+    def _subject_request():
+        return {
+            'kind': 'subject',
+            'swap': bool(state['swapped']),
+            'figures': state['plain_figures'],
+            'defects': state['plain_defects'],
+        }
+
+    def _begin_ask(request):
+        if state.get('ask'):
+            return False
+        request = dict(request)
+        if _ASK_TRACE:
+            request['trace'] = _ASK_TRACE
+        token = state['ask_seq'] + 1
+        state['ask_seq'] = token
+        state['ask_token'] = token
+        state['pump_token'] = token
+        state['ask'] = request['kind']
+        state['ask_done'] = False
+        state['inbox'] = _empty_inbox()
+        ctx = multiprocessing.get_context('spawn')
+        pausing = ctx.Event()
+        cancelled = ctx.Event()
+        if state['pause'].is_set():
+            pausing.set()
+        if state['cancel'].is_set():
+            cancelled.set()
+        try:
+            proc, conn = _spawn_ask(request, _ASK_HOLD, pausing, cancelled)
+        except Exception:
+            state['ask'] = None
+            state['ask_token'] = None
+            raise
+        state['proc'] = proc
+        state['conn'] = conn
+        state['mp_pause'] = pausing
+        state['mp_cancel'] = cancelled
+        set_controls(True, paused=state['pause'].is_set())
+        QtCore.QTimer.singleShot(0, _pump_ask)
+        return True
+
+    def _store_classify(inbox):
+        nonlocal check, blocked
+        plain_figures = []
+        for fig_id, fill, elements, rule in inbox['figures']:
+            plain_figures.append({
+                'id': fig_id,
+                'fill': fill,
+                'elements': elements,
+                'rule': rule,
+            })
+        defects = []
+        plain_defects = []
+        for kind_name, x, y in inbox['defects']:
+            defects.append(_Defect(kind_name, QtCore.QPointF(x, y)))
+            plain_defects.append({'kind': kind_name, 'x': x, 'y': y})
+        check = _Check(defects)
+        state['plain_figures'] = plain_figures
+        state['plain_defects'] = plain_defects
+        blocked = bool(defects)
+        return_line.setText(_defect_line(defects))
+        if blocked and not state.get('arrows_button'):
+            arrows_btn = QtWidgets.QPushButton(
+                'Return to Inkscape with correction arrows')
+            arrows_btn.setObjectName('return-arrows')
+            return_row.insertWidget(1, arrows_btn)
+            arrows_btn.clicked.connect(on_return_arrows)
+            # setParent from the layout hides a widget added after show.
+            arrows_btn.show()
+            state['arrows_button'] = arrows_btn
+
+    def _store_subject(inbox):
+        packed = inbox.get('subject') or ([], 0)
+        subject = _unpack_path(packed[0], packed[1])
+        packed = inbox.get('weed') or ([], 0)
+        weed = _unpack_path(packed[0], packed[1])
+        x, y, width, height = inbox['bounds']
+        bounds = QtCore.QRectF(x, y, width, height)
+        state['regions'] = _Regions(subject, weed, bounds)
+        state['regions_swap'] = state['swapped']
+        state['fill_parts'] = [
+            (fill, _unpack_path(elements, rule))
+            for fill, elements, rule in inbox['fills']
+        ]
+        arrow_paths = {}
+        for kind, color, shaft, shaft_rule, head, head_rule in inbox['arrows']:
+            arrow = ArrowPath(
+                _unpack_path(shaft, shaft_rule),
+                _unpack_path(head, head_rule),
+                color)
+            arrow_paths.setdefault(kind, []).append(arrow)
+        state['arrow_paths'] = arrow_paths
+        if state.get('opening'):
+            # Setting the spin is not a surround ask.
+            initial_distance = _surround_distance(bounds)
             distance_spin.blockSignals(True)
-            distance_spin.setRange(
-                0.0, max(1000000.0, initial_distance))
+            distance_spin.setRange(0.0, max(1000000.0, initial_distance))
             distance_spin.setValue(initial_distance)
             distance_spin.blockSignals(False)
-            refresh_preview()
+
+    def _fail_ask(exc):
+        state['ask'] = None
+        state['opening'] = False
+        state['ready_error'] = exc
+        dialog.reject()
+
+    def _after_classify(inbox):
+        if state.get('drop'):
+            state['opening'] = False
+            return
+        if inbox.get('error'):
+            raise RuntimeError(inbox['error'])
+        if inbox.get('cancelled'):
+            append_log('Cancelled.\n')
+            state['opening'] = False
             set_controls(False)
+            return
+        _store_classify(inbox)
+        if not _begin_ask(_subject_request()):
+            raise RuntimeError('subject ask did not start')
+
+    def _after_subject(inbox):
+        if state.get('drop'):
+            state['ask'] = None
+            state['opening'] = False
+            return
+        if inbox.get('error'):
+            if not state.get('opening'):
+                state['swapped'] = not state['swapped']
+                append_log('Error: %s\n' % inbox['error'])
+                state['ask'] = None
+                set_controls(False)
+                return
+            raise RuntimeError(inbox['error'])
+        if inbox.get('cancelled'):
+            append_log('Cancelled.\n')
+            if not state.get('opening'):
+                state['swapped'] = not state['swapped']
+            state['ask'] = None
+            state['opening'] = False
+            set_controls(False)
+            return
+        _store_subject(inbox)
+        if state['surround_started'] and not blocked and _in_surround():
+            _ask_surrounds()
+        refresh_preview()
+        set_controls(False)
+        state['ask'] = None
+        if state.get('opening'):
+            state['opening'] = False
             root.invalidate()
             root.activate()
             _fit()
             if ready is not None:
                 ready(dialog)
+
+    def _finish_ask(token):
+        if state.get('ask_token') != token:
+            return
+        if state.get('closed_token') == token:
+            return
+        state['closed_token'] = token
+        kind = state.get('ask')
+        inbox = state.get('inbox') or _empty_inbox()
+        proc = state.get('proc')
+        conn = state.get('conn')
+        state['ask_token'] = None
+        state['proc'] = None
+        state['conn'] = None
+        state['mp_pause'] = None
+        state['mp_cancel'] = None
+        _reap_proc(proc)
+        if conn is not None:
+            try:
+                conn.close()
+            except OSError:
+                pass
+        if not state.get('ask_done') and not inbox.get('error'):
+            if not inbox.get('cancelled'):
+                inbox['error'] = 'figure check stopped'
+        try:
+            if kind == 'classify':
+                state['ask'] = None
+                _after_classify(inbox)
+            elif kind == 'subject':
+                _after_subject(inbox)
+        except Exception as exc:
+            _fail_ask(exc)
+
+    def _pump_ask():
+        token = state.get('pump_token')
+        if token is None or state.get('ask_token') != token:
+            return
+        conn = state.get('conn')
+        if conn is not None:
+            while _conn_pending(conn):
+                try:
+                    msg = conn.recv()
+                except EOFError:
+                    inbox = state.get('inbox')
+                    if inbox is not None and not inbox.get('error'):
+                        inbox['error'] = 'figure check stopped'
+                    state['ask_done'] = True
+                    break
+                _take_message(msg)
+                if msg[0] == 'done':
+                    break
+        if state.get('ask_token') != token:
+            return
+        proc = state.get('proc')
+        alive = proc is not None and proc.is_alive()
+        if state.get('ask_done') or not alive:
+            _finish_ask(token)
+            return
+        QtCore.QTimer.singleShot(15, _pump_ask)
+
+    def _shown():
+        # exec_ has shown the dialog. The ask returns here; ready is later.
+        if state['asked']:
+            return
+        state['asked'] = True
+        state['opening'] = True
+        try:
+            _begin_ask({
+                'kind': 'classify',
+                'records': list(records or []),
+            })
         except Exception as exc:
             state['ready_error'] = exc
             dialog.reject()
+
+    def _mark_closed():
+        state['drop'] = True
+
+    dialog.rejected.connect(_mark_closed)
 
     QtCore.QTimer.singleShot(0, _shown)
 

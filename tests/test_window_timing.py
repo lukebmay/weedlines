@@ -120,20 +120,32 @@ def _brush_hex(item):
     return brush.color().name().lower()
 
 
+def _library_arrows(records):
+    import weedlib.arrows as arrow_mod
+    import weedlib.figures as figures
+
+    check = figures.classify_figures(records)
+    regions = figures.subject_weed_regions(check.figures, swap=False)
+    grouped = {}
+    for defect in check.defects:
+        grouped.setdefault(defect.kind, []).append(defect.target)
+    arrows = []
+    for kind in ('dangling', 'overlap', 'self-overlap'):
+        targets = grouped.get(kind)
+        if not targets:
+            continue
+        arrows.extend(arrow_mod.build_arrow_paths(
+            kind, targets, regions.bounds))
+    return arrows
+
+
 def _watch(monkeypatch):
     import weedlib
     import weedlib.arrows as arrow_mod
     import weedlib.figures as figures
 
-    events = []
-    swaps = []
+    parent = []
     surrounds = []
-    arrows = []
-
-    def see(name):
-        dialog = _visible_dialog()
-        assert dialog is not None, name
-        events.append((name, dialog))
 
     real_classify = figures.classify_figures
     real_subject = figures.subject_weed_regions
@@ -141,24 +153,23 @@ def _watch(monkeypatch):
     real_surrounds = weedlib.build_surrounds
 
     def classify_wrap(records):
-        see('classify')
+        parent.append('classify')
         return real_classify(records)
 
     def subject_wrap(figures, swap):
-        see('subject')
-        swaps.append(swap)
+        parent.append(('subject', swap))
         return real_subject(figures, swap)
 
     def arrows_wrap(kind, targets, bounds):
-        see('arrows')
-        batch = real_arrows(kind, targets, bounds)
-        arrows.append(batch)
-        return batch
+        parent.append('arrows')
+        return real_arrows(kind, targets, bounds)
 
     def surrounds_wrap(subject, distance, join_gap=0.0):
-        see('surrounds')
+        dialog = _visible_dialog()
+        assert dialog is not None
+        parent.append('surrounds')
         paths = real_surrounds(subject, distance, join_gap)
-        surrounds.append((float(distance), float(join_gap), paths))
+        surrounds.append((float(distance), float(join_gap), paths, dialog))
         return paths
 
     def refuse_solver(*_args, **_kwargs):
@@ -169,28 +180,18 @@ def _watch(monkeypatch):
     monkeypatch.setattr(arrow_mod, 'build_arrow_paths', arrows_wrap)
     monkeypatch.setattr(weedlib, 'build_surrounds', surrounds_wrap)
     monkeypatch.setattr(weedlib, 'generate_weeds', refuse_solver)
-    return events, swaps, surrounds, arrows
-
-
-def _names(events):
-    return [name for name, _dialog in events]
-
-
-def _assert_same_dialog(events, dialog):
-    assert events
-    for _name, seen in events:
-        assert seen is dialog
+    return parent, surrounds
 
 
 def test_clear_surround_waits_until_start(monkeypatch):
-    events, swaps, surrounds, arrows = _watch(monkeypatch)
+    parent, surrounds = _watch(monkeypatch)
 
     def drive(dialog):
         assert dialog.isVisible() is True
-        assert _names(events) == ['classify', 'subject']
-        _assert_same_dialog(events, dialog)
-        assert swaps == [False]
-        assert arrows == []
+        # The parent patch does not see the child. The worker does.
+        assert parent == []
+        assert list(dialog.worker_calls) == ['classify', 'subject']
+        assert list(dialog.worker_swaps) == [False]
         assert surrounds == []
         for item in _path_items(dialog):
             assert _pen_hex(item) != _WEED
@@ -210,11 +211,12 @@ def test_clear_surround_waits_until_start(monkeypatch):
         ]
         assert correction == []
         start.click()
-        assert _names(events) == ['classify', 'subject', 'surrounds']
-        _assert_same_dialog(events, dialog)
+        assert list(dialog.worker_calls) == ['classify', 'subject']
+        assert parent == ['surrounds']
         assert dialog.isVisible() is True
         assert len(surrounds) == 1
-        distance, join_gap, paths = surrounds[0]
+        distance, join_gap, paths, seen = surrounds[0]
+        assert seen is dialog
         assert distance == pytest.approx(spin.value())
         assert join_gap == pytest.approx(join.value())
         assert distance == pytest.approx(2.5)
@@ -237,32 +239,31 @@ def test_clear_surround_waits_until_start(monkeypatch):
 
 
 def test_defect_asks_once_after_the_window_is_visible(monkeypatch):
-    events, swaps, surrounds, arrows = _watch(monkeypatch)
+    expected = _library_arrows(_DEFECTS)
+    assert len(expected) >= 3
+    parent, surrounds = _watch(monkeypatch)
 
     def drive(dialog):
         assert dialog.isVisible() is True
-        assert _names(events) == [
+        assert parent == []
+        assert list(dialog.worker_calls) == [
             'classify', 'subject', 'arrows', 'arrows', 'arrows']
-        _assert_same_dialog(events, dialog)
-        assert swaps == [False]
+        assert list(dialog.worker_swaps) == [False]
         assert surrounds == []
-        assert len(arrows) == 3
         items = _path_items(dialog)
-        for batch in arrows:
-            assert batch
-            for arrow in batch:
-                shafts = [
-                    item for item in items
-                    if _same_path(item.path(), arrow.shaft)
-                ]
-                heads = [
-                    item for item in items
-                    if _same_path(item.path(), arrow.head)
-                ]
-                assert len(shafts) == 1
-                assert len(heads) == 1
-                assert _pen_hex(shafts[0]) == arrow.color.lower()
-                assert _brush_hex(heads[0]) == arrow.color.lower()
+        for arrow in expected:
+            shafts = [
+                item for item in items
+                if _same_path(item.path(), arrow.shaft)
+            ]
+            heads = [
+                item for item in items
+                if _same_path(item.path(), arrow.head)
+            ]
+            assert len(shafts) == 1
+            assert len(heads) == 1
+            assert _pen_hex(shafts[0]) == arrow.color.lower()
+            assert _brush_hex(heads[0]) == arrow.color.lower()
         line = dialog.findChild(QtWidgets.QLabel, 'return-line')
         assert line is not None and line.text() == _ALL_KINDS
         correction = dialog.findChild(QtWidgets.QPushButton, 'return-arrows')
@@ -271,10 +272,121 @@ def test_defect_asks_once_after_the_window_is_visible(monkeypatch):
         assert correction.isVisible() is True
         start = dialog.findChild(QtWidgets.QPushButton, 'start')
         assert start is not None and start.isEnabled() is False
-        asked = list(events)
+        asked = list(dialog.worker_calls)
         start.click()
-        assert events == asked
+        assert list(dialog.worker_calls) == asked
+        assert parent == []
         assert start.isEnabled() is False
         dialog.reject()
 
     _run(_DEFECTS, drive)
+
+
+def test_hold_on_a_thread_blocks_the_gui_timer():
+    """The spawn target's loop does not let this process paint."""
+    import time
+    import threading
+    from weedlines_dialog import _burn_hold
+
+    app = QtWidgets.QApplication.instance()
+    if app is None:
+        app = QtWidgets.QApplication([])
+    fired = []
+    timer = QtCore.QTimer()
+    timer.setSingleShot(True)
+    timer.timeout.connect(lambda: fired.append(True))
+    timer.start(0)
+    worker = threading.Thread(target=lambda: _burn_hold(20000000))
+    worker.start()
+    started = time.monotonic()
+    app.processEvents()
+    blocked = time.monotonic() - started
+    worker.join(timeout=5)
+    assert worker.is_alive() is False
+    assert fired == [True]
+    assert blocked > 0.05
+
+
+def test_figure_check_hold_lets_the_gui_timer_fire(monkeypatch):
+    import inspect
+    import weedlines_dialog as dialog_mod
+
+    fired = []
+    real_spawn = dialog_mod._spawn_ask
+
+    def wrapped(request, hold, pausing, cancelled):
+        assert hold == dialog_mod._ASK_HOLD
+        assert hold
+        proc, conn = real_spawn(request, hold, pausing, cancelled)
+        assert proc._start_method == 'spawn'
+        dialog = _visible_dialog()
+        assert dialog is not None and dialog.isVisible() is True
+        timer = QtCore.QTimer(dialog)
+        timer.setSingleShot(True)
+
+        def mark():
+            fired.append(dialog.isVisible() is True and proc.is_alive())
+
+        timer.timeout.connect(mark)
+        timer.start(0)
+        timers = getattr(dialog, '_hold_timers', None)
+        if timers is None:
+            timers = []
+            dialog._hold_timers = timers
+        timers.append(timer)
+        return proc, conn
+
+    monkeypatch.setattr(dialog_mod, '_spawn_ask', wrapped)
+    old = dialog_mod._ASK_HOLD
+    dialog_mod._ASK_HOLD = 8000000
+
+    def drive(dialog):
+        assert all(frame.function != '_shown' for frame in inspect.stack())
+        assert fired
+        assert all(fired)
+        assert dialog.isVisible() is True
+        dialog.reject()
+
+    try:
+        _run(_CLEAR, drive)
+    finally:
+        dialog_mod._ASK_HOLD = old
+
+
+def test_child_stdio_reaches_the_algorithm_log():
+    import weedlines_dialog as dialog_mod
+
+    old = dialog_mod._ASK_TRACE
+    dialog_mod._ASK_TRACE = 'ask-stdio-marker'
+
+    def drive(dialog):
+        log = dialog.findChild(QtWidgets.QPlainTextEdit)
+        assert log is not None
+        text = log.toPlainText()
+        assert text.count('ask-stdio-marker') >= 2
+        dialog.reject()
+
+    try:
+        _run(_CLEAR, drive)
+    finally:
+        dialog_mod._ASK_TRACE = old
+
+
+def test_focus_is_forwarded_and_not_painted():
+    def drive(dialog):
+        mark = dialog.focus_mark
+        assert isinstance(mark, tuple) and len(mark) == 2
+        outline, line = mark
+        assert isinstance(outline, tuple) and outline
+        assert all(
+            isinstance(point, tuple) and len(point) == 2 for point in outline)
+        assert line is None or (
+            isinstance(line, tuple) and len(line) == 2)
+        for item in _path_items(dialog):
+            pen = _pen_hex(item)
+            brush = _brush_hex(item)
+            assert pen not in ('#7a5cff', '#15803d')
+            assert brush not in ('#7a5cff', '#15803d')
+        dialog.reject()
+
+    _run(_CLEAR, drive)
