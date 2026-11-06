@@ -285,7 +285,7 @@ def test_correction_file_imports_as_arrow_groups_only(tmp_path, monkeypatch):
         'M 0,0 L 10,10')
 
 
-def _run_dialog(records, drive):
+def _run_dialog(records, drive, defaults=None):
     from weedlines_dialog import run_weedlines_dialog
     QtCore, QtWidgets, _path = _qt()
 
@@ -296,7 +296,8 @@ def _run_dialog(records, drive):
         timer.start(20000)
         drive(dialog, QtCore, QtWidgets)
 
-    return run_weedlines_dialog(records, ready=ready, quit_app=False)
+    return run_weedlines_dialog(
+        records, defaults=defaults, ready=ready, quit_app=False)
 
 
 def _color_edit(dialog, QtWidgets):
@@ -315,6 +316,11 @@ def test_closed_window_returns_no_color():
         dialog.reject()
 
     assert _run_dialog(_RECT, drive) == (None, None, None)
+
+
+# Frame cuts. Surround and Conquer Start paints a surround and
+# does not enable Apply, so that opening returns no color.
+_FRAME = {'mode': 'frame'}
 
 
 def _apply(dialog, QtCore, QtWidgets, text):
@@ -355,7 +361,7 @@ def test_untouched_apply_returns_the_initial_color(monkeypatch):
     monkeypatch.setattr(weedlib, 'generate_weeds', fake)
     weed, layer, color = _run_dialog(
         _RECT, lambda dialog, QtCore, QtWidgets: _apply(
-            dialog, QtCore, QtWidgets, None))
+            dialog, QtCore, QtWidgets, None), _FRAME)
     assert color == _RED
     assert layer == 'Weed lines'
     assert weed is not None and not weed.isEmpty()
@@ -374,7 +380,7 @@ def test_apply_returns_the_changed_weed_line_color(monkeypatch):
     monkeypatch.setattr(weedlib, 'generate_weeds', fake)
     weed, _layer, color = _run_dialog(
         _RECT, lambda dialog, QtCore, QtWidgets: _apply(
-            dialog, QtCore, QtWidgets, '#00aa00'))
+            dialog, QtCore, QtWidgets, '#00aa00'), _FRAME)
     assert color == '#00AA00'
     assert weed is not None and not weed.isEmpty()
 
