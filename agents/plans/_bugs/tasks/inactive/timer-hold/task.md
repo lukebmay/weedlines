@@ -1,6 +1,6 @@
 # Timer hold
 
-**Status:** ready
+**Status:** done
 
 ## Goal
 
@@ -35,6 +35,60 @@ times, offscreen when Qt loads, with no Inkscape.
 
 ## Note
 
-The developer writes what changed, why, and how it was checked.
-The reviewer then writes the summary, the context worth keeping,
-and the result.
+`test_hold_on_a_thread_blocks_the_gui_timer` holds the worker
+on an event until just before `processEvents`, then arms a
+0ms timer and calls `processEvents` until that call both
+delivers the timer and takes more than 0.05s. One call could
+return before the worker reached the non-yielding loop. The
+dialog was not edited.
+
+Why: the old check measured a single `processEvents`. That
+call can return while the worker is still starting, so the
+assert saw about 0. A hold that returns at once still leaves
+that call near 0, and the assert fails.
+
+Checked with `QT_QPA_PLATFORM=offscreen pytest
+tests/test_window_timing.py`: 20 runs, 6 passed each time.
+Qt loaded. No Inkscape. The child-hold check passed in those
+runs. A `_burn_hold` that returns at once failed the
+thread-hold check at `assert blocked > 0.05` (`3.7e-05`).
+Status left `in-progress`.
+
+## Summary
+
+No defects remain. The thread-hold check waits until the
+worker is released, then calls `processEvents` until that
+call both delivers the timer and takes more than 0.05s. A
+hold that returns at once still fails that assert. The
+dialog was not edited. The child-hold check is unchanged
+and still shows the child can paint.
+
+## Context worth keeping
+
+The only edit is `test_hold_on_a_thread_blocks_the_gui_timer`
+in `tests/test_window_timing.py`. The worker waits on an
+event, then runs `_burn_hold(20000000)`. One `processEvents`
+can still return before that loop. The test keeps calling
+until the same call appends to `fired` and takes more than
+0.05s. Three direct runs needed more than one call. The
+call that passed took about 0.22s. Earlier calls were about
+0 or about 0.005s.
+
+An immediate `_burn_hold` still fires the timer and fails
+at line 357, `assert blocked > 0.05`. `blocked` was about
+3.5e-05.
+
+`test_figure_check_hold_lets_the_gui_timer_fire` was not
+edited. The timer records that the dialog is visible and
+the child is alive, and every sample must be true.
+`extensions/inkscape/weedlines_dialog.py` has no diff.
+
+## Result
+
+No defects remain. The named checks passed.
+`QT_QPA_PLATFORM=offscreen pytest tests/test_window_timing.py`
+passed 20 of 20 runs, 6 passed each time (1.80s to 1.84s).
+Qt loaded. Nothing skipped. The tests did not start
+Inkscape. Pid 471572 was already running; that pid and its
+start time were unchanged. A direct call of the thread-hold
+check passed 80 of 80 times. No bug outside this change.
