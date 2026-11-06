@@ -22,6 +22,7 @@ paper the architecture with the story.
 
 | Seen | What happened | Rule |
 | --- | --- | --- |
+| 2026-11-05, `src/weedlib/solvers.py` | Some island-hop seals are reported twice. Two 30 by 20 rectangles at (0, 0) and (50, 0), padding 10, collar 4: the path has 19 segments and the hook receives 21. `(30, 0)–(50, 0)` comes from both `_add_seg` calls in `_agglomerate_islands`, and `(30, 20)–(50, 20)` from both in `_seal_frame_peninsulas`. One call writes the weed path and the other writes the `seen` copy. The returned path has each once. Reported. Not yet confirmed by a second agent. | [Run](./architecture/runtime.md). [_bugs](./plans/_bugs/plan.md). |
 
 ## Closed
 
