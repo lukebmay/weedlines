@@ -373,18 +373,10 @@ def test_line_names_only_the_kinds_present():
     _run(_TWO, drive_two)
 
 
-def test_clear_check_has_an_empty_line_and_start_works(monkeypatch):
-    import weedlib
-    seen = []
-
-    def fake(_keep_path, **kwargs):
-        seen.append(kwargs.get('mode'))
-        out = QPainterPath()
-        out.addRect(0, 0, 1, 1)
-        return out
-
-    monkeypatch.setattr(weedlib, 'generate_weeds', fake)
-    holder = {'error': None}
+def test_clear_check_has_an_empty_line_and_start_works():
+    # The solver imports generate_weeds in the spawned child. The parent
+    # sees that run as the frame keep and Apply.
+    holder = {'error': None, 'modes': None, 'solver_calls': 0}
 
     def drive(dialog):
         view = _view(dialog)
@@ -406,7 +398,10 @@ def test_clear_check_has_an_empty_line_and_start_works(monkeypatch):
 
         def poll():
             ticks['n'] += 1
-            if apply_btn.isEnabled() and seen:
+            modes = [mode for mode, _path in dialog.solver_keeps]
+            if apply_btn.isEnabled() and modes:
+                holder['modes'] = list(modes)
+                holder['solver_calls'] = dialog.worker_calls.count('solver')
                 dialog.reject()
                 return
             if ticks['n'] > 100:
@@ -419,7 +414,8 @@ def test_clear_check_has_an_empty_line_and_start_works(monkeypatch):
 
     _run(_CLEAR, drive)
     assert holder['error'] is None, holder['error']
-    assert seen == ['frame']
+    assert holder['modes'] == ['frame']
+    assert holder['solver_calls'] == 1
 
 
 def test_plain_return_writes_nothing_and_closes(tmp_path, monkeypatch):
