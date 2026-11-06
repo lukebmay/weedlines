@@ -121,13 +121,53 @@ def _named_spin(dialog, name):
 
 
 def _collar(dialog):
-    spins = [
-        spin for spin in dialog.findChildren(QtWidgets.QDoubleSpinBox)
-        if spin.objectName() not in (
-            'padding', 'spacing', 'surround-distance', 'join-gap')
+    return _named_spin(dialog, 'collar')
+
+
+def _line_edit(dialog, name):
+    widget = dialog.findChild(QtWidgets.QLineEdit, name)
+    assert widget is not None, name
+    return widget
+
+
+def _label_text(dialog, text):
+    found = [
+        label for label in dialog.findChildren(QtWidgets.QLabel)
+        if label.text() == text
     ]
-    assert len(spins) == 1
-    return spins[0]
+    assert len(found) == 1, text
+    return found[0]
+
+
+_COLOR_NAMES = (
+    'checkerboard-light',
+    'checkerboard-dark',
+    'weed-line-color',
+    'default-subject-color',
+)
+
+
+def _assert_mode_knobs(dialog, mode):
+    cut = mode in ('frame', 'grid', 'island-hop')
+    pairs = (
+        (_length_label(dialog, 'padding-label'),
+         _named_spin(dialog, 'padding'), cut),
+        (_length_label(dialog, 'spacing-label'),
+         _named_spin(dialog, 'spacing'), mode == 'grid'),
+        (_length_label(dialog, 'collar-label'),
+         _named_spin(dialog, 'collar'), mode == 'island-hop'),
+        (_label_text(dialog, 'Output layer'),
+         _line_edit(dialog, 'layer-name'), cut),
+        (_distance_label(dialog), _distance_spin(dialog), mode == _SURROUND),
+        (_join_label(dialog), _join_spin(dialog), mode == _SURROUND),
+    )
+    for label, field, show in pairs:
+        assert label.isVisible() is show, (mode, label.text())
+        assert field.isVisible() is show, (mode, field.objectName())
+    assert _mode_box(dialog).isVisible() is True
+    assert _button(dialog, 'swap').isVisible() is True
+    for name in _COLOR_NAMES:
+        assert _line_edit(dialog, name).isVisible() is True, name
 
 
 def _view(dialog):
@@ -361,6 +401,82 @@ def test_window_opens_on_the_named_mode(defaults, expected):
     if defaults is not None:
         kwargs['defaults'] = defaults
     _run(_CLEAR, drive, **kwargs)
+
+
+def test_mode_knobs_follow_the_mode():
+    def drive(dialog):
+        _assert_mode_knobs(dialog, _SURROUND)
+        distance = _distance_spin(dialog)
+        join = _join_spin(dialog)
+        pad = _named_spin(dialog, 'padding')
+        space = _named_spin(dialog, 'spacing')
+        collar = _named_spin(dialog, 'collar')
+        layer = _line_edit(dialog, 'layer-name')
+        distance.setValue(7.0)
+        join.setValue(3.0)
+
+        _set_mode(dialog, 'frame')
+        _assert_mode_knobs(dialog, 'frame')
+        assert distance.value() == pytest.approx(7.0)
+        assert join.value() == pytest.approx(3.0)
+        pad.setValue(9.0)
+        layer.setText('Peel')
+
+        _set_mode(dialog, 'grid')
+        _assert_mode_knobs(dialog, 'grid')
+        assert pad.value() == pytest.approx(9.0)
+        assert layer.text() == 'Peel'
+        space.setValue(12.0)
+
+        _set_mode(dialog, 'island-hop')
+        _assert_mode_knobs(dialog, 'island-hop')
+        assert pad.value() == pytest.approx(9.0)
+        assert layer.text() == 'Peel'
+        assert space.value() == pytest.approx(12.0)
+        collar.setValue(1.5)
+
+        _set_mode(dialog, _SURROUND)
+        _assert_mode_knobs(dialog, _SURROUND)
+        assert distance.value() == pytest.approx(7.0)
+        assert join.value() == pytest.approx(3.0)
+        assert pad.value() == pytest.approx(9.0)
+        assert space.value() == pytest.approx(12.0)
+        assert collar.value() == pytest.approx(1.5)
+        assert layer.text() == 'Peel'
+
+        _set_mode(dialog, 'frame')
+        _assert_mode_knobs(dialog, 'frame')
+        assert pad.value() == pytest.approx(9.0)
+        assert layer.text() == 'Peel'
+        assert space.value() == pytest.approx(12.0)
+        assert collar.value() == pytest.approx(1.5)
+
+        _set_mode(dialog, 'grid')
+        _assert_mode_knobs(dialog, 'grid')
+        assert space.value() == pytest.approx(12.0)
+        assert pad.value() == pytest.approx(9.0)
+        assert layer.text() == 'Peel'
+
+        _set_mode(dialog, 'island-hop')
+        _assert_mode_knobs(dialog, 'island-hop')
+        assert collar.value() == pytest.approx(1.5)
+        assert layer.text() == 'Peel'
+        assert pad.value() == pytest.approx(9.0)
+
+        _set_mode(dialog, _SURROUND)
+        _assert_mode_knobs(dialog, _SURROUND)
+        assert distance.value() == pytest.approx(7.0)
+        assert join.value() == pytest.approx(3.0)
+        dialog.reject()
+
+    _run(_CLEAR, drive)
+
+    def drive_grid(dialog):
+        assert _mode_box(dialog).currentData() == 'grid'
+        _assert_mode_knobs(dialog, 'grid')
+        dialog.reject()
+
+    _run(_CLEAR, drive_grid, defaults={'mode': 'grid'})
 
 
 def test_clear_design_strokes_surrounds_and_follows_distance(monkeypatch):

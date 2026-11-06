@@ -798,8 +798,11 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     collar_label = QtWidgets.QLabel('Collar (island-hop)')
     collar_label.setObjectName('collar-label')
     collar_spin = QtWidgets.QDoubleSpinBox()
+    collar_spin.setObjectName('collar')
     collar_spin.setDecimals(4)
+    layer_label = QtWidgets.QLabel('Output layer')
     layer_edit = QtWidgets.QLineEdit(str(defaults.get('layer_name', 'Weed lines')))
+    layer_edit.setObjectName('layer-name')
     unit_box = QtWidgets.QComboBox()
     unit_box.setObjectName('display-unit')
     for _name in _DISPLAY_UNITS:
@@ -817,7 +820,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     form.addRow(pad_label, pad_spin)
     form.addRow(space_label, space_spin)
     form.addRow(collar_label, collar_spin)
-    form.addRow('Output layer', layer_edit)
+    form.addRow(layer_label, layer_edit)
 
     def _color_edit(name, initial):
         edit = QtWidgets.QLineEdit(initial)
@@ -1155,6 +1158,20 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
         join_spin.setVisible(show)
         change_btn.setVisible(show)
 
+    def _show_mode_knobs():
+        # Hiding keeps the value.
+        mode = mode_box.currentData()
+        cut = mode in _CUT_MODES
+        pad_label.setVisible(cut)
+        pad_spin.setVisible(cut)
+        space_label.setVisible(mode == 'grid')
+        space_spin.setVisible(mode == 'grid')
+        hop = mode == 'island-hop'
+        collar_label.setVisible(hop)
+        collar_spin.setVisible(hop)
+        layer_label.setVisible(cut)
+        layer_edit.setVisible(cut)
+
     def _arm_surround_controls():
         live = not _form_locked()
         distance_spin.setEnabled(live)
@@ -1381,6 +1398,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
             return
         had_surrounds = bool(state['surround_paths'])
         _show_surround_controls()
+        _show_mode_knobs()
         _arm_surround_controls()
         if state['surround_started'] and not blocked and _in_surround():
             if state.get('ask'):
@@ -1501,6 +1519,7 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     root.addWidget(hint)
 
     _show_surround_controls()
+    _show_mode_knobs()
 
     def _conn_pending(conn):
         try:
