@@ -1,0 +1,22 @@
+# tests
+
+- `__init__.py` Marks the test directory as a package.
+- `test_arrows.py` Correction arrows: origin, tip, and kind color.
+- `test_correction_import.py` Import places correction arrows on one layer.
+- `test_correction_result.py` Correction result: arrow groups only.
+- `test_cut_stroke.py` Weed-cut stroke follows the window color.
+- `test_default_mode.py` Unchosen job mode is Surround and Conquer.
+- `test_figures.py` Figure check: classify, dangling ends, twins, subject, and swap.
+- `test_inkscape_args.py` Regression: Inkscape weed extension must register --layer_name etc.
+- `test_job_records.py` Job path records: open geometry, computed fill, correction skip.
+- `test_overlap.py` Separate-figure overlap: one defect for each connected shared area.
+- `test_progress.py` Progress / cancel / pause hooks for long-running solvers.
+- `test_self_overlap.py` Self-overlap on the real border, not the painted close.
+- `test_surround.py` Surrounds from the subject and a distance.
+- `test_weeds.py` Weed strategies: even-odd keep/waste, clip to work, no false reliefs.
+- `test_window_gate.py` Window gate: figure check before Start, subject region as keep.
+- `test_window_options.py` Option history on the weedlines window.
+- `test_window_preview.py` Window preview: subject, weed area, arrows, swap, and plugin colors.
+- `test_window_return.py` Window return: the line and actions under the preview.
+- `test_window_surround.py` Window surround: preview, distance, and join gap.
+- `test_window_timing.py` Window timing: library asks run once, after the dialog is visible.

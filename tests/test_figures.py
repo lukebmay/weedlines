@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Figure check: open paths, twins, dangling ends, and overlap."""
+"""Figure check: classify, dangling ends, twins, subject, and swap."""
 from __future__ import division
 
 import math
@@ -17,12 +17,16 @@ from weedlib.progress import WeedCancelled
 from weedlib.svg_paths import svg_d_to_qpainterpath
 
 _OPEN = "M 5,6 L 15,6 L 15,20"
-_SQUARE = "M 0,0 L 10,0 L 10,10 L 0,10 Z"
-_OUTER = "M 0,0 L 80,0 L 80,50 L 0,50 Z"
-_HOLE = "M 25,15 L 55,15 L 55,35 L 25,35"
-_CLOSED_LETTER = _OUTER + " " + _HOLE + " Z"
-_OPEN_HOLE = _OUTER + " " + _HOLE
 
+_SQUARE = "M 0,0 L 10,0 L 10,10 L 0,10 Z"
+
+_OUTER = "M 0,0 L 80,0 L 80,50 L 0,50 Z"
+
+_HOLE = "M 25,15 L 55,15 L 55,35 L 25,35"
+
+_CLOSED_LETTER = _OUTER + " " + _HOLE + " Z"
+
+_OPEN_HOLE = _OUTER + " " + _HOLE
 
 def _assert_same_path(got, expected):
     assert got.elementCount() == expected.elementCount()
@@ -33,12 +37,10 @@ def _assert_same_path(got, expected):
         assert left.x == pytest.approx(right.x)
         assert left.y == pytest.approx(right.y)
 
-
 def _dangling(result):
     kinds = [defect.kind for defect in result.defects]
     assert kinds == ["dangling"] * len(result.defects)
     return [(defect.target.x(), defect.target.y()) for defect in result.defects]
-
 
 def test_open_subpath_stays_open_when_closed_flag_is_set():
     parsed = svg_d_to_qpainterpath(_OPEN)
@@ -52,7 +54,6 @@ def test_open_subpath_stays_open_when_closed_flag_is_set():
     assert result.figures[0].fill == "none"
     _assert_same_path(result.figures[0].path, parsed)
     assert _dangling(result) == [(5.0, 6.0), (15.0, 20.0)]
-
 
 def test_twin_outline_is_one_figure_and_not_a_defect():
     result = classify_figures([
@@ -73,7 +74,6 @@ def test_twin_outline_is_one_figure_and_not_a_defect():
     assert result.figures[0].fill == "#336699"
     assert result.defects == []
     _assert_same_path(result.figures[0].path, svg_d_to_qpainterpath(_SQUARE))
-
 
 def test_closed_hole_has_no_dangling_end_and_open_hole_does():
     closed = classify_figures([{
@@ -96,7 +96,6 @@ def test_closed_hole_has_no_dangling_end_and_open_hole_does():
     _assert_same_path(opened.figures[0].path, svg_d_to_qpainterpath(_OPEN_HOLE))
     assert _dangling(opened) == [(25.0, 15.0), (25.0, 35.0)]
 
-
 def test_correction_id_is_not_a_figure():
     result = classify_figures([
         {
@@ -116,29 +115,16 @@ def test_correction_id_is_not_a_figure():
     assert result.figures[0].fill == "other"
     assert result.defects == []
 
-
 _OPEN_TRI = "M 0,0 L 10,0 L 10,10"
+
 _BLOCK = "M 8,-2 L 14,-2 L 14,4 L 8,4 Z"
+
 _CROSS = (
     "M 100,100 L 110,100 L 110,110 L 100,110 Z "
     "M 105,105 L 115,105 L 115,115 L 105,115 Z"
 )
-_ISLANDS = "M 0,0 L 10,0 L 10,10 L 0,10 Z M 20,0 L 30,0 L 30,10 L 20,10 Z"
-_BAR = "M 0,3 L 30,3 L 30,7 L 0,7 Z"
-_MED = "M 20,10 L 60,10 L 60,40 L 20,40 Z"
-_LENS = "M 0,0 L 10,0 L 10,10 L 0,10 Z M 5,5 L 15,5 L 15,15 L 5,15 Z"
-_THROUGH = "M 4,6 L 16,6 L 16,9 L 4,9 Z"
-_INNER = "M 2,2 L 6,2 L 6,6 L 2,6 Z"
+
 _CORNER = "M 10,10 L 20,10 L 20,20 L 10,20 Z"
-_SHARE = "M 10,0 L 20,0 L 20,10 L 10,10 Z"
-_BOWTIE = "M 0,0 L 10,10 L 0,10 L 10,0 Z"
-_SQUARE4 = "M 0,0 L 4,0 L 4,4 L 0,4 Z"
-_PAINTED = "M -1,2 L -1,5 L 5,5 L 5,2"
-
-
-def _points(defects):
-    return [(defect.target.x(), defect.target.y()) for defect in defects]
-
 
 def _by_kind(result):
     found = {}
@@ -147,12 +133,10 @@ def _by_kind(result):
             (defect.target.x(), defect.target.y()))
     return found
 
-
 def _fill(d):
     path = svg_d_to_qpainterpath(d)
     path.setFillRule(Qt.OddEvenFill)
     return path
-
 
 def _matches(points, expected):
     pending = list(points)
@@ -167,14 +151,12 @@ def _matches(points, expected):
         pending.pop(found)
     return not pending
 
-
 def _combined_records():
     return [
         {"id": "gap", "d": _OPEN_TRI, "closed": [False], "fill": "none"},
         {"id": "block", "d": _BLOCK, "closed": [True], "fill": "#336699"},
         {"id": "cross", "d": _CROSS, "closed": [True, True], "fill": "#222222"},
     ]
-
 
 def test_one_result_holds_dangling_overlap_and_self_overlap():
     result = classify_figures(_combined_records())
@@ -190,96 +172,6 @@ def test_one_result_holds_dangling_overlap_and_self_overlap():
     assert _fill(_OPEN_TRI).contains(QPointF(x, y))
     assert _fill(_BLOCK).contains(QPointF(x, y))
 
-
-def test_nesting_point_touch_and_shared_boundary_are_not_overlaps():
-    nested = classify_figures([
-        {"id": "outer", "d": _SQUARE, "closed": [True], "fill": "#336699"},
-        {"id": "inner", "d": _INNER, "closed": [True], "fill": "none"},
-    ])
-    assert [figure.id for figure in nested.figures] == ["outer", "inner"]
-    assert nested.defects == []
-
-    touched = classify_figures([
-        {"id": "left", "d": _SQUARE, "closed": [True], "fill": "none"},
-        {"id": "right", "d": _CORNER, "closed": [True], "fill": "none"},
-    ])
-    assert [figure.id for figure in touched.figures] == ["left", "right"]
-    assert touched.defects == []
-
-    shared = classify_figures([
-        {"id": "left", "d": _SQUARE, "closed": [True], "fill": "none"},
-        {"id": "right", "d": _SHARE, "closed": [True], "fill": "none"},
-    ])
-    assert [figure.id for figure in shared.figures] == ["left", "right"]
-    assert shared.defects == []
-
-
-def test_each_connected_shared_area_is_one_overlap():
-    separate = classify_figures([
-        {"id": "islands", "d": _ISLANDS, "closed": [True, True], "fill": "#336699"},
-        {"id": "bar", "d": _BAR, "closed": [True], "fill": "none"},
-    ])
-    assert [figure.id for figure in separate.figures] == ["islands", "bar"]
-    assert [defect.kind for defect in separate.defects] == ["overlap", "overlap"]
-    boxes = ((0.0, 10.0, 3.0, 7.0), (20.0, 30.0, 3.0, 7.0))
-    seen = [False, False]
-    for x, y in _points(separate.defects):
-        hits = [
-            index for index, (xmin, xmax, ymin, ymax) in enumerate(boxes)
-            if xmin < x < xmax and ymin < y < ymax
-        ]
-        assert hits == [0] or hits == [1]
-        assert seen[hits[0]] is False
-        seen[hits[0]] = True
-    assert seen == [True, True]
-
-    band = classify_figures([
-        {"id": "letter", "d": _CLOSED_LETTER, "closed": [True, True], "fill": "#222222"},
-        {"id": "med", "d": _MED, "closed": [True], "fill": "none"},
-    ])
-    assert [figure.id for figure in band.figures] == ["letter", "med"]
-    assert [defect.kind for defect in band.defects] == ["overlap"]
-    x, y = _points(band.defects)[0]
-    assert _fill(_CLOSED_LETTER).contains(QPointF(x, y))
-    assert _fill(_MED).contains(QPointF(x, y))
-    assert not (25.0 < x < 55.0 and 15.0 < y < 35.0)
-
-    crossed = classify_figures([
-        {"id": "cross", "d": _LENS, "closed": [True, True], "fill": "#336699"},
-        {"id": "through", "d": _THROUGH, "closed": [True], "fill": "none"},
-    ])
-    found = _by_kind(crossed)
-    assert _matches(found["self-overlap"], [(5.0, 10.0), (10.0, 5.0)])
-    assert len(found.get("overlap", [])) == 1
-    x, y = found["overlap"][0]
-    assert 4.0 < x < 15.0 and 6.0 < y < 9.0
-    assert "dangling" not in found
-
-
-def test_one_subpath_bowtie_is_a_self_overlap():
-    result = classify_figures([{
-        "id": "bowtie",
-        "d": _BOWTIE,
-        "closed": [True],
-        "fill": "#336699",
-    }])
-    assert [figure.id for figure in result.figures] == ["bowtie"]
-    found = _by_kind(result)
-    assert set(found) == {"self-overlap"}
-    assert _matches(found["self-overlap"], [(5.0, 5.0)])
-
-
-def test_painted_closing_chord_is_not_a_border():
-    result = classify_figures([{
-        "id": "open",
-        "d": _SQUARE4 + " " + _PAINTED,
-        "closed": [True, False],
-        "fill": "none",
-    }])
-    assert [figure.id for figure in result.figures] == ["open"]
-    assert _dangling(result) == [(-1.0, 2.0), (5.0, 2.0)]
-
-
 def test_same_records_produce_the_same_defects():
     records = _combined_records()
     first = classify_figures(records)
@@ -290,24 +182,29 @@ def test_same_records_produce_the_same_defects():
         assert left.target.x() == pytest.approx(right.target.x())
         assert left.target.y() == pytest.approx(right.target.y())
 
-
 _FRAME = "M 0,0 L 80,0 L 80,50 L 0,50 Z"
+
 _LETTER_A = "M 10,10 L 24,10 L 24,30 L 10,30 Z"
+
 _LETTER_B = "M 50,12 L 68,12 L 68,32 L 50,32 Z"
+
 _BAND = (
     _FRAME + " M 12,12 L 28,12 L 28,28 L 12,28 Z"
     " M 50,18 L 66,18 L 66,36 L 50,36 Z"
 )
-_LEFT_SQ = "M 0,0 L 10,0 L 10,10 L 0,10 Z"
-_RIGHT_SQ = "M 20,0 L 30,0 L 30,10 L 20,10 Z"
-_OVER_A = "M 40,40 L 50,40 L 50,50 L 40,50 Z"
-_OVER_B = "M 45,40 L 55,40 L 55,50 L 45,50 Z"
-_PAINTED_OPEN = "M 0,20 L 10,20 L 10,30"
 
+_LEFT_SQ = "M 0,0 L 10,0 L 10,10 L 0,10 Z"
+
+_RIGHT_SQ = "M 20,0 L 30,0 L 30,10 L 20,10 Z"
+
+_OVER_A = "M 40,40 L 50,40 L 50,50 L 40,50 Z"
+
+_OVER_B = "M 45,40 L 55,40 L 55,50 L 45,50 Z"
+
+_PAINTED_OPEN = "M 0,20 L 10,20 L 10,30"
 
 def _regions(records, swap):
     return subject_weed_regions(classify_figures(records).figures, swap)
-
 
 def _assert_regions(regions, subject, weed, outside):
     for x, y in subject:
@@ -320,13 +217,11 @@ def _assert_regions(regions, subject, weed, outside):
         assert not regions.subject.contains(QPointF(x, y))
         assert not regions.weed_area.contains(QPointF(x, y))
 
-
 def _assert_bounds(bounds, x, y, width, height):
     assert bounds.x() == pytest.approx(x)
     assert bounds.y() == pytest.approx(y)
     assert bounds.width() == pytest.approx(width)
     assert bounds.height() == pytest.approx(height)
-
 
 def test_painted_interiors_start_as_subject():
     painted = _regions([
@@ -357,7 +252,6 @@ def test_painted_interiors_start_as_subject():
         outside=[],
     )
 
-
 def test_weed_area_is_the_bounds_minus_the_subject():
     regions = _regions([
         {"id": "left", "d": _LEFT_SQ, "closed": [True], "fill": "#112233"},
@@ -370,7 +264,6 @@ def test_weed_area_is_the_bounds_minus_the_subject():
         weed=[(15.0, 5.0)],
         outside=[(-5.0, 5.0), (40.0, 5.0), (15.0, 20.0)],
     )
-
 
 def test_swap_exchanges_subject_and_weed_inside_the_bounds():
     letters = [
@@ -410,7 +303,6 @@ def test_swap_exchanges_subject_and_weed_inside_the_bounds():
     _assert_bounds(band_restored.bounds, 0.0, 0.0, 80.0, 50.0)
     _assert_regions(band_restored, band_subject, holes, band_outside)
 
-
 def test_swap_does_not_add_or_remove_defects():
     records = _combined_records()
     result = classify_figures(records)
@@ -431,7 +323,6 @@ def test_swap_does_not_add_or_remove_defects():
         assert left.target.x() == pytest.approx(right.target.x())
         assert left.target.y() == pytest.approx(right.target.y())
 
-
 def _ring_points(path):
     try:
         polygons = path.toSubpathPolygons()
@@ -443,7 +334,6 @@ def _ring_points(path):
             points[0][1] - points[-1][1]) <= 1e-9:
         points.pop()
     return points
-
 
 def _deepest_chord(ring):
     best = None
@@ -458,7 +348,6 @@ def _deepest_chord(ring):
             best = (radius, mx, my)
     return best
 
-
 def _point_in_ring(x, y, ring):
     inside = False
     previous = len(ring) - 1
@@ -471,7 +360,6 @@ def _point_in_ring(x, y, ring):
                 inside = not inside
         previous = index
     return inside
-
 
 def _triangle_at_radius(mid_x, mid_y, vertex_radius):
     aim = math.hypot(mid_x, mid_y)
@@ -496,7 +384,6 @@ def _triangle_at_radius(mid_x, mid_y, vertex_radius):
     triangle.closeSubpath()
     return QPointF(vx, vy), triangle
 
-
 def _triangle_centroid(triangle):
     points = []
     for index in range(triangle.elementCount()):
@@ -512,14 +399,12 @@ def _triangle_centroid(triangle):
         sum(point[1] for point in points) / count,
     )
 
-
 def _moves(path):
     move = QPainterPath.MoveToElement
     return sum(
         1 for index in range(path.elementCount())
         if path.elementAt(index).type == move
     )
-
 
 def _assert_curved_counter(ellipse, hole):
     path = QPainterPath()
@@ -543,7 +428,6 @@ def _assert_curved_counter(ellipse, hole):
     assert regions.subject.contains(QPointF(0.0, 0.0))
     assert not regions.weed_area.contains(QPointF(0.0, 0.0))
 
-
 def test_curved_hole_in_a_chord_gap_stays_a_counter():
     radius = 10.0
     ellipse = QPainterPath()
@@ -560,118 +444,6 @@ def test_curved_hole_in_a_chord_gap_stays_a_counter():
     assert ellipse.contains(inward_vertex)
     assert _point_in_ring(inward_vertex.x(), inward_vertex.y(), ring)
     _assert_curved_counter(ellipse, inward)
-
-
-def _figure(path, closed):
-    return classify_figures([{
-        "id": "shape",
-        "path": path,
-        "closed": closed,
-        "fill": "#222222",
-    }])
-
-
-def _self_overlaps(path, closed):
-    return _by_kind(_figure(path, closed)).get("self-overlap", [])
-
-
-def _near(points, expected, tol):
-    pending = list(points)
-    for ex, ey in expected:
-        found = None
-        for index, (x, y) in enumerate(pending):
-            if abs(x - ex) <= tol and abs(y - ey) <= tol:
-                found = index
-                break
-        if found is None:
-            return False
-        pending.pop(found)
-    return not pending
-
-
-def test_neighboring_pieces_that_cross_are_a_self_overlap():
-    path = QPainterPath()
-    path.moveTo(0, 0)
-    path.lineTo(10, 0)
-    path.cubicTo(10, 5, 0, -5, 0, 2)
-    found = _by_kind(_figure(path, [False]))
-    assert _near(found["self-overlap"], [(0.51, 0.0), (4.36, 0.0)], 0.01)
-    assert found["dangling"] == [(0.0, 0.0), (0.0, 2.0)]
-
-    joint = QPainterPath()
-    joint.moveTo(0, 0)
-    joint.lineTo(10, 0)
-    joint.cubicTo(11, 1, 12, 1, 13, 0.5)
-    assert _self_overlaps(joint, [False]) == []
-
-    curves = QPainterPath()
-    curves.moveTo(0, 0)
-    curves.cubicTo(0, 4, 4, 4, 4, 0)
-    curves.cubicTo(4, 2, 0, 2, 0, 3)
-    assert _near(_self_overlaps(curves, [False]), [(0.708, 2.354)], 0.001)
-
-
-def test_line_touching_a_cubic_is_not_a_self_overlap():
-    def hump(y):
-        path = QPainterPath()
-        path.moveTo(0, 0)
-        path.cubicTo(0, 3, 3, 3, 3, 0)
-        path.moveTo(-1, y)
-        path.lineTo(4, y)
-        return path
-
-    assert _self_overlaps(hump(2.25), [False, False]) == []
-    assert _near(
-        _self_overlaps(hump(2.05), [False, False]),
-        [(0.849056, 2.05), (2.150944, 2.05)],
-        1e-5,
-    )
-
-    flat = QPainterPath()
-    flat.moveTo(0, -0.125)
-    flat.cubicTo(1.0 / 3.0, 0.125, 2.0 / 3.0, -0.125, 1, 0.125)
-    flat.moveTo(-0.2, 0)
-    flat.lineTo(1.2, 0)
-    assert _near(_self_overlaps(flat, [False, False]), [(0.5, 0.0)], 1e-4)
-
-
-def test_straight_cubic_crosses_when_its_line_does():
-    def hump(y):
-        path = QPainterPath()
-        path.moveTo(0, 0)
-        path.cubicTo(0, 3, 3, 3, 3, 0)
-        path.moveTo(-1, y)
-        path.cubicTo(1, y, 2, y, 4, y)
-        return path
-
-    assert _self_overlaps(hump(2.25), [False, False]) == []
-    assert _near(
-        _self_overlaps(hump(2.05), [False, False]),
-        [(0.849056, 2.05), (2.150944, 2.05)],
-        1e-5,
-    )
-
-    slant = QPainterPath()
-    slant.moveTo(0, -1)
-    slant.cubicTo(3, -1, 7, 1, 10, 1)
-    slant.moveTo(0, 0)
-    slant.cubicTo(0.2, 0, 0.4, 0, 10, 0)
-    assert _near(_self_overlaps(slant, [False, False]), [(5.0, 0.0)], 1e-5)
-
-
-def test_flat_inflection_against_an_even_straight_cubic():
-    flat = QPainterPath()
-    flat.moveTo(0, -0.125)
-    flat.cubicTo(1.0 / 3.0, 0.125, 2.0 / 3.0, -0.125, 1, 0.125)
-    span = 1.4
-    flat.moveTo(-0.2, 0)
-    flat.cubicTo(
-        -0.2 + span / 3.0, 0.0,
-        -0.2 + 2.0 * span / 3.0, 0.0,
-        1.2, 0.0,
-    )
-    assert _near(_self_overlaps(flat, [False, False]), [(0.5, 0.0)], 1e-4)
-
 
 def _cubic_mid_miss(path, x, y):
     curve = QPainterPath.CurveToElement
@@ -708,95 +480,11 @@ def _cubic_mid_miss(path, x, y):
         index += 1
     return best
 
-
 def _bezier_mid(p0, p1, p2, p3):
     return (
         0.125 * p0[0] + 0.375 * p1[0] + 0.375 * p2[0] + 0.125 * p3[0],
         0.125 * p0[1] + 0.375 * p1[1] + 0.375 * p2[1] + 0.125 * p3[1],
     )
-
-
-def test_uneven_cubic_just_off_the_segment_is_a_self_overlap():
-    def hump(y, upper, lower):
-        path = QPainterPath()
-        path.moveTo(0, 0)
-        path.cubicTo(0, 3, 3, 3, 3, 0)
-        path.moveTo(-1, y)
-        path.cubicTo(1, upper, 2, lower, 4, y)
-        return path
-
-    assert _self_overlaps(hump(2.25, 2.2501, 2.2499), [False, False]) == []
-    assert _near(
-        _self_overlaps(hump(2.05, 2.0501, 2.0499), [False, False]),
-        [(0.849, 2.05), (2.151, 2.05)],
-        1e-3,
-    )
-
-    ellipse = QPainterPath()
-    ellipse.addEllipse(-10, -10, 20, 20)
-    ellipse.moveTo(-12, 1)
-    ellipse.cubicTo(-11.5, 1.01, -11, 0.99, 12, 1)
-    assert _near(
-        _self_overlaps(ellipse, [True, False]),
-        [(-9.950, 1.001), (9.951, 0.999)],
-        1e-3,
-    )
-
-
-def test_shallow_curve_side_change_is_a_self_overlap():
-    flat = QPainterPath()
-    flat.moveTo(0, -0.125)
-    flat.cubicTo(1.0 / 3.0, 0.125, 2.0 / 3.0, -0.125, 1, 0.125)
-    flat.moveTo(0, 0)
-    flat.cubicTo(1.0 / 3.0, 5e-6, 2.0 / 3.0, -5e-6, 1, 0)
-    assert _near(_self_overlaps(flat, [False, False]), [(0.5, 0.0)], 1e-4)
-
-
-def test_collinear_cubic_past_its_ends_is_a_self_overlap():
-    def pair(bow):
-        path = QPainterPath()
-        path.moveTo(0, 0)
-        path.cubicTo(-1, bow, 2, -bow, 1, 0)
-        path.moveTo(0.6, -0.4)
-        path.cubicTo(1.4, -0.3, 0.9, 0.2, 1.6, 0.5)
-        return path
-
-    for bow in (0.0, 1e-6, 2e-6, 3e-6):
-        assert _near(
-            _self_overlaps(pair(bow), [False, False]), [(1.146, 0.0)], 1e-3,
-        )
-
-    # x=1.5 is past the curve, which ends near x=1.207.
-    past = QPainterPath()
-    past.moveTo(0, 0)
-    past.cubicTo(-1, 1e-6, 2, -1e-6, 1, 0)
-    past.moveTo(1.5, -0.4)
-    past.cubicTo(1.55, -0.1, 1.45, 0.1, 1.5, 0.4)
-    assert _self_overlaps(past, [False, False]) == []
-
-
-def test_curves_that_only_touch_are_not_a_self_overlap():
-    radius = 10.0
-    outer = QPainterPath()
-    outer.addEllipse(-radius, -radius, radius * 2.0, radius * 2.0)
-    center = 7.0 / math.sqrt(2.0)
-    inner_radius = 3.0
-    inner = QPainterPath()
-    inner.addEllipse(
-        center - inner_radius, center - inner_radius,
-        inner_radius * 2.0, inner_radius * 2.0,
-    )
-    meet = radius / math.sqrt(2.0)
-    # Float leaves the shared midpoint just past 1e-10.
-    assert _cubic_mid_miss(outer, meet, meet) <= 2e-10
-    assert _cubic_mid_miss(inner, meet, meet) <= 2e-10
-    path = QPainterPath()
-    path.addPath(outer)
-    path.addPath(inner)
-    # The outlines only touch. Whether the hole stays the counter is
-    # touching-hole-counter, not this check.
-    assert _self_overlaps(path, [True, True]) == []
-
 
 def _near_element(path, x, y, tol):
     for index in range(path.elementCount()):
@@ -804,7 +492,6 @@ def _near_element(path, x, y, tol):
         if math.hypot(element.x - x, element.y - y) <= tol:
             return True
     return False
-
 
 def test_touching_circles_keep_the_hole_as_the_counter():
     radius = 10.0
@@ -859,356 +546,6 @@ def test_touching_circles_keep_the_hole_as_the_counter():
     assert_counter(7.0)
     assert_counter(6.0)
 
-
-def _circle(cx, cy, radius):
-    path = QPainterPath()
-    path.addEllipse(cx - radius, cy - radius, radius * 2.0, radius * 2.0)
-    return path
-
-
-def _two_circles(center_dist):
-    center = center_dist / math.sqrt(2.0)
-    return classify_figures([
-        {
-            "id": "outer",
-            "path": _circle(0.0, 0.0, 10.0),
-            "closed": [True],
-            "fill": "#336699",
-        },
-        {
-            "id": "inner",
-            "path": _circle(center, center, 3.0),
-            "closed": [True],
-            "fill": "none",
-        },
-    ])
-
-
-def _assert_one_overlap(result, center_dist):
-    assert [figure.id for figure in result.figures] == ["outer", "inner"]
-    found = _by_kind(result)
-    assert set(found) == {"overlap"}
-    assert len(found["overlap"]) == 1
-    x, y = found["overlap"][0]
-    point = QPointF(x, y)
-    center = center_dist / math.sqrt(2.0)
-    assert _circle(0.0, 0.0, 10.0).contains(point)
-    assert _circle(center, center, 3.0).contains(point)
-
-
-def test_touching_contained_circles_are_not_a_separate_overlap():
-    center = 7.0 / math.sqrt(2.0)
-    meet = 10.0 / math.sqrt(2.0)
-    outer = _circle(0.0, 0.0, 10.0)
-    inner = _circle(center, center, 3.0)
-    # Float leaves the shared midpoint just past 1e-10.
-    assert _cubic_mid_miss(outer, meet, meet) <= 2e-10
-    assert _cubic_mid_miss(inner, meet, meet) <= 2e-10
-    touched = _two_circles(7.0)
-    assert [figure.id for figure in touched.figures] == ["outer", "inner"]
-    assert touched.defects == []
-    assert _two_circles(6.0).defects == []
-    # The outlines cross here while the inner leftover is still contained.
-    _assert_one_overlap(_two_circles(7.001), 7.001)
-    _assert_one_overlap(_two_circles(7.07), 7.07)
-    _assert_one_overlap(_two_circles(8.0), 8.0)
-
-
-def test_shallow_crossing_circles_are_one_overlap():
-    # The outlines still cross after the intersection polygon loses its area.
-    _assert_one_overlap(_two_circles(12.97), 12.97)
-    _assert_one_overlap(_two_circles(12.96), 12.96)
-    for center_dist in (13.0, 7.0):
-        result = _two_circles(center_dist)
-        assert [figure.id for figure in result.figures] == ["outer", "inner"]
-        assert result.defects == []
-
-
-def test_rotated_shallow_band_is_one_overlap():
-    # Four crossings of one sliver. The segment between the ends is one region.
-    outer = _circle(0.0, 0.0, 10.0)
-    band = QPainterPath()
-    band.addRect(-3.0, 9.99, 6.0, 0.005)
-    band = QTransform().rotate(45.0).map(band)
-    result = classify_figures([
-        {"id": "outer", "path": outer, "closed": [True], "fill": "#336699"},
-        {"id": "band", "path": band, "closed": [True], "fill": "none"},
-    ])
-    assert [figure.id for figure in result.figures] == ["outer", "band"]
-    found = _by_kind(result)
-    assert set(found) == {"overlap"}
-    assert len(found["overlap"]) == 1
-    x, y = found["overlap"][0]
-    point = QPointF(x, y)
-    assert outer.contains(point)
-    assert band.contains(point)
-
-
-def test_two_subpath_circles_are_two_overlaps():
-    # The deep lens keeps polygon area. The shallow lens does not.
-    center = 12.97 / math.sqrt(2.0)
-    outer = _circle(0.0, 0.0, 10.0)
-    pair = QPainterPath()
-    pair.addEllipse(5.0, -3.0, 6.0, 6.0)
-    pair.addEllipse(center - 3.0, center - 3.0, 6.0, 6.0)
-    result = classify_figures([
-        {"id": "outer", "path": outer, "closed": [True], "fill": "#336699"},
-        {"id": "pair", "path": pair, "closed": [True, True], "fill": "none"},
-    ])
-    assert [figure.id for figure in result.figures] == ["outer", "pair"]
-    found = _by_kind(result)
-    assert set(found) == {"overlap"}
-    assert len(found["overlap"]) == 2
-    side = _circle(8.0, 0.0, 3.0)
-    diagonal = _circle(center, center, 3.0)
-    hits = [0, 0]
-    for x, y in found["overlap"]:
-        point = QPointF(x, y)
-        assert outer.contains(point)
-        assert pair.contains(point)
-        in_side = side.contains(point)
-        in_diagonal = diagonal.contains(point)
-        assert in_side != in_diagonal
-        hits[0 if in_side else 1] += 1
-    assert hits == [1, 1]
-
-
-def _arc_band(inner, outer, start, end, pieces=24):
-    """Annular sector as straight pieces. The inner arc runs back."""
-    path = QPainterPath()
-    path.moveTo(outer * math.cos(start), outer * math.sin(start))
-    for index in range(1, pieces + 1):
-        angle = start + (end - start) * index / float(pieces)
-        path.lineTo(outer * math.cos(angle), outer * math.sin(angle))
-    for index in range(pieces + 1):
-        angle = end - (end - start) * index / float(pieces)
-        path.lineTo(inner * math.cos(angle), inner * math.sin(angle))
-    path.closeSubpath()
-    return path
-
-
-def _assert_curved_band(start, end):
-    # The boolean splits this one lens into pieces. The pieces are not regions.
-    outer = _circle(0.0, 0.0, 10.0)
-    band = _arc_band(9.99, 10.05, start, end)
-    result = classify_figures([
-        {"id": "outer", "path": outer, "closed": [True], "fill": "#336699"},
-        {"id": "band", "path": band, "closed": [True], "fill": "none"},
-    ])
-    assert [figure.id for figure in result.figures] == ["outer", "band"]
-    found = _by_kind(result)
-    assert set(found) == {"overlap"}
-    assert len(found["overlap"]) == 1
-    x, y = found["overlap"][0]
-    point = QPointF(x, y)
-    assert outer.contains(point)
-    assert band.contains(point)
-    assert outer.contains(QPointF(0.0, 0.0))
-    assert not band.contains(QPointF(0.0, 0.0))
-    assert band.contains(QPointF(10.04, 0.0))
-    assert not outer.contains(QPointF(10.04, 0.0))
-
-
-def test_curved_shallow_band_is_one_overlap():
-    _assert_curved_band(-1.0, 1.0)
-    _assert_curved_band(-0.2, 0.2)
-
-
-def _ngon(radius, sides, reverse=False):
-    path = QPainterPath()
-    step = 2.0 * math.pi / float(sides)
-    order = range(sides)
-    if reverse:
-        order = range(sides - 1, -1, -1)
-    started = False
-    for index in order:
-        angle = step * index
-        point = (radius * math.cos(angle), radius * math.sin(angle))
-        if not started:
-            path.moveTo(*point)
-            started = True
-        else:
-            path.lineTo(*point)
-    path.closeSubpath()
-    return path
-
-
-def _ring(sides, inner, outer):
-    path = QPainterPath()
-    path.addPath(_ngon(outer, sides))
-    path.addPath(_ngon(inner, sides, reverse=True))
-    return path
-
-
-def test_thin_ring_without_crossings_is_one_overlap():
-    # The outlines do not cross. Boolean pieces of the band are one region.
-    outer = _circle(0.0, 0.0, 10.0)
-    for sides in (64, 48, 96):
-        ring = _ring(sides, 9.99, 10.05)
-        result = classify_figures([
-            {"id": "outer", "path": outer, "closed": [True], "fill": "#336699"},
-            {"id": "ring", "path": ring, "closed": [True, True], "fill": "none"},
-        ])
-        assert [figure.id for figure in result.figures] == ["outer", "ring"]
-        found = _by_kind(result)
-        assert set(found) == {"overlap"}
-        assert len(found["overlap"]) == 1
-        x, y = found["overlap"][0]
-        point = QPointF(x, y)
-        assert outer.contains(point)
-        assert ring.contains(point)
-        assert outer.contains(QPointF(0.0, 0.0))
-        assert not ring.contains(QPointF(0.0, 0.0))
-        assert ring.contains(QPointF(10.04, 0.0))
-        assert not outer.contains(QPointF(10.04, 0.0))
-
-
-def test_two_distant_shallow_lenses_are_two_overlaps():
-    # Both lenses lose their polygon. They stay two regions.
-    center = 12.97 / math.sqrt(2.0)
-    big = QPainterPath()
-    big.addEllipse(-10.0, -10.0, 20.0, 20.0)
-    big.addEllipse(30.0, -10.0, 20.0, 20.0)
-    smalls = QPainterPath()
-    smalls.addEllipse(center - 3.0, center - 3.0, 6.0, 6.0)
-    smalls.addEllipse(40.0 + center - 3.0, center - 3.0, 6.0, 6.0)
-    result = classify_figures([
-        {"id": "big", "path": big, "closed": [True, True], "fill": "#336699"},
-        {
-            "id": "smalls",
-            "path": smalls,
-            "closed": [True, True],
-            "fill": "none",
-        },
-    ])
-    assert [figure.id for figure in result.figures] == ["big", "smalls"]
-    found = _by_kind(result)
-    assert set(found) == {"overlap"}
-    assert len(found["overlap"]) == 2
-    left = _circle(center, center, 3.0)
-    right = _circle(40.0 + center, center, 3.0)
-    hits = [0, 0]
-    for x, y in found["overlap"]:
-        point = QPointF(x, y)
-        assert big.contains(point)
-        assert smalls.contains(point)
-        in_left = left.contains(point)
-        in_right = right.contains(point)
-        assert in_left != in_right
-        hits[0 if in_left else 1] += 1
-    assert hits == [1, 1]
-
-
-def _diamond(radius, reverse=False):
-    points = [(radius, 0.0), (0.0, radius), (-radius, 0.0), (0.0, -radius)]
-    if reverse:
-        points.reverse()
-    path = QPainterPath()
-    path.moveTo(*points[0])
-    for point in points[1:]:
-        path.lineTo(*point)
-    path.closeSubpath()
-    return path
-
-
-def test_four_vertex_ring_is_four_overlaps():
-    # Inner vertices lie on the circle. Four lenses meet only at a point.
-    outer = _circle(0.0, 0.0, 10.0)
-    ring = QPainterPath()
-    ring.addPath(_diamond(15.0))
-    ring.addPath(_diamond(10.0, reverse=True))
-    result = classify_figures([
-        {"id": "outer", "path": outer, "closed": [True], "fill": "#336699"},
-        {"id": "ring", "path": ring, "closed": [True, True], "fill": "none"},
-    ])
-    assert [figure.id for figure in result.figures] == ["outer", "ring"]
-    found = _by_kind(result)
-    assert set(found) == {"overlap"}
-    assert len(found["overlap"]) == 4
-    quadrants = [0, 0, 0, 0]
-    for x, y in found["overlap"]:
-        point = QPointF(x, y)
-        assert outer.contains(point)
-        assert ring.contains(point)
-        assert abs(x) > 1.0 and abs(y) > 1.0
-        quadrants[(0 if x > 0.0 else 1) + (0 if y > 0.0 else 2)] += 1
-    assert quadrants == [1, 1, 1, 1]
-    assert outer.contains(QPointF(0.0, 0.0))
-    assert not ring.contains(QPointF(0.0, 0.0))
-    assert ring.contains(QPointF(12.0, 0.0))
-    assert not outer.contains(QPointF(12.0, 0.0))
-
-
-def test_gapped_rectangles_are_two_overlaps():
-    # The gap is narrower than a fixed probe step along the long chord.
-    wide = QPainterPath()
-    wide.addRect(0.0, 0.0, 30.0, 4.0)
-    pair = QPainterPath()
-    pair.addRect(-2.0, 1.0, 10.0, 2.0)
-    pair.addRect(8.5, 1.0, 24.0, 2.0)
-    result = classify_figures([
-        {"id": "wide", "path": wide, "closed": [True], "fill": "#336699"},
-        {"id": "pair", "path": pair, "closed": [True, True], "fill": "none"},
-    ])
-    assert [figure.id for figure in result.figures] == ["wide", "pair"]
-    found = _by_kind(result)
-    assert set(found) == {"overlap"}
-    assert len(found["overlap"]) == 2
-    sides = [0, 0]
-    for x, y in found["overlap"]:
-        point = QPointF(x, y)
-        assert wide.contains(point)
-        assert pair.contains(point)
-        assert 1.0 < y < 3.0
-        assert x < 8.0 or x > 8.5
-        sides[0 if x < 8.0 else 1] += 1
-    assert sides == [1, 1]
-    assert wide.contains(QPointF(8.2, 2.0))
-    assert not pair.contains(QPointF(8.2, 2.0))
-
-
-def _closed_polygon(points):
-    path = QPainterPath()
-    path.moveTo(*points[0])
-    for point in points[1:]:
-        path.lineTo(*point)
-    path.closeSubpath()
-    return path
-
-
-def test_bridged_rectangles_are_three_overlaps():
-    # One outline. The bridge outside the wide rectangle leaves three regions.
-    wide = QPainterPath()
-    wide.addRect(0.0, 0.0, 30.0, 4.0)
-    bridge = _closed_polygon((
-        (-2.0, 1.0), (8.0, 1.0), (8.0, 6.0), (8.5, 6.0), (8.5, 1.0),
-        (32.5, 1.0), (32.5, 3.0), (8.5, 3.0), (8.0, 3.0), (-2.0, 3.0),
-    ))
-    result = classify_figures([
-        {"id": "wide", "path": wide, "closed": [True], "fill": "#336699"},
-        {"id": "bridge", "path": bridge, "closed": [True], "fill": "none"},
-    ])
-    assert [figure.id for figure in result.figures] == ["wide", "bridge"]
-    found = _by_kind(result)
-    assert set(found) == {"overlap"}
-    assert len(found["overlap"]) == 3
-    zones = [0, 0, 0]
-    for x, y in found["overlap"]:
-        point = QPointF(x, y)
-        assert wide.contains(point)
-        assert bridge.contains(point)
-        if x < 8.0:
-            zones[0] += 1
-        elif x > 8.5:
-            zones[1] += 1
-        else:
-            assert y > 3.0
-            zones[2] += 1
-    assert zones == [1, 1, 1]
-    assert wide.contains(QPointF(8.25, 2.0))
-    assert not bridge.contains(QPointF(8.25, 2.0))
-
-
 def _two_squares():
     return [
         {
@@ -1225,13 +562,11 @@ def _two_squares():
         },
     ]
 
-
 def _has_point(points, x, y):
     return any(
         abs(point[0] - x) < 1e-6 and abs(point[1] - y) < 1e-6
         for point in points
     )
-
 
 def test_cancel_at_the_start_of_several_figures_raises():
     returned = None
@@ -1243,7 +578,6 @@ def test_cancel_at_the_start_of_several_figures_raises():
         assert returned is None
     finally:
         progress.clear()
-
 
 def test_host_records_a_check_before_several_figures_return():
     seen = []
@@ -1275,283 +609,3 @@ def test_host_records_a_check_before_several_figures_return():
         assert any(_has_point(outline, 20.0, 0.0) for outline in named)
     finally:
         progress.clear()
-
-
-def test_overlap_walk_records_a_check_while_marks_remain():
-    # The mark walk is the long stretch of one pair. A check
-    # before that walk, or after it, does not count.
-    seen = {
-        'in_walk': False,
-        'done': 0,
-        'limit': 0,
-        'walks': 0,
-        'during': 0,
-    }
-    real_groups = figures._linked_mark_groups
-    real_share = figures._marks_share_region
-
-    def wrap_groups(pieces, marks, closed, left, right):
-        limit = len(marks) if closed else max(len(marks) - 1, 0)
-        seen['limit'] = limit
-        seen['done'] = 0
-        seen['in_walk'] = True
-        if limit > 1:
-            seen['walks'] += 1
-        try:
-            return real_groups(pieces, marks, closed, left, right)
-        finally:
-            seen['in_walk'] = False
-
-    def wrap_share(pieces, start, end, wrapped, left, right):
-        if seen['in_walk']:
-            seen['done'] += 1
-        return real_share(pieces, start, end, wrapped, left, right)
-
-    def focus(outline, line):
-        if not seen['in_walk']:
-            return
-        if not 0 < seen['done'] < seen['limit']:
-            return
-        seen['during'] += 1
-        assert line is None
-        if outline is not None:
-            assert isinstance(outline, tuple)
-
-    figures._linked_mark_groups = wrap_groups
-    figures._marks_share_region = wrap_share
-    progress.clear()
-    try:
-        progress.install(focus=focus)
-        result = classify_figures([
-            {
-                "id": "left",
-                "d": _SQUARE,
-                "closed": [True],
-                "fill": "#336699",
-            },
-            {
-                "id": "right",
-                "d": "M 5,5 L 15,5 L 15,15 L 5,15 Z",
-                "closed": [True],
-                "fill": "none",
-            },
-        ])
-        assert seen['walks'] >= 1
-        assert seen['during'] >= 1
-        assert any(defect.kind == "overlap" for defect in result.defects)
-    finally:
-        figures._linked_mark_groups = real_groups
-        figures._marks_share_region = real_share
-        progress.clear()
-
-
-def test_self_overlap_checks_while_pieces_remain():
-    # The piece walk is the long stretch of one figure. A check
-    # before the first pair, or after the last, does not count.
-    seen = {
-        'in_walk': False,
-        'hits': 0,
-        'limit': 0,
-        'during': 0,
-    }
-    real_self = figures._self_overlap_defects
-    real_hits = figures._piece_hits
-
-    def wrap_self(subpaths):
-        pieces = []
-        for subpath in subpaths:
-            pieces.extend(figures._border_pieces(subpath))
-        count = len(pieces)
-        seen['limit'] = count * (count - 1) // 2
-        seen['hits'] = 0
-        seen['in_walk'] = True
-        try:
-            return real_self(subpaths)
-        finally:
-            seen['in_walk'] = False
-
-    def wrap_hits(left, right):
-        if seen['in_walk']:
-            seen['hits'] += 1
-        return real_hits(left, right)
-
-    def focus(outline, line):
-        if not seen['in_walk']:
-            return
-        if not 0 < seen['hits'] < seen['limit']:
-            return
-        seen['during'] += 1
-        assert line is None
-
-    figures._self_overlap_defects = wrap_self
-    figures._piece_hits = wrap_hits
-    progress.clear()
-    try:
-        progress.install(focus=focus)
-        result = classify_figures([{
-            "id": "square",
-            "d": _SQUARE,
-            "closed": [True],
-            "fill": "none",
-        }])
-        assert seen['limit'] > 1
-        assert seen['hits'] == seen['limit']
-        assert seen['during'] >= 1
-        assert result.defects == []
-    finally:
-        figures._self_overlap_defects = real_self
-        figures._piece_hits = real_hits
-        progress.clear()
-
-
-def _two_lenses():
-    left = QPainterPath()
-    left.addRect(0.0, 0.0, 10.0, 6.0)
-    left.addRect(20.0, 0.0, 10.0, 6.0)
-    right = QPainterPath()
-    right.addRect(4.0, 1.0, 10.0, 6.0)
-    right.addRect(24.0, 1.0, 10.0, 6.0)
-    return [
-        {
-            "id": "left",
-            "path": left,
-            "closed": [True, True],
-            "fill": "#336699",
-        },
-        {
-            "id": "right",
-            "path": right,
-            "closed": [True, True],
-            "fill": "none",
-        },
-    ]
-
-
-def test_region_merge_checks_while_a_comparison_remains():
-    # The merge after the crossings compares regions. A check
-    # before that merge, or after the last comparison, does not count.
-    seen = {
-        'in_merge': False,
-        'compares': 0,
-        'limit': 0,
-        'record': True,
-        'arm': False,
-        'cancel': False,
-        'during': 0,
-        'events': [],
-        'marks': [],
-    }
-    real_one = figures._one_point_per_region
-    real_meet = figures._meets_region
-    real_sets = figures._sample_sets_meet
-
-    def wrap_one(left, right, left_parts, right_parts, polygon_points):
-        seen['in_merge'] = True
-        try:
-            return real_one(
-                left, right, left_parts, right_parts, polygon_points,
-            )
-        finally:
-            seen['in_merge'] = False
-
-    def wrap_meet(point, target, samples, left, right):
-        if seen['in_merge']:
-            seen['compares'] += 1
-            if seen['record']:
-                seen['events'].append('compare')
-        return real_meet(point, target, samples, left, right)
-
-    def wrap_sets(first, second, left, right):
-        if seen['in_merge']:
-            seen['compares'] += 1
-            if seen['record']:
-                seen['events'].append('compare')
-        return real_sets(first, second, left, right)
-
-    def focus(outline, line):
-        if not seen['in_merge']:
-            return
-        if seen['record']:
-            seen['events'].append(('check', outline, line))
-        if not seen['arm']:
-            return
-        if not 0 < seen['compares'] < seen['limit']:
-            return
-        seen['during'] += 1
-        seen['marks'].append((outline, line))
-        seen['cancel'] = True
-
-    figures._one_point_per_region = wrap_one
-    figures._meets_region = wrap_meet
-    figures._sample_sets_meet = wrap_sets
-    progress.clear()
-    try:
-        progress.install(focus=focus, cancel=lambda: seen['cancel'])
-        result = classify_figures(_two_lenses())
-        compare_at = [
-            index for index, event in enumerate(seen['events'])
-            if event == 'compare'
-        ]
-        window = [
-            event for index, event in enumerate(seen['events'])
-            if (
-                isinstance(event, tuple)
-                and compare_at
-                and compare_at[0] < index < compare_at[-1]
-            )
-        ]
-        assert len(compare_at) > 1
-        assert window
-        assert all(
-            outline is None and line is None
-            for _kind, outline, line in window
-        )
-        assert sum(
-            defect.kind == "overlap" for defect in result.defects
-        ) == 2
-
-        seen['limit'] = len(compare_at)
-        seen['compares'] = 0
-        seen['record'] = False
-        seen['arm'] = True
-        seen['cancel'] = False
-        returned = None
-        with pytest.raises(WeedCancelled):
-            returned = classify_figures(_two_lenses())
-        assert returned is None
-        assert seen['during'] >= 1
-        assert 0 < seen['compares'] < seen['limit']
-        assert seen['marks']
-        assert all(
-            outline is None and line is None
-            for outline, line in seen['marks']
-        )
-    finally:
-        figures._one_point_per_region = real_one
-        figures._meets_region = real_meet
-        figures._sample_sets_meet = real_sets
-        progress.clear()
-
-
-def test_two_arm_outline_is_two_overlaps():
-    # The outlines meet at the notch corner. That touch is two regions.
-    outer = _circle(0.0, 0.0, 10.0)
-    arms = _closed_polygon((
-        (2.0, 14.0), (2.0, 0.0), (4.0, 0.0), (4.0, 8.0),
-        (6.0, 8.0), (6.0, 0.0), (8.0, 0.0), (8.0, 14.0),
-    ))
-    result = classify_figures([
-        {"id": "outer", "path": outer, "closed": [True], "fill": "#336699"},
-        {"id": "arms", "path": arms, "closed": [True], "fill": "none"},
-    ])
-    assert [figure.id for figure in result.figures] == ["outer", "arms"]
-    found = _by_kind(result)
-    assert set(found) == {"overlap"}
-    assert len(found["overlap"]) == 2
-    sides = [0, 0]
-    for x, y in found["overlap"]:
-        point = QPointF(x, y)
-        assert outer.contains(point)
-        assert arms.contains(point)
-        sides[0 if x < 6.0 else 1] += 1
-    assert sides == [1, 1]

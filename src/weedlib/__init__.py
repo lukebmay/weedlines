@@ -6,6 +6,12 @@ Qt ``QPainterPath`` (PyQt / PySide / enaml.qt). Hosts convert at edges.
 """
 from __future__ import division
 
+from .keep import (  # noqa: F401
+    closed_fill_union,
+    even_odd_keep_fill,
+    list_closed_subpaths,
+    padded_work_rect,
+)
 from .solvers import (  # noqa: F401
     DEFAULT_BRIDGE_WIDTH,
     DEFAULT_CHANNEL_STANDOFF,
@@ -23,15 +29,11 @@ from .solvers import (  # noqa: F401
     DEFAULT_WEED_MODE,
     WEED_MODES,
     auto_weeds,
-    closed_fill_union,
     enclosure_weeds,
-    even_odd_keep_fill,
     frame_weeds,
     generate_weeds,
     grid_weeds,
     island_hop_weeds,
-    list_closed_subpaths,
-    padded_work_rect,
     region_weeds,
     residual_waste_traps,
     sample_points_on_path,
