@@ -77,9 +77,9 @@ Do not fork peel logic. Change solvers only under `inkcut/weedlib/`.
 
 - Solver knobs (`padding`, `spacing`, `collar`, …) are **device/user
   units**. In Inkcut jobs that is typically **mm**.
-- The extension treats document user units as **mm** when the SVG width is
-  in mm (common Inkscape default). Padding/spacing/collar spinners are
-  labeled **mm**.
+- The padding, spacing, and collar spinners are labeled **Padding**,
+  **Grid spacing**, and **Collar (island-hop)**. The unit is the
+  display unit. The library receives document user units.
 - Keep geometry is read from selected paths (or the whole document if
   nothing is selected). Convert text/clones to paths first.
 

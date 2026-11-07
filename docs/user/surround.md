@@ -32,8 +32,9 @@ is drawn until you start that step.
   and the surround. The subject is the region you are keeping.
   The number cannot go below zero. Zero is the outer boundary
   of the subject. It is a length in the document's units.
-- [ ] Find **Join gap (mm)**. It is on the form only in this
-  mode. Until you set it, it is 6.35, a quarter of an inch. It
+- [ ] Find **Join gap**. It is on the form only in this mode.
+  Until you set it, it is a quarter of an inch under the
+  document scale, shown in the unit the window is using. It
   cannot go below zero. Zero joins only surrounds that meet or
   overlap. A larger number also joins surrounds that stay at
   most that far apart.
@@ -46,7 +47,7 @@ change the surround.
 - [ ] Choose **Start Algorithm**. The surround is drawn in the
   **Weed line color**, on top of the checkerboard. That does
   not write a result.
-- [ ] Change **Surround distance** or **Join gap (mm)**. The
+- [ ] Change **Surround distance** or **Join gap**. The
   surround follows the new length.
 - [ ] Choose **Swap subject and weed area**. The surround follows
   the swapped regions.

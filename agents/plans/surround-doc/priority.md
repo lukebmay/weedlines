@@ -1,7 +1,5 @@
 # Priority
 
-The order of active tasks for surround-doc. A path, then
-the reason only when the order would otherwise be a guess.
+The order of active tasks for surround-doc.
 
-1. [join-label](tasks/active/join-label/task.md)
-2. [spinner-labels](tasks/active/spinner-labels/task.md) — the extension doc, not the surround doc
+The label stage has no active task.
