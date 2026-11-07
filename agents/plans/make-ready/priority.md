@@ -1,8 +1,6 @@
 # Priority
 
-The order of active tasks for make-ready. A path, then
-the reason only when the order would otherwise be a guess.
+The order of active tasks for make-ready.
 
-ready-marks and ready-writer are done.
-
-1. [ready-menu](tasks/active/ready-menu/task.md)
+The stub stage has no active task. Cleanup waits
+on the design meeting and has no tasks.

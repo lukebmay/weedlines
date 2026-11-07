@@ -3,7 +3,7 @@
 
 Runs outside Inkscape's extension wait so the app stays interactive.
 On Apply, writes ``last_result.svg`` (design + cuts in document units) and
-``last_result.json`` for ``Weedlines → Import last result``.
+``last_result.json`` for ``Weedlines → Reimport last weedlines``.
 """
 from __future__ import division
 
@@ -112,7 +112,7 @@ def main(argv=None):
             'Weedlines',
             'Saved design + weed cuts.\n\n'
             'Back in Inkscape, run:\n'
-            'Extensions → Weedlines → Import last result\n\n'
+            'Extensions → Weedlines → Reimport last weedlines\n\n'
             'That brings in the design and cuts together at the\n'
             'original document size/position.\n\n'
             '(%d cut paths)\n%s' % (len(paths), svg_path),

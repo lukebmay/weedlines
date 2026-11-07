@@ -17,6 +17,7 @@ import time
 
 _RESULT_NAME = 'last_result.json'
 _RESULT_SVG_NAME = 'last_result.svg'
+_READY_SVG_NAME = 'last_ready.svg'
 _JOB_PREFIX = 'job-'
 
 
@@ -49,6 +50,11 @@ def result_path():
 
 def result_svg_file():
     return os.path.join(cache_dir(), _RESULT_SVG_NAME)
+
+
+def ready_svg_file():
+    """Ready file from Make ready to cut. Not the weed-line result."""
+    return os.path.join(cache_dir(), _READY_SVG_NAME)
 
 
 def write_job(keep_d, defaults, doc_attrs=None, records=None):
@@ -119,24 +125,25 @@ def write_result(layer_name, path_d_list, meta=None, keep_d=None,
 
 
 def write_correction_result(arrows, doc_attrs=None, meta=None, labels=None):
-    """Store a correction result: JSON plus an SVG of arrow groups only.
+    """Store a correction result. The SVG is the ready file, not the weed lines.
 
     *arrows* maps dangling, overlap, or self-overlap to shaft/head
     paths. Kinds with no arrows are omitted. *labels* are placed by
-    ``write_correction_svg``. No design copy.
+    ``write_correction_svg``. No design copy. ``last_result.svg`` is
+    left for a weed-line result.
     """
     from weedlines_svg import write_correction_svg
 
     doc_attrs = dict(doc_attrs or {})
     write_correction_svg(
-        arrows, doc_attrs=doc_attrs, path=result_svg_file(), labels=labels)
+        arrows, doc_attrs=doc_attrs, path=ready_svg_file(), labels=labels)
     payload = {
         'version': 2,
         'created': time.time(),
         'result': 'correction',
         'doc_attrs': doc_attrs,
         'meta': dict(meta or {}),
-        'svg': _RESULT_SVG_NAME,
+        'svg': _READY_SVG_NAME,
     }
     path = result_path()
     tmp = path + '.tmp'
@@ -154,25 +161,24 @@ def read_result(path=None):
         return json.load(fh)
 
 
-def spawn_host(job_path):
-    """Launch ``weedlines_host.py`` fully detached from Inkscape.
+def spawn_detached(script_name, args, log_name='host.log'):
+    """Launch *script_name* in its own session and return at once.
 
     Must not leave a live ``Popen`` that Python warns about on GC —
     Inkscape treats that ``ResourceWarning`` as extension stderr
     ("received additional data from the script").
     """
     here = os.path.abspath(os.path.dirname(__file__))
-    host = os.path.join(here, 'weedlines_host.py')
-    if not os.path.isfile(host):
-        raise RuntimeError('weedlines_host.py missing next to extension')
+    script = os.path.join(here, script_name)
+    if not os.path.isfile(script):
+        raise RuntimeError('%s missing next to extension' % script_name)
 
     env = os.environ.copy()
-    # Prefer the same interpreter Inkscape used for this extension.
-    cmd = [sys.executable, host, os.path.abspath(job_path)]
+    cmd = [sys.executable, script] + list(args)
 
     import warnings
 
-    log_path = os.path.join(cache_dir(), 'host.log')
+    log_path = os.path.join(cache_dir(), log_name)
     log_fh = open(log_path, 'wb')
     try:
         popen_kw = {
@@ -203,3 +209,9 @@ def spawn_host(job_path):
         except Exception:
             pass
     return None
+
+
+def spawn_host(job_path):
+    """Launch ``weedlines_host.py`` fully detached from Inkscape."""
+    return spawn_detached(
+        'weedlines_host.py', [os.path.abspath(job_path)], log_name='host.log')

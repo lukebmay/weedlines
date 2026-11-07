@@ -132,9 +132,15 @@ def _open_root(inkex):
     return inkex.load_svg(_OPEN.encode('utf-8')).getroot()
 
 
-def _import(root):
+class _Reimport(object):
+    def __init__(self, kind):
+        self.reimport = kind
+
+
+def _import(root, kind='weedlines'):
     import weedlines_import as IMP
     effect = IMP.WeedLinesImportEffect()
+    effect.options = _Reimport(kind)
     effect.svg = root
     effect.effect()
     return root
@@ -258,16 +264,10 @@ def test_result_svg_import_keeps_the_file_style(tmp_path, monkeypatch):
 def test_correction_file_imports_as_arrow_groups_only(tmp_path, monkeypatch):
     inkex = _need_inkex()
     _cache(tmp_path, monkeypatch)
-    svg_path = os.path.join(str(tmp_path), 'last_result.svg')
+    svg_path = os.path.join(str(tmp_path), 'last_ready.svg')
     with open(svg_path, 'w', encoding='utf-8') as fh:
         fh.write(_CORRECTION)
-    with open(JOB.result_path(), 'w', encoding='utf-8') as fh:
-        json.dump({
-            'version': 2,
-            'result': 'correction',
-            'weed_line_color': '#123456',
-        }, fh)
-    root = _import(_open_root(inkex))
+    root = _import(_open_root(inkex), 'ready')
     person = root.getElementById('person-path')
     assert person.get('d') == _PERSON_D
     assert root.getElementById('weed-cut-0000') is None
@@ -425,5 +425,5 @@ def test_host_writes_the_window_color(tmp_path, monkeypatch):
     assert 'stroke-width:0.25' in cuts[0].get('style')
     text = shown['args'][2]
     assert text.startswith('Saved design + weed cuts.')
-    assert 'Extensions → Weedlines → Import last result' in text
+    assert 'Extensions → Weedlines → Reimport last weedlines' in text
     assert '#ABCDEF' not in text

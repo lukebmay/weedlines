@@ -22,7 +22,7 @@ A waiting plan stays under its rank. The notes say why. Skip it.
 | Plan | Notes |
 | --- | --- |
 | [source-split](plans/source-split/plan.md) | The split stage is met. No open task. Skip it. |
-| [make-ready](plans/make-ready/plan.md) | ready-marks is first. Cleanup is a design meeting and has no tasks. |
+| [make-ready](plans/make-ready/plan.md) | The stub tasks are done. Cleanup waits on the design meeting and has no tasks. |
 | [surround-doc](plans/surround-doc/plan.md) | The label stage is met. No open task. Skip it. |
 | [preview-color-picker](plans/preview-color-picker/plan.md) | Waiting on source-split's dialog package. |
 | [start-disabled-reason](plans/start-disabled-reason/plan.md) | Waiting on source-split's run controls file. |

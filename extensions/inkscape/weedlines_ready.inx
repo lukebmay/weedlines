@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
+  <name>Make ready to cut</name>
+  <id>org.lukebmay.weedlines.ready</id>
+  <dependency type="executable" location="extensions">weedlines_ready.py</dependency>
+  <dependency type="executable" location="extensions">weedlines.py</dependency>
+  <dependency type="executable" location="extensions">weedlines_job.py</dependency>
+  <dependency type="executable" location="extensions">weedlines_svg.py</dependency>
+  <effect needs-live-preview="false" show-stderr="false">
+    <object-type>all</object-type>
+    <effects-menu>
+      <submenu name="Weedlines"/>
+    </effects-menu>
+    <menu-tip>Check the selection and write a ready file. Inkscape stays usable</menu-tip>
+  </effect>
+  <script>
+    <command location="inx" interpreter="python">weedlines_ready.py</command>
+  </script>
+</inkscape-extension>

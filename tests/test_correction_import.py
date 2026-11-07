@@ -64,8 +64,14 @@ def _open_document():
     return inkex.load_svg(_OPEN.encode('utf-8')).getroot()
 
 
-def _import(root):
+class _Options(object):
+    def __init__(self, kind):
+        self.reimport = kind
+
+
+def _import(root, kind='weedlines'):
     effect = IMP.WeedLinesImportEffect()
+    effect.options = _Options(kind)
     effect.svg = root
     effect.effect()
     return root
@@ -81,11 +87,11 @@ def _descendants(el):
 
 def test_correction_file_becomes_one_layer_of_groups(tmp_path, monkeypatch):
     monkeypatch.setattr(JOB, 'cache_dir', lambda: str(tmp_path))
-    svg_path = os.path.join(str(tmp_path), 'last_result.svg')
+    svg_path = os.path.join(str(tmp_path), 'last_ready.svg')
     with open(svg_path, 'w', encoding='utf-8') as fh:
         fh.write(_CORRECTION)
 
-    root = _import(_open_document())
+    root = _import(_open_document(), 'ready')
     person = root.getElementById('person-path')
     assert person.get('d') == _PERSON_D
     assert person.getparent().get('id') == 'layer1'

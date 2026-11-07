@@ -30,7 +30,7 @@ _ALL_KINDS = (
 _DANGLING_ONLY = _PROBLEM + ' dangling ends.'
 _TWO_KINDS = _PROBLEM + ' dangling ends and self-overlaps.'
 _IMPORT = (
-    'Run Extensions → Weedlines → Import last result to place the arrows.')
+    'Run Extensions → Weedlines → Reimport last ready to place the arrows.')
 _PLAIN = 'Return to Inkscape'
 _ARROW = 'Return to Inkscape with correction arrows'
 _INK_LABEL = '{http://www.inkscape.org/namespaces/inkscape}label'
@@ -73,6 +73,17 @@ _CLEAR = [{
     'closed': [True],
     'fill': '#112233',
 }]
+_PERSON_D = 'M 2,3 L 4,5'
+_PERSON_DOC = (
+    '<?xml version="1.0" encoding="UTF-8"?>\n'
+    '<svg xmlns="http://www.w3.org/2000/svg" '
+    'xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" '
+    'width="100" height="80" viewBox="0 0 100 80">\n'
+    '  <g id="layer1" inkscape:groupmode="layer" inkscape:label="Layer 1">\n'
+    '    <path id="person-path" d="%s"/>\n'
+    '  </g>\n'
+    '</svg>\n'
+) % _PERSON_D
 
 
 def _button(dialog, name):
@@ -438,6 +449,56 @@ def test_plain_return_writes_nothing_and_closes(tmp_path, monkeypatch):
     assert list(tmp_path.iterdir()) == []
 
 
+class _ReimportKind(object):
+    def __init__(self, kind):
+        self.reimport = kind
+
+
+def _inkex():
+    try:
+        import inkex
+    except ImportError:
+        inkex_dir = '/usr/share/inkscape/extensions'
+        if (
+            os.path.isdir(os.path.join(inkex_dir, 'inkex'))
+            and inkex_dir not in sys.path
+        ):
+            sys.path.insert(0, inkex_dir)
+        import inkex
+    return inkex
+
+
+def _open_person():
+    return _inkex().load_svg(_PERSON_DOC.encode('utf-8')).getroot()
+
+
+def _run_reimport(root, kind):
+    import weedlines_import as IMP
+    effect = IMP.WeedLinesImportEffect()
+    effect.options = _ReimportKind(kind)
+    effect.svg = root
+    effect.effect()
+
+
+def _local_name(el):
+    tag = el.tag
+    if not isinstance(tag, str):
+        return ''
+    return tag.rsplit('}', 1)[-1]
+
+
+def _child_values(group, local):
+    found = []
+    for el in list(group):
+        if _local_name(el) != local:
+            continue
+        if local == 'path':
+            found.append(el.get('d'))
+        else:
+            found.append(el.text)
+    return found
+
+
 def _expected_arrow_batches(records):
     import weedlib.arrows as arrow_mod
     from weedlib.figures import classify_figures, subject_weed_regions
@@ -525,8 +586,9 @@ def test_arrow_return_writes_the_preview_paths_and_stays_open(
                 assert _same_path(got.shaft, arrow.shaft)
                 assert _same_path(got.head, arrow.head)
                 assert got.color.lower() == arrow.color.lower()
-        svg_path = tmp_path / 'last_result.svg'
+        svg_path = tmp_path / 'last_ready.svg'
         holder['svg'] = svg_path.read_text(encoding='utf-8')
+        assert not (tmp_path / 'last_result.svg').is_file()
         _one(dialog, _PLAIN).click()
         assert dialog.isVisible() is False
 
@@ -544,8 +606,9 @@ def test_arrow_return_writes_the_preview_paths_and_stays_open(
         'viewBox': '0 0 100 80',
     }
     json_path = tmp_path / 'last_result.json'
-    svg_path = tmp_path / 'last_result.svg'
+    svg_path = tmp_path / 'last_ready.svg'
     assert svg_path.read_text(encoding='utf-8') == holder['svg']
+    assert not (tmp_path / 'last_result.svg').is_file()
     with json_path.open(encoding='utf-8') as fh:
         payload = json.load(fh)
     assert payload.get('result') == 'correction'
@@ -587,3 +650,36 @@ def test_arrow_return_writes_the_preview_paths_and_stays_open(
         assert float(texts[0].get('y')) == pytest.approx(label.point[1])
         assert label.color.lower() in (texts[0].get('style') or '').lower()
         assert texts[0].text == _LABELS[kind]
+
+    # This return wrote last_ready.svg. Reimport last ready places that file.
+    assert str(svg_path) == JOB.ready_svg_file()
+    root = _open_person()
+    _run_reimport(root, 'ready')
+    person = root.getElementById('person-path')
+    assert person.get('d') == _PERSON_D
+    assert person.getparent().get('id') == 'layer1'
+    layers = [
+        el for el in root if el.get(_INK_LABEL) == 'Weedlines corrections'
+    ]
+    assert len(layers) == 1
+    layer = layers[0]
+    assert list(root)[-1] is layer
+    placed = list(layer)
+    assert [el.get(_INK_LABEL) for el in placed] == [
+        group.get(_INK_LABEL) for group in groups
+    ]
+    for src, got in zip(groups, placed):
+        assert _child_values(got, 'path') == _child_values(src, 'path')
+        assert _child_values(got, 'text') == _child_values(src, 'text')
+    assert root.getElementById('weedlines-design') is None
+    assert opened == []
+
+    # The same bytes are a ready result. Reimport last weedlines refuses them.
+    (tmp_path / 'last_result.svg').write_text(
+        svg_path.read_text(encoding='utf-8'), encoding='utf-8')
+    refused = _open_person()
+    with pytest.raises(_inkex().AbortExtension) as raised:
+        _run_reimport(refused, 'weedlines')
+    assert 'ready result' in str(raised.value)
+    assert refused.getElementById('person-path').get('d') == _PERSON_D
+    assert [el.get(_INK_LABEL) for el in refused] == ['Layer 1']

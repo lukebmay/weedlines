@@ -399,9 +399,11 @@ class _Window(_Form, _RunControls, _ReturnLine, _Preview, _Inbox, _Ask):
             'Builds weed cuts only (no cutter travel planning). '
             'Pause holds the run so you can inspect the live preview, '
             'then Resume. Clear All discards the lines from this visit. '
-            'After Apply, use Extensions → Weedlines → Import last result '
+            'After Apply, use Extensions → Weedlines → Reimport last weedlines '
             'in Inkscape — that brings back the design and cuts together at '
-            'the original size and position.')
+            'the original size and position. '
+            'Place correction arrows with Extensions → Weedlines → '
+            'Reimport last ready.')
         hint.setObjectName('hint')
         hint.setWordWrap(True)
         self.root.addWidget(hint)

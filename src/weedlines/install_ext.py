@@ -22,6 +22,9 @@ WEED_FILES = (
     'weedlines_host.py',
     'weedlines_import.inx',
     'weedlines_import.py',
+    'weedlines_ready.inx',
+    'weedlines_ready.py',
+    'weedlines_reimport_ready.inx',
     'weedlines_svg.py',
     'stdio_capture.py',
 )

@@ -56,14 +56,55 @@ def _append_layer(svg, inkex, label):
     return layer
 
 
+def _reimport_kind(effect):
+    options = getattr(effect, 'options', None)
+    kind = getattr(options, 'reimport', None) if options is not None else None
+    if kind in ('ready', 'weedlines'):
+        return kind
+    return 'weedlines'
+
+
+def _place_correction_layer(svg, inkex, groups):
+    layer = _append_layer(svg, inkex, 'Weedlines corrections')
+    for group in groups:
+        _append_etree_element(layer, group, inkex)
+    return layer
+
+
 class WeedLinesImportEffect(object):
     def add_arguments(self, pars):
         pars.add_argument('--tab', type=str, default='')
+        pars.add_argument('--reimport', type=str, default='weedlines')
 
     def effect(self):
         import inkex
 
         _ensure_paths()
+        if _reimport_kind(self) == 'ready':
+            self._import_ready(inkex)
+            return
+        self._import_weedlines(inkex)
+
+    def _import_ready(self, inkex):
+        from weedlines_job import ready_svg_file
+        from weedlines_svg import load_correction_svg_groups
+
+        svg_file = ready_svg_file()
+        if not os.path.isfile(svg_file):
+            raise inkex.AbortExtension(
+                'No Weedlines ready file found.\n'
+                'Run Extensions → Weedlines → Make ready to cut, '
+                'then Reimport last ready.\n'
+                '(Looking for %s)' % svg_file
+            )
+        groups = load_correction_svg_groups(svg_file)
+        if not groups:
+            raise inkex.AbortExtension(
+                'The ready file has no correction groups:\n%s' % svg_file
+            )
+        _place_correction_layer(self.svg, inkex, groups)
+
+    def _import_weedlines(self, inkex):
         from weedlines_job import read_result, result_path, result_svg_file
         from weedlines_svg import (
             load_correction_svg_groups,
@@ -83,12 +124,12 @@ class WeedLinesImportEffect(object):
         if os.path.isfile(svg_file):
             groups = load_correction_svg_groups(svg_file)
             design, cuts = load_result_svg_groups(svg_file)
-            # Arrow groups and no design copy: do not use the weed-line layer.
+            # A ready file is correction groups and no design copy.
             if groups and design is None:
-                layer = _append_layer(self.svg, inkex, 'Weedlines corrections')
-                for group in groups:
-                    _append_etree_element(layer, group, inkex)
-                return
+                raise inkex.AbortExtension(
+                    'That file is a ready result.\n'
+                    'Run Extensions → Weedlines → Reimport last ready.'
+                )
 
             if design is None and cuts is None:
                 raise inkex.AbortExtension(
@@ -116,8 +157,8 @@ class WeedLinesImportEffect(object):
         if not payload or not payload.get('paths'):
             raise inkex.AbortExtension(
                 'No Weedlines result found.\n'
-                'Run Extensions → Weedlines → Weedlines from selection…, '
-                'Apply in the Weedlines window, then Import again.\n'
+                'Run Extensions → Weedlines → Auto generate weedlines…, '
+                'Apply in the Weedlines window, then Reimport last weedlines.\n'
                 '(Looking for %s or %s)' % (result_path(), svg_file)
             )
 

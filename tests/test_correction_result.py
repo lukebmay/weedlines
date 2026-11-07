@@ -42,7 +42,7 @@ def _write(tmp_path, monkeypatch, arrows, labels=None):
     monkeypatch.setattr(JOB, 'cache_dir', lambda: str(tmp_path))
     json_path = JOB.write_correction_result(
         arrows, doc_attrs=_DOC, labels=labels)
-    svg_path = os.path.join(str(tmp_path), 'last_result.svg')
+    svg_path = os.path.join(str(tmp_path), 'last_ready.svg')
     return json_path, svg_path
 
 
@@ -100,7 +100,8 @@ def test_empty_kind_is_omitted_and_file_has_no_design(tmp_path, monkeypatch):
         payload = json.load(fh)
     assert payload.get('result') == 'correction'
     assert 'keep_d' not in payload
-    assert payload.get('svg') == 'last_result.svg'
+    assert payload.get('svg') == 'last_ready.svg'
+    assert not os.path.isfile(os.path.join(str(tmp_path), 'last_result.svg'))
 
 
 def test_shaft_has_no_fill_and_head_uses_arrow_color(tmp_path, monkeypatch):

@@ -1,16 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
-  <name>Import last result</name>
+  <name>Reimport last weedlines</name>
   <id>org.lukebmay.weedlines.import</id>
   <dependency type="executable" location="extensions">weedlines_import.py</dependency>
   <dependency type="executable" location="extensions">weedlines_job.py</dependency>
   <dependency type="executable" location="extensions">weedlines.py</dependency>
+  <dependency type="executable" location="extensions">weedlines_svg.py</dependency>
+  <param name="reimport" type="string" gui-hidden="true">weedlines</param>
   <effect needs-live-preview="false">
     <object-type>all</object-type>
     <effects-menu>
       <submenu name="Weedlines"/>
     </effects-menu>
-    <menu-tip>Import last Weedlines result (design + cuts) at original document size and position</menu-tip>
+    <menu-tip>Place the last weed-line result. A ready file is refused</menu-tip>
   </effect>
   <script>
     <command location="inx" interpreter="python">weedlines_import.py</command>
