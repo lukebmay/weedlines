@@ -11,7 +11,13 @@ from pathlib import Path
 WEED_FILES = (
     'weedlines.inx',
     'weedlines.py',
-    'weedlines_dialog.py',
+    'weedlines_dialog/__init__.py',
+    'weedlines_dialog/geometry_ask.py',
+    'weedlines_dialog/inbox.py',
+    'weedlines_dialog/preview.py',
+    'weedlines_dialog/run_controls.py',
+    'weedlines_dialog/form.py',
+    'weedlines_dialog/return_line.py',
     'weedlines_job.py',
     'weedlines_host.py',
     'weedlines_import.inx',
@@ -114,6 +120,8 @@ def install_extensions(
 
     for name, source in sorted(mapping.items()):
         dest = dest_dir / name
+        if not dry_run:
+            dest.parent.mkdir(parents=True, exist_ok=True)
         if dest.exists() or dest.is_symlink():
             if dest.is_symlink() or dest.is_file():
                 if _same_target(dest, source):

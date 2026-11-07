@@ -3,7 +3,13 @@
   <name>Weedlines from selection…</name>
   <id>org.lukebmay.weedlines</id>
   <dependency type="executable" location="extensions">weedlines.py</dependency>
-  <dependency type="executable" location="extensions">weedlines_dialog.py</dependency>
+  <dependency type="executable" location="extensions">weedlines_dialog/__init__.py</dependency>
+  <dependency type="executable" location="extensions">weedlines_dialog/geometry_ask.py</dependency>
+  <dependency type="executable" location="extensions">weedlines_dialog/inbox.py</dependency>
+  <dependency type="executable" location="extensions">weedlines_dialog/preview.py</dependency>
+  <dependency type="executable" location="extensions">weedlines_dialog/run_controls.py</dependency>
+  <dependency type="executable" location="extensions">weedlines_dialog/form.py</dependency>
+  <dependency type="executable" location="extensions">weedlines_dialog/return_line.py</dependency>
   <dependency type="executable" location="extensions">stdio_capture.py</dependency>
   <effect implements-custom-gui="true" needs-live-preview="false" show-stderr="false">
     <object-type>all</object-type>

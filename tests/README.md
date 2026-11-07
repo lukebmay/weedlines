@@ -20,5 +20,7 @@
 - `test_window_options.py` Option history on the weedlines window.
 - `test_window_preview.py` Window preview: subject, weed area, arrows, swap, and plugin colors.
 - `test_window_return.py` Window return: the line and actions under the preview.
-- `test_window_surround.py` Window surround: preview, distance, and join gap.
+- `test_window_surround.py` Window surround: mode, preview, distance, and start.
+- `test_window_surround_run.py` Window surround run: hold, pause, Clear All, and the log.
+- `test_window_units.py` Window surround units: display unit, join gap, and padding.
 - `test_window_timing.py` Window timing: library asks run once, after the dialog is visible.

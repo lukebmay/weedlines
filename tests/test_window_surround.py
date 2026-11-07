@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Window surround: preview, distance, and join gap. No Inkscape."""
+"""Window surround: mode, preview, distance, and start. No Inkscape."""
 from __future__ import division
 
 import os
@@ -408,6 +408,13 @@ def _click_text(dialog, text):
 def _regions(records, swap):
     return subject_weed_regions(classify_figures(records).figures, swap=swap)
 
+def _pen_colors(dialog):
+    found = []
+    for item in _path_items(_view(dialog).scene()):
+        color = _pen_hex(item)
+        if color is not None:
+            found.append(color)
+    return found
 
 @pytest.mark.parametrize('defaults, expected', [
     (None, _SURROUND),
@@ -433,7 +440,6 @@ def test_window_opens_on_the_named_mode(defaults, expected):
     if defaults is not None:
         kwargs['defaults'] = defaults
     _run(_CLEAR, drive, **kwargs)
-
 
 def test_mode_knobs_follow_the_mode():
     def drive(dialog):
@@ -509,7 +515,6 @@ def test_mode_knobs_follow_the_mode():
         dialog.reject()
 
     _run(_CLEAR, drive_grid, defaults={'mode': 'grid'})
-
 
 def test_clear_design_strokes_surrounds_and_follows_distance(monkeypatch):
     import weedlib
@@ -731,16 +736,6 @@ def test_clear_design_strokes_surrounds_and_follows_distance(monkeypatch):
     )
     assert cuts == []
 
-
-def _pen_colors(dialog):
-    found = []
-    for item in _path_items(_view(dialog).scene()):
-        color = _pen_hex(item)
-        if color is not None:
-            found.append(color)
-    return found
-
-
 def test_defect_paints_no_surround_and_disables_start(monkeypatch):
     import weedlib
     calls = []
@@ -800,7 +795,6 @@ def test_defect_paints_no_surround_and_disables_start(monkeypatch):
         dialog.reject()
 
     _run(_OPEN, drive)
-
 
 def test_start_paints_without_a_solver_or_a_result(monkeypatch, tmp_path):
     import weedlib
@@ -887,257 +881,6 @@ def test_start_paints_without_a_solver_or_a_result(monkeypatch, tmp_path):
     assert writes == []
     assert list(tmp_path.iterdir()) == []
 
-
-def _keep_timer(dialog, timer):
-    timers = getattr(dialog, '_hold_timers', None)
-    if timers is None:
-        timers = []
-        dialog._hold_timers = timers
-    timers.append(timer)
-
-
-def test_surround_hold_drops_a_newer_distance_join_and_swap(monkeypatch):
-    """A GUI timer fires before the surround is painted. The older result is dropped."""
-    import weedlib
-    import weedlines_dialog as dialog_mod
-
-    fired = []
-    painted_early = []
-    cuts = []
-    real = weedlib.build_surrounds
-
-    def parent_saw(*_args, **_kwargs):
-        raise AssertionError('parent saw build_surrounds')
-
-    def refuse(*_args, **_kwargs):
-        cuts.append('cut')
-        raise AssertionError('generate_weeds ran')
-
-    monkeypatch.setattr(weedlib, 'build_surrounds', parent_saw)
-    monkeypatch.setattr(weedlib, 'generate_weeds', refuse)
-    real_spawn = dialog_mod._spawn_ask
-
-    def wrapped_spawn(request, hold, pausing, cancelled):
-        proc, conn = real_spawn(request, hold, pausing, cancelled)
-        if request.get('kind') != 'surround':
-            return proc, conn
-        assert hold
-        assert proc._start_method == 'spawn'
-        dialog = _visible_dialog()
-        assert dialog is not None and dialog.isVisible()
-        if getattr(dialog, '_hold_armed', False):
-            return proc, conn
-        dialog._hold_armed = True
-        timer = QtCore.QTimer(dialog)
-        timer.setSingleShot(True)
-
-        def mark():
-            alive = dialog.isVisible() and proc.is_alive()
-            fired.append(bool(alive))
-            painted_early.append(_WEED in _pen_colors(dialog))
-            if not alive:
-                return
-            _distance_spin(dialog).setValue(6.0)
-            _join_spin(dialog).setValue(1.25)
-            _button(dialog, 'swap').click()
-
-        timer.timeout.connect(mark)
-        timer.start(0)
-        _keep_timer(dialog, timer)
-        return proc, conn
-
-    monkeypatch.setattr(dialog_mod, '_spawn_ask', wrapped_spawn)
-    old_hold = dialog_mod._ASK_HOLD
-    dialog_mod._ASK_HOLD = 8000000
-
-    def drive(dialog):
-        apply_btn = _button(dialog, 'apply')
-        assert apply_btn.isEnabled() is False
-        _button(dialog, 'start').click()
-        _pump_until(lambda: bool(fired), timeout=10)
-        assert fired == [True]
-        assert painted_early == [False]
-        assert dialog.isVisible() is True
-        assert apply_btn.isEnabled() is False
-        assert cuts == []
-        _wait_idle(dialog, timeout=30)
-        assert dialog.isVisible() is True
-        assert apply_btn.isEnabled() is False
-        assert cuts == []
-        assert len(dialog.surround_args) == 2
-        assert dialog.surround_args[0][0] == pytest.approx(_FIVE_PERCENT)
-        assert dialog.surround_args[0][1] == pytest.approx(6.35)
-        assert dialog.surround_args[-1][0] == pytest.approx(6.0)
-        assert dialog.surround_args[-1][1] == pytest.approx(1.25)
-        fresh = real(_regions(_CLEAR, swap=True).subject, 6.0, 1.25)
-        stale = real(_regions(_CLEAR, swap=False).subject, _FIVE_PERCENT, 6.35)
-        _assert_strokes(dialog, fresh, _WEED)
-        assert not _same_path(fresh[0], stale[0])
-        assert dialog.worker_swaps[-1] is True
-        assert 'surrounds' in dialog.worker_calls
-        dialog.reject()
-
-    try:
-        _run(_CLEAR, drive)
-    finally:
-        dialog_mod._ASK_HOLD = old_hold
-    assert cuts == []
-
-
-def test_clear_all_discards_the_surround_and_does_not_kill(monkeypatch):
-    import weedlines_dialog as dialog_mod
-
-    killed = []
-    real_spawn = dialog_mod._spawn_ask
-
-    def wrapped_spawn(request, hold, pausing, cancelled):
-        proc, conn = real_spawn(request, hold, pausing, cancelled)
-        if request.get('kind') != 'surround':
-            return proc, conn
-
-        def deny(*_args, **_kwargs):
-            killed.append('kill')
-            raise AssertionError('child killed')
-
-        proc.terminate = deny
-        proc.kill = deny
-        return proc, conn
-
-    monkeypatch.setattr(dialog_mod, '_spawn_ask', wrapped_spawn)
-    old_hold = dialog_mod._ASK_HOLD
-    dialog_mod._ASK_HOLD = 8000000
-
-    def drive(dialog):
-        color = dialog.findChild(QtWidgets.QLineEdit, 'weed-line-color')
-        assert color is not None
-        _button(dialog, 'start').click()
-        _pump_until(
-            lambda: _status(dialog).text().startswith('working'),
-            timeout=5)
-        assert _spinner(dialog).isVisible() is True
-        assert _button(dialog, 'start').text() == 'Restart'
-        assert _button(dialog, 'start').isEnabled() is False
-        _button(dialog, 'clear-all').click()
-        _wait_idle(dialog)
-        assert killed == []
-        assert _WEED not in _pen_colors(dialog)
-        assert dialog.isVisible() is True
-        assert _button(dialog, 'start').text() == 'Start'
-        assert _button(dialog, 'start').isEnabled() is True
-        assert _status(dialog).text() == 'ready'
-        assert _spinner(dialog).isVisible() is False
-        assert _mode_box(dialog).currentData() == _SURROUND
-        assert color.property('color') == '#FF0000'
-        assert _button(dialog, 'apply').isEnabled() is False
-        asked = len(dialog.surround_args)
-        _distance_spin(dialog).setValue(4.0)
-        _wait_idle(dialog)
-        assert len(dialog.surround_args) == asked
-        assert _WEED not in _pen_colors(dialog)
-        dialog.reject()
-
-    try:
-        _run(_CLEAR, drive)
-    finally:
-        dialog_mod._ASK_HOLD = old_hold
-
-
-def test_pause_holds_the_surround_until_resume(monkeypatch):
-    import weedlines_dialog as dialog_mod
-
-    paused = []
-    real_spawn = dialog_mod._spawn_ask
-
-    def wrapped_spawn(request, hold, pausing, cancelled):
-        proc, conn = real_spawn(request, hold, pausing, cancelled)
-        if request.get('kind') != 'surround':
-            return proc, conn
-        dialog = _visible_dialog()
-        assert dialog is not None
-        timer = QtCore.QTimer(dialog)
-        timer.setSingleShot(True)
-
-        def mark():
-            if dialog.isVisible() and proc.is_alive():
-                _click_text(dialog, 'Pause')
-                paused.append(proc.is_alive())
-
-        timer.timeout.connect(mark)
-        timer.start(0)
-        _keep_timer(dialog, timer)
-        return proc, conn
-
-    monkeypatch.setattr(dialog_mod, '_spawn_ask', wrapped_spawn)
-    old_hold = dialog_mod._ASK_HOLD
-    dialog_mod._ASK_HOLD = 8000000
-
-    def drive(dialog):
-        try:
-            _button(dialog, 'start').click()
-            _pump_until(lambda: bool(paused), timeout=10)
-            assert paused == [True]
-            assert _status(dialog).text().startswith('paused')
-            assert _spinner(dialog).isVisible() is False
-            assert _button(dialog, 'start').text() == 'Restart'
-            assert _button(dialog, 'start').isEnabled() is False
-            assert dialog.isVisible() is True
-            _pump_until(
-                lambda: dialog.worker_calls.count('surrounds') >= 1,
-                timeout=10)
-            assert _WEED not in _pen_colors(dialog)
-            app = QtWidgets.QApplication.instance()
-            for _ in range(4):
-                app.processEvents(QtCore.QEventLoop.AllEvents, 50)
-            assert _WEED not in _pen_colors(dialog)
-            assert _run_busy(dialog) is True
-            assert dialog.isVisible() is True
-            _click_text(dialog, 'Resume')
-            _wait_idle(dialog)
-            assert _WEED in _pen_colors(dialog)
-            assert _button(dialog, 'apply').isEnabled() is False
-            assert _status(dialog).text() == 'done'
-            assert _spinner(dialog).isVisible() is False
-            assert _button(dialog, 'start').text() == 'Restart'
-            assert dialog.isVisible() is True
-        finally:
-            if dialog.isVisible() and _run_busy(dialog):
-                resume = [
-                    button for button in dialog.findChildren(
-                        QtWidgets.QPushButton)
-                    if button.isVisible() and button.text() == 'Resume'
-                ]
-                if resume:
-                    resume[0].click()
-                _wait_idle(dialog)
-            if dialog.isVisible():
-                dialog.reject()
-
-    try:
-        _run(_CLEAR, drive)
-    finally:
-        dialog_mod._ASK_HOLD = old_hold
-
-
-def test_surround_stdio_reaches_the_algorithm_log():
-    import weedlines_dialog as dialog_mod
-
-    old_trace = dialog_mod._ASK_TRACE
-
-    def drive(dialog):
-        dialog_mod._ASK_TRACE = 'surround-stdio-marker'
-        _button(dialog, 'start').click()
-        _wait_idle(dialog)
-        log = dialog.findChild(QtWidgets.QPlainTextEdit)
-        assert log is not None
-        assert log.toPlainText().count('surround-stdio-marker') >= 2
-        dialog.reject()
-
-    try:
-        _run(_CLEAR, drive)
-    finally:
-        dialog_mod._ASK_TRACE = old_trace
-
-
 def test_surround_forwards_focus_and_does_not_paint_it():
     def drive(dialog):
         dialog.focus_mark = None
@@ -1156,239 +899,3 @@ def test_surround_forwards_focus_and_does_not_paint_it():
         dialog.reject()
 
     _run(_CLEAR, drive)
-
-
-_LENGTH_LABELS = (
-    ('surround-distance-label', 'Surround distance'),
-    ('join-gap-label', 'Join gap'),
-    ('padding-label', 'Padding'),
-    ('spacing-label', 'Grid spacing'),
-    ('collar-label', 'Collar (island-hop)'),
-)
-
-
-def _assert_length_labels(dialog):
-    for name, text in _LENGTH_LABELS:
-        label = _length_label(dialog, name)
-        assert label.text() == text
-
-
-def test_display_unit_converts_lengths_without_clamping():
-    def drive(dialog):
-        box = _display_box(dialog)
-        assert box.currentData() == 'mm'
-        assert box.findData('%') < 0
-        assert box.findData('em') < 0
-        assert box.findText('%') < 0
-        assert box.findText('em') < 0
-        _assert_length_labels(dialog)
-        join = _join_spin(dialog)
-        pad = _named_spin(dialog, 'padding')
-        space = _named_spin(dialog, 'spacing')
-        assert join.suffix().strip() == 'mm'
-        assert pad.suffix().strip() == 'mm'
-        assert join.value() == pytest.approx(6.35)
-        assert pad.value() == pytest.approx(4.0)
-        assert space.value() == pytest.approx(25.0)
-
-        pad.setValue(200.0)
-        _set_display_unit(dialog, 'px')
-        shown_pad = 200.0 * 96.0 / 25.4
-        assert pad.value() == pytest.approx(shown_pad, abs=1e-3)
-        assert pad.value() > 200.0
-        _assert_length_labels(dialog)
-        assert pad.suffix().strip() == 'px'
-
-        _set_display_unit(dialog, 'in')
-        assert space.value() == pytest.approx(25.0 / 25.4, abs=1e-3)
-        assert space.value() < 1.0
-        assert join.value() == pytest.approx(0.25)
-        assert pad.value() == pytest.approx(200.0 / 25.4, abs=1e-3)
-        assert join.suffix().strip() == 'in'
-        assert pad.suffix().strip() == 'in'
-        _assert_length_labels(dialog)
-
-        _button(dialog, 'start').click()
-        _wait_idle(dialog)
-        assert len(dialog.surround_args) == 1
-        distance, join_gap = dialog.surround_args[0]
-        assert distance == pytest.approx(_FIVE_PERCENT)
-        assert join_gap == pytest.approx(6.35)
-        assert _distance_spin(dialog).value() == pytest.approx(
-            _FIVE_PERCENT / 25.4, abs=1e-3)
-        assert join.value() == pytest.approx(0.25)
-        dialog.reject()
-
-    _run(_CLEAR, drive)
-
-
-def test_no_scale_join_gap_is_a_quarter_inch_in_px():
-    def drive(dialog):
-        box = _display_box(dialog)
-        assert box.currentData() == 'px'
-        join = _join_spin(dialog)
-        assert join.value() == pytest.approx(24.0)
-        assert join.value() != pytest.approx(6.35)
-        _button(dialog, 'start').click()
-        _wait_idle(dialog)
-        assert len(dialog.surround_args) == 1
-        distance, join_gap = dialog.surround_args[0]
-        assert distance == pytest.approx(_FIVE_PERCENT)
-        assert join_gap == pytest.approx(24.0)
-        assert join_gap != pytest.approx(6.35)
-        dialog.reject()
-
-    _run(_CLEAR, drive, display_unit=None, user_unit_scale=None)
-
-
-def test_centimeter_scale_join_gap_is_not_the_millimeter_count():
-    scale = 1.0 / 2.54
-    expected = 0.25 / scale
-
-    def drive(dialog):
-        assert _display_box(dialog).currentData() == 'cm'
-        join = _join_spin(dialog)
-        assert join.value() == pytest.approx(expected)
-        assert join.value() != pytest.approx(6.35)
-        _button(dialog, 'start').click()
-        _wait_idle(dialog)
-        distance, join_gap = dialog.surround_args[0]
-        assert distance == pytest.approx(_FIVE_PERCENT)
-        assert join_gap == pytest.approx(expected)
-        assert join_gap != pytest.approx(6.35)
-        dialog.reject()
-
-    _run(_CLEAR, drive, display_unit='cm', user_unit_scale=scale)
-
-
-def test_padding_converts_on_screen_and_stays_for_the_solver():
-    def drive(dialog):
-        pad = _named_spin(dialog, 'padding')
-        space = _named_spin(dialog, 'spacing')
-        collar = _collar(dialog)
-        assert pad.value() == pytest.approx(4.0 / 25.4, abs=1e-3)
-        assert pad.value() != pytest.approx(4.0)
-        assert space.value() == pytest.approx(25.0 / 25.4, abs=1e-3)
-        assert space.value() != pytest.approx(25.0)
-        assert collar.value() == pytest.approx(4.0 / 25.4, abs=1e-3)
-        assert collar.value() != pytest.approx(4.0)
-        assert pad.suffix().strip() == 'in'
-        _set_mode(dialog, 'frame')
-        assert _button(dialog, 'start').isEnabled() is True
-        _button(dialog, 'start').click()
-        _pump_until(lambda: bool(dialog.solver_args))
-        padding, spacing, collar_arg = dialog.solver_args[-1]
-        assert padding == pytest.approx([4.0, 4.0, 4.0, 4.0])
-        assert spacing == pytest.approx(25.0)
-        assert collar_arg == pytest.approx(4.0)
-        dialog.reject()
-
-    _run(
-        _CLEAR,
-        drive,
-        display_unit='in',
-        user_unit_scale=1.0 / 25.4,
-        defaults={'padding': 4.0},
-    )
-
-
-_LINEAR_UNITS = ('px', 'in', 'ft', 'mm', 'cm', 'm', 'pt', 'pc')
-
-
-@pytest.mark.parametrize('unit', ('yd', 'q', 'km'))
-def test_dropdown_rejects_yd_q_and_km(unit):
-    def drive(dialog):
-        box = _display_box(dialog)
-        assert dialog.display_unit == unit
-        assert box.currentData() == 'px'
-        choices = [box.itemData(index) for index in range(box.count())]
-        labels = [box.itemText(index) for index in range(box.count())]
-        assert unit not in choices
-        assert unit not in labels
-        assert 'yd' not in choices and 'q' not in choices
-        assert 'km' not in choices
-        assert tuple(choices) == _LINEAR_UNITS
-        assert unit in _INCHES_PER_UNIT
-        assert _join_spin(dialog).value() == pytest.approx(24.0)
-        dialog.reject()
-
-    _run(
-        _CLEAR,
-        drive,
-        display_unit=unit,
-        user_unit_scale=1.0 / 25.4,
-    )
-
-
-@pytest.mark.parametrize('unit', ('%', 'em'))
-def test_dropdown_rejects_percent_and_em(unit):
-    def drive(dialog):
-        box = _display_box(dialog)
-        assert box.currentData() == 'px'
-        assert box.findData(unit) < 0
-        assert box.findData('%') < 0
-        assert box.findData('em') < 0
-        assert _join_spin(dialog).value() == pytest.approx(24.0)
-        dialog.reject()
-
-    _run(
-        _CLEAR,
-        drive,
-        display_unit=unit,
-        user_unit_scale=1.0 / 25.4,
-    )
-
-
-def test_conquer_start_does_not_cut_and_restart_repeats(monkeypatch):
-    import weedlib
-    calls, real = _watch(monkeypatch)
-    cuts = []
-
-    def refuse(*_args, **_kwargs):
-        cuts.append('cut')
-        raise AssertionError('generate_weeds ran')
-
-    monkeypatch.setattr(weedlib, 'generate_weeds', refuse)
-
-    def drive(dialog):
-        _assert_no_retired(dialog)
-        assert _visible_step_labels(dialog) == ['Surround', 'Conquer']
-        mark = dialog.findChild(QtWidgets.QLabel, 'step-conquer-mark')
-        assert mark is not None and mark.text() == 'left' and mark.isVisible()
-        conquer = _button(dialog, 'conquer-start')
-        assert conquer.isEnabled() is False
-        asked = list(dialog.worker_calls)
-        conquer.click()
-        assert list(dialog.worker_calls) == asked
-        assert dialog.solver_keeps == []
-        assert cuts == []
-        assert calls == []
-
-        _button(dialog, 'start').click()
-        _wait_idle(dialog)
-        assert cuts == []
-        assert calls == []
-        assert 'solver' not in dialog.worker_calls
-        assert _button(dialog, 'start').text() == 'Restart'
-        assert _status(dialog).text() == 'done'
-        assert _spinner(dialog).isVisible() is False
-        assert _visible_step_labels(dialog) == ['Surround', 'Conquer']
-        paths = real(
-            _regions(_CLEAR, swap=False).subject,
-            _distance_spin(dialog).value(),
-            _join_spin(dialog).value())
-        _assert_strokes(dialog, paths, _WEED)
-        asked_n = len(dialog.surround_args)
-        _button(dialog, 'start').click()
-        _wait_idle(dialog)
-        assert len(dialog.surround_args) == asked_n + 1
-        assert cuts == []
-        assert calls == []
-        assert 'solver' not in dialog.worker_calls
-        assert _status(dialog).text() == 'done'
-        assert _button(dialog, 'start').text() == 'Restart'
-        _assert_strokes(dialog, paths, _WEED)
-        dialog.reject()
-
-    _run(_CLEAR, drive)
-    assert cuts == []
