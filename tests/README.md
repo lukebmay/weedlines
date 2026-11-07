@@ -12,7 +12,9 @@
 - `test_overlap.py` Separate-figure overlap: one defect for each connected shared area.
 - `test_progress.py` Progress / cancel / pause hooks for long-running solvers.
 - `test_self_overlap.py` Self-overlap on the real border, not the painted close.
-- `test_surround.py` Surrounds from the subject and a distance.
+- `test_surround.py` Offset, join gap, and the preamble.
+- `test_surround_bridge.py` Inner bridges and their clearance.
+- `test_surround_smooth.py` Fillets out to the surround distance.
 - `test_weeds.py` Weed strategies: even-odd keep/waste, clip to work, no false reliefs.
 - `test_window_gate.py` Window gate: figure check before Start, subject region as keep.
 - `test_window_options.py` Option history on the weedlines window.
