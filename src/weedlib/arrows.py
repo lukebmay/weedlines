@@ -38,14 +38,15 @@ def build_arrow_paths(kind, targets, bounds):
     the design box in document units, minimum y at the top.
     """
     try:
-        color, place, inward = _KINDS[kind]
+        kind_spec = _KINDS[kind]
     except KeyError:
         raise ValueError('unknown arrow kind: {!r}'.format(kind))
+    color, inward = kind_spec[0], kind_spec[2]
     if not isinstance(bounds, QRectF):
         raise TypeError(
             'bounds must be a QRectF, got: {}'.format(type(bounds).__name__))
     box = bounds.normalized()
-    origin = _origin(place, box)
+    origin = arrow_origin(kind, bounds)
     head_len = _head_length(box)
     inward = _unit(inward)
     return [
@@ -54,7 +55,16 @@ def build_arrow_paths(kind, targets, bounds):
     ]
 
 
-def _origin(place, box):
+def arrow_origin(kind, bounds):
+    """Shared origin for one kind. Minimum y is the top."""
+    try:
+        place = _KINDS[kind][1]
+    except KeyError:
+        raise ValueError('unknown arrow kind: {!r}'.format(kind))
+    if not isinstance(bounds, QRectF):
+        raise TypeError(
+            'bounds must be a QRectF, got: {}'.format(type(bounds).__name__))
+    box = bounds.normalized()
     if place == 'top-left':
         return box.left(), box.top()
     if place == 'top-right':
