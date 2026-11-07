@@ -21,7 +21,7 @@ A waiting plan stays under its rank. The notes say why. Skip it.
 
 | Plan | Notes |
 | --- | --- |
-| [source-split](plans/source-split/plan.md) | Files past 1000 lines. Behavior preserved. The dialog package may run beside the library tasks. |
+| [source-split](plans/source-split/plan.md) | The four split tasks are done. Skip it until an architect confirms the stage is met. |
 | [make-ready](plans/make-ready/plan.md) | Stub waits on source-split's figures package. Cleanup is a design meeting and has no tasks. |
 | [surround-doc](plans/surround-doc/plan.md) | The label stage is met. No open task. Skip it. |
 | [preview-color-picker](plans/preview-color-picker/plan.md) | Waiting on source-split's dialog package. |
