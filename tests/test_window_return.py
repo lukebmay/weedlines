@@ -481,10 +481,12 @@ def test_arrow_return_writes_the_preview_paths_and_stays_open(
     written = {}
     real_write = JOB.write_correction_result
 
-    def wrapped_write(arrows, doc_attrs=None, meta=None):
+    def wrapped_write(arrows, doc_attrs=None, meta=None, labels=None):
         written['arrows'] = arrows
         written['doc'] = doc_attrs
-        return real_write(arrows, doc_attrs=doc_attrs, meta=meta)
+        written['labels'] = labels
+        return real_write(
+            arrows, doc_attrs=doc_attrs, meta=meta, labels=labels)
 
     monkeypatch.setattr(JOB, 'write_correction_result', wrapped_write)
     holder = {}
@@ -553,6 +555,17 @@ def test_arrow_return_writes_the_preview_paths_and_stays_open(
     assert [group.get(_INK_LABEL) for group in groups] == [
         _LABELS[kind] for kind, _batch in expected
     ]
+    from weedlib.ready import build_correction_marks
+    marks = build_correction_marks(_DEFECTS)
+    by_text = {label.text: label for label in marks.labels}
+    assert [got['text'] for got in written['labels']] == [
+        label.text for label in marks.labels
+    ]
+    for got, label in zip(written['labels'], marks.labels):
+        assert got['text'] == label.text
+        assert got['color'] == label.color
+        assert got['point'][0] == pytest.approx(label.point[0])
+        assert got['point'][1] == pytest.approx(label.point[1])
     for (kind, batch), group in zip(expected, groups):
         shafts, heads = _group_paths(group)
         assert shafts == [
@@ -563,3 +576,14 @@ def test_arrow_return_writes_the_preview_paths_and_stays_open(
             qpainterpath_to_svg_d(arrow.head, close_subpaths=False)
             for arrow in batch
         ]
+        texts = [
+            el for el in list(group)
+            if isinstance(el.tag, str) and el.tag.rsplit('}', 1)[-1] == 'text'
+        ]
+        assert len(texts) == 1
+        label = by_text[group.get(_INK_LABEL)]
+        assert texts[0].text == label.text
+        assert float(texts[0].get('x')) == pytest.approx(label.point[0])
+        assert float(texts[0].get('y')) == pytest.approx(label.point[1])
+        assert label.color.lower() in (texts[0].get('style') or '').lower()
+        assert texts[0].text == _LABELS[kind]

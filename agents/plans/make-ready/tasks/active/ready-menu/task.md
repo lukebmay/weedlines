@@ -1,6 +1,6 @@
 # Ready menu
 
-**Status:** ready
+**Status:** in-progress
 
 ## Goal
 
@@ -45,8 +45,11 @@ The window hint names `Reimport last ready`.
 Update the menu sentences in
 `agents/architecture/host.md` in this task. The user
 named these entries. The behavior sentence is the
-two-step above. Do not edit the `solvers.py` sentence in
-`algorithms.md`.
+two-step above. The correction-result sentences also
+say a present kind has one text label at the kind
+origin, in the arrow color. They no longer say the
+result holds only arrows. Do not edit the `solvers.py`
+sentence in `algorithms.md`.
 
 ## Checks
 
@@ -65,6 +68,7 @@ two-step above. Do not edit the `solvers.py` sentence in
 - `tests/test_window_return.py` and
   `tests/test_cut_stroke.py` pass with the new hint.
 - `host.md` names the four entries and the two-step.
+  It does not say the correction result holds only arrows.
 
 ## Note
 

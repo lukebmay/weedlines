@@ -320,15 +320,20 @@ def _ask_solver(request, conn, pausing, cancelled):
 
 
 def _ask_classify(request, conn):
-    from weedlib.figures import classify_figures
+    from weedlib.ready import build_correction_marks
     _send_call(conn, 'classify')
-    check = classify_figures(request.get('records') or [])
+    records = request.get('records') or []
+    marks = build_correction_marks(records)
+    check = marks.check
     for figure in check.figures:
         elements, rule = _pack_path(figure.path)
         conn.send(('figure', figure.id, figure.fill, elements, rule))
     for defect in check.defects:
         x, y = _point_xy(defect.target)
         conn.send(('defect', defect.kind, x, y))
+    for label in marks.labels:
+        x, y = _point_xy(label.point)
+        conn.send(('mark', label.text, label.color, x, y))
 
 
 def _ask_surround(request, conn):

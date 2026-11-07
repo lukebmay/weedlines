@@ -110,7 +110,11 @@ class _ReturnLine(object):
         arrows = self.state.get('arrows') or {}
         if not arrows:
             return
-        self.write_correction_result(arrows, doc_attrs=self._doc_attrs())
+        self.write_correction_result(
+            arrows,
+            doc_attrs=self._doc_attrs(),
+            labels=self.state.get('correction_labels'),
+        )
         self.return_line.setTextFormat(self.QtCore.Qt.PlainText)
         self.return_line.setText(_IMPORT_SENTENCE)
 
@@ -141,6 +145,14 @@ class _ReturnLine(object):
         self.check = _Check(defects)
         self.state['plain_figures'] = plain_figures
         self.state['plain_defects'] = plain_defects
+        labels = []
+        for text, color, x, y in inbox.get('marks') or []:
+            labels.append({
+                'text': text,
+                'color': color,
+                'point': (float(x), float(y)),
+            })
+        self.state['correction_labels'] = labels
         self.blocked = bool(defects)
         self._show_return_line()
         if self.blocked and not self.state.get('arrows_button'):

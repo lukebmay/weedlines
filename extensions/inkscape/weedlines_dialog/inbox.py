@@ -13,6 +13,7 @@ def _empty_inbox():
         'bounds': None,
         'fills': [],
         'arrows': [],
+        'marks': [],
         'surrounds': [],
         'result': None,
         'error': None,
@@ -94,6 +95,8 @@ class _Inbox(object):
             inbox['fills'].append((msg[1], msg[2], msg[3]))
         elif kind == 'arrow':
             inbox['arrows'].append(msg[1:])
+        elif kind == 'mark':
+            inbox['marks'].append(msg[1:])
         elif kind == 'surround':
             inbox['surrounds'].append((msg[1], msg[2]))
         elif kind == 'cancelled':

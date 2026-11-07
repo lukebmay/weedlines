@@ -321,6 +321,7 @@ class _Window(_Form, _RunControls, _ReturnLine, _Preview, _Inbox, _Ask):
             'arrow_paths': {},
             'plain_figures': [],
             'plain_defects': [],
+            'correction_labels': [],
             'ask': None,
             'ask_seq': 0,
             'ask_token': None,

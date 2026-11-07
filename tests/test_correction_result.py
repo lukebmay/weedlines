@@ -38,9 +38,10 @@ def _arrow_sets(targets_by_kind):
     return arrows
 
 
-def _write(tmp_path, monkeypatch, arrows):
+def _write(tmp_path, monkeypatch, arrows, labels=None):
     monkeypatch.setattr(JOB, 'cache_dir', lambda: str(tmp_path))
-    json_path = JOB.write_correction_result(arrows, doc_attrs=_DOC)
+    json_path = JOB.write_correction_result(
+        arrows, doc_attrs=_DOC, labels=labels)
     svg_path = os.path.join(str(tmp_path), 'last_result.svg')
     return json_path, svg_path
 
@@ -53,6 +54,17 @@ def _paths(group):
         if local == 'path':
             found.append(el)
     return found
+
+
+def _local(el):
+    tag = el.tag
+    if not isinstance(tag, str):
+        return ''
+    return tag.rsplit('}', 1)[-1]
+
+
+def _texts(group):
+    return [el for el in list(group) if _local(el) == 'text']
 
 
 def _fill(el):
@@ -137,6 +149,43 @@ def test_open_shaft_is_not_closed_in_the_file(tmp_path, monkeypatch):
         arrows['dangling'][0].shaft, close_subpaths=False)
     assert d == open_d
     assert _CLOSEPATH.search(d) is None
+
+
+def test_present_kind_has_one_text_at_the_mark_origin(tmp_path, monkeypatch):
+    from weedlib.ready import CorrectionLabel, build_correction_marks
+
+    records = [{
+        'id': 'gap',
+        'd': 'M 5,6 L 15,6 L 15,20',
+        'closed': [True],
+        'fill': 'none',
+    }]
+    marks = build_correction_marks(records)
+    assert [label.text for label in marks.labels] == ['Dangling ends']
+    extra = list(marks.labels) + [
+        CorrectionLabel('Figure overlaps', '#FF6A00', (1.0, 2.0)),
+    ]
+    _json_path, svg_path = _write(
+        tmp_path, monkeypatch, marks.arrows, labels=extra)
+    groups = SVG.load_correction_svg_groups(svg_path)
+    assert [group.get(_INK_LABEL) for group in groups] == ['Dangling ends']
+    texts = _texts(groups[0])
+    assert len(texts) == 1
+    label = marks.labels[0]
+    assert texts[0].text == label.text
+    assert float(texts[0].get('x')) == pytest.approx(label.point[0])
+    assert float(texts[0].get('y')) == pytest.approx(label.point[1])
+    assert label.color == '#FF00FF'
+    assert label.color in (texts[0].get('style') or '')
+    with open(svg_path, encoding='utf-8') as fh:
+        written = fh.read()
+    assert 'Figure overlaps' not in written
+    assert 'Self-overlaps' not in written
+    shapes = [
+        el for el in list(groups[0])
+        if _local(el) not in ('path', 'text')
+    ]
+    assert shapes == []
 
 
 def test_write_result_still_writes_design_and_cuts(tmp_path, monkeypatch):

@@ -23,6 +23,7 @@ paper the architecture with the story.
 | Seen | What happened | Rule |
 | --- | --- | --- |
 | 2026-11-07, `agents/architecture/algorithms.md` | Modes that cut today still says the private helpers live in `solvers.py`. That file is now the package `src/weedlib/solvers/`. The guide is human-owned, so the sentence was not edited. | [Algorithms](./architecture/algorithms.md). [source-split](./plans/source-split/plan.md). |
+| 2026-11-07, `agents/architecture/host.md` | The correction result is described as arrows only. The writer now also emits one text label per present kind. The guide is human-owned. [ready-menu](./plans/make-ready/tasks/active/ready-menu/task.md) updates this sentence with the menu. | [Host](./architecture/host.md). [make-ready](./plans/make-ready/plan.md). |
 
 ## Closed
 

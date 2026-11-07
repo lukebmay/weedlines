@@ -345,11 +345,66 @@ def _head_style(color):
     return 'fill:%s;stroke:none' % color
 
 
-def write_correction_svg(arrows, doc_attrs=None, path=None):
+def _label_fields(label):
+    """Text, color, and point from a mark. No origin is computed here."""
+    if isinstance(label, dict):
+        text = label.get('text')
+        color = label.get('color')
+        point = label.get('point')
+    else:
+        text = getattr(label, 'text', None)
+        color = getattr(label, 'color', None)
+        point = getattr(label, 'point', None)
+    if text is None or point is None:
+        return None
+    if isinstance(point, (tuple, list)) and len(point) >= 2:
+        x, y = point[0], point[1]
+    else:
+        x = getattr(point, 'x', None)
+        y = getattr(point, 'y', None)
+        if callable(x):
+            x, y = x(), y()
+    return text, color, float(x), float(y)
+
+
+def _label_for_text(text, labels):
+    for label in labels or ():
+        fields = _label_fields(label)
+        if fields is not None and fields[0] == text:
+            return fields
+    return None
+
+
+def _xml_escape_text(value):
+    return (
+        str(value)
+        .replace('&', '&amp;')
+        .replace('<', '&lt;')
+        .replace('>', '&gt;')
+    )
+
+
+def _correction_text(kind, text, color, x, y):
+    style = 'fill:%s;stroke:none' % color
+    return (
+        '    <text id="%s" x="%s" y="%s" style="%s">%s</text>\n'
+        % (
+            _correction_path_id(kind, 'label', 0),
+            _xml_escape_attr(x),
+            _xml_escape_attr(y),
+            _xml_escape_attr(style),
+            _xml_escape_text(text),
+        )
+    )
+
+
+def write_correction_svg(arrows, doc_attrs=None, path=None, labels=None):
     """Write one group per kind that has an arrow. No design copy.
 
     *arrows* maps dangling, overlap, or self-overlap to objects with
     shaft, head, and color. Shaft and head are ``QPainterPath`` values.
+    *labels* are the marks for those kinds. Each present kind gets one
+    text element at that mark's point, in that mark's color.
     """
     from weedlib.svg_paths import qpainterpath_to_svg_d
 
@@ -400,6 +455,12 @@ def write_correction_svg(arrows, doc_attrs=None, path=None):
                 )
         if not body:
             continue
+        mark = _label_for_text(label, labels)
+        if mark is not None:
+            text, color, x, y = mark
+            if not color and batch:
+                color = batch[0].color
+            body.append(_correction_text(kind, text, color, x, y))
         parts.append(
             '  <g id="weedlines-correction-%s" inkscape:label="%s">\n'
             % (kind, _xml_escape_attr(label))
