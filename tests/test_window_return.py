@@ -30,7 +30,7 @@ _ALL_KINDS = (
 _DANGLING_ONLY = _PROBLEM + ' dangling ends.'
 _TWO_KINDS = _PROBLEM + ' dangling ends and self-overlaps.'
 _IMPORT = (
-    'Run Extensions → Weedlines → Reimport last ready to place the arrows.')
+    'Run Extensions → Weedlines → 4 Reimport last ready cut to place the arrows.')
 _PLAIN = 'Return to Inkscape'
 _ARROW = 'Return to Inkscape with correction arrows'
 _INK_LABEL = '{http://www.inkscape.org/namespaces/inkscape}label'
@@ -651,7 +651,7 @@ def test_arrow_return_writes_the_preview_paths_and_stays_open(
         assert label.color.lower() in (texts[0].get('style') or '').lower()
         assert texts[0].text == _LABELS[kind]
 
-    # This return wrote last_ready.svg. Reimport last ready places that file.
+    # This return wrote last_ready.svg. 4 Reimport last ready cut places that file.
     assert str(svg_path) == JOB.ready_svg_file()
     root = _open_person()
     _run_reimport(root, 'ready')
@@ -674,7 +674,7 @@ def test_arrow_return_writes_the_preview_paths_and_stays_open(
     assert root.getElementById('weedlines-design') is None
     assert opened == []
 
-    # The same bytes are a ready result. Reimport last weedlines refuses them.
+    # The same bytes are a ready result. 3 Reimport last weedlines refuses them.
     (tmp_path / 'last_result.svg').write_text(
         svg_path.read_text(encoding='utf-8'), encoding='utf-8')
     refused = _open_person()

@@ -93,8 +93,8 @@ class WeedLinesImportEffect(object):
         if not os.path.isfile(svg_file):
             raise inkex.AbortExtension(
                 'No Weedlines ready file found.\n'
-                'Run Extensions → Weedlines → Make ready to cut, '
-                'then Reimport last ready.\n'
+                'Run Extensions → Weedlines → 2 Make ready to cut, '
+                'then 4 Reimport last ready cut.\n'
                 '(Looking for %s)' % svg_file
             )
         groups = load_correction_svg_groups(svg_file)
@@ -128,7 +128,7 @@ class WeedLinesImportEffect(object):
             if groups and design is None:
                 raise inkex.AbortExtension(
                     'That file is a ready result.\n'
-                    'Run Extensions → Weedlines → Reimport last ready.'
+                    'Run Extensions → Weedlines → 4 Reimport last ready cut.'
                 )
 
             if design is None and cuts is None:
@@ -157,8 +157,8 @@ class WeedLinesImportEffect(object):
         if not payload or not payload.get('paths'):
             raise inkex.AbortExtension(
                 'No Weedlines result found.\n'
-                'Run Extensions → Weedlines → Auto generate weedlines…, '
-                'Apply in the Weedlines window, then Reimport last weedlines.\n'
+                'Run Extensions → Weedlines → 1 Auto generate weedlines, '
+                'Apply in the Weedlines window, then 3 Reimport last weedlines.\n'
                 '(Looking for %s or %s)' % (result_path(), svg_file)
             )
 

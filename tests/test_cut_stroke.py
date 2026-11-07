@@ -425,5 +425,5 @@ def test_host_writes_the_window_color(tmp_path, monkeypatch):
     assert 'stroke-width:0.25' in cuts[0].get('style')
     text = shown['args'][2]
     assert text.startswith('Saved design + weed cuts.')
-    assert 'Extensions → Weedlines → Reimport last weedlines' in text
+    assert 'Extensions → Weedlines → 3 Reimport last weedlines' in text
     assert '#ABCDEF' not in text

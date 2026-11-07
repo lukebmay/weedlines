@@ -37,27 +37,29 @@ The detached window stays the way a run opens. The host still
 returns at once so Inkscape stays usable. The inline path
 remains available for the same window.
 
-The menu is Extensions → Weedlines. The entries are
-`Auto generate weedlines…`, `Make ready to cut`,
-`Reimport last ready`, and `Reimport last weedlines`.
-The ellipsis is only on the first. Reimport is one word.
-Inkscape sorts them alphabetically. There is no divider
-and no sort prefix.
+The menu is Extensions → Weedlines. Inkscape sorts the
+entries by name. The number is part of each name, and
+none of the names end in an ellipsis. The entries are
+`1 Auto generate weedlines`, `2 Make ready to cut`,
+`3 Reimport last weedlines`, and `4 Reimport last ready cut`.
+There is no divider.
 
-`Make ready to cut` spawns a child and returns at once.
+`2 Make ready to cut` spawns a child and returns at once.
 The effect does not change the open document. The child
 runs the check. A defect writes the ready file through
 the correction writer. A clear check writes none and
-removes a stale ready file. `Reimport last ready` places
-that file. `Reimport last weedlines` places a weed-line
-result and refuses a ready file.
+removes a stale ready file. `4 Reimport last ready cut`
+places that file. `3 Reimport last weedlines` places a
+weed-line result and refuses a ready file.
 
-`Auto generate weedlines…` still opens the detached
+`1 Auto generate weedlines` still opens the detached
 window and returns at once. No path geometry aborts and
 tells the person to convert objects to paths. Apply writes
 `last_result.json` and `last_result.svg`. The ready file
 is not that result. The on-screen hint names
-`Reimport last ready`. The host does not configure a cutter.
+`3 Reimport last weedlines` for cuts and
+`4 Reimport last ready cut` for arrows. The host does not
+configure a cutter.
 
 ## Result
 

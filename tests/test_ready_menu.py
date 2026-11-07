@@ -39,10 +39,16 @@ _SQUARE = [{
     'fill': 'none',
 }]
 _MENU = (
-    'Auto generate weedlines…',
-    'Make ready to cut',
-    'Reimport last ready',
-    'Reimport last weedlines',
+    '1 Auto generate weedlines',
+    '2 Make ready to cut',
+    '4 Reimport last ready cut',
+    '3 Reimport last weedlines',
+)
+_SORTED = (
+    '1 Auto generate weedlines',
+    '2 Make ready to cut',
+    '3 Reimport last weedlines',
+    '4 Reimport last ready cut',
 )
 _INX = (
     'weedlines.inx',
@@ -104,8 +110,8 @@ def _inx_name(filename):
 def test_menu_names_match_the_four_entries():
     found = [_inx_name(name) for name in _INX]
     assert found == list(_MENU)
-    assert found[0].endswith('…')
-    assert all('…' not in name and '...' not in name for name in found[1:])
+    assert sorted(found) == list(_SORTED)
+    assert all('…' not in name and '...' not in name for name in found)
     for filename in _INX:
         text = open(os.path.join(_EXT, filename), encoding='utf-8').read()
         assert '<separator' not in text

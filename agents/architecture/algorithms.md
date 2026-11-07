@@ -37,7 +37,7 @@ Frame is a padded box around the keep bounds. Grid is an
 axis-aligned hatch over the weed area, plus a closed outline
 on the padded work rect. Island-hop peels a frame, then ranked
 seals. Hosts call `generate_weeds`. They do not call private
-helpers in `solvers.py`.
+helpers in the solvers package.
 
 The window shows one padding number and copies it to all four
 sides, plus grid spacing, the island-hop collar, and the output

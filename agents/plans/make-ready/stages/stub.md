@@ -29,16 +29,18 @@ there is a defect. A clear check removes a stale ready
 file. `write_correction_svg` is the only correction
 writer. It adds one text element at the label point.
 
-`Reimport last ready` places that file with the existing
-correction import. `Reimport last weedlines` still places
-a weed-line result and refuses a ready file.
+`4 Reimport last ready cut` places that file with the
+existing correction import. `3 Reimport last weedlines`
+still places a weed-line result and refuses a ready file.
 
 The window hint and the correction return name
-`Reimport last ready`. They call the same writer.
+`4 Reimport last ready cut`. They call the same writer.
 
-`Make ready to cut` has no ellipsis. `Auto generate
-weedlines…` keeps the ellipsis. The two Reimport names
-have no ellipsis. Reimport is one word.
+None of the four names end in an ellipsis. The number
+is part of each name. Alphabetical order is
+`1 Auto generate weedlines`, `2 Make ready to cut`,
+`3 Reimport last weedlines`, and `4 Reimport last ready
+cut`. Reimport is one word.
 
 ## Not this stage
 

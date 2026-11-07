@@ -53,7 +53,7 @@ def result_svg_file():
 
 
 def ready_svg_file():
-    """Ready file from Make ready to cut. Not the weed-line result."""
+    """Ready file from 2 Make ready to cut. Not the weed-line result."""
     return os.path.join(cache_dir(), _READY_SVG_NAME)
 
 

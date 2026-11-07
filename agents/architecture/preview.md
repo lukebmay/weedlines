@@ -140,7 +140,7 @@ every mode while a defect exists.
 "Return to Inkscape" writes no result and closes the window.
 "Return to Inkscape with correction arrows" writes the
 correction result, then replaces the line with "Run Extensions →
-Weedlines → Import last result to place the arrows." It does not
+Weedlines → 4 Reimport last ready cut to place the arrows." It does not
 close the window and it does not open a message box. The person
 then uses "Return to Inkscape" to close it.
 

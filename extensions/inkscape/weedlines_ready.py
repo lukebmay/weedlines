@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Make ready to cut: spawn the check and return at once.
+"""2 Make ready to cut: spawn the check and return at once.
 
 The effect does not change the open document. The child calls
 ``build_correction_marks`` and writes the ready file through

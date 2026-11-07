@@ -19,7 +19,7 @@ _PROBLEM_SENTENCE = (
 
 
 _IMPORT_SENTENCE = (
-    'Run Extensions → Weedlines → Reimport last ready to place the arrows.')
+    'Run Extensions → Weedlines → 4 Reimport last ready cut to place the arrows.')
 
 
 def _kind_swatch(color):

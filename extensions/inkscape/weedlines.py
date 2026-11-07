@@ -757,7 +757,7 @@ class WeedLinesEffect(object):
                     pass
                 sys.stderr = old_err
             # Return immediately so Inkscape unblocks; the host window is
-            # already open. After Apply: Reimport last weedlines.
+            # already open. After Apply: 3 Reimport last weedlines.
             return
 
         # Legacy in-process path (blocks Inkscape until the dialog closes).

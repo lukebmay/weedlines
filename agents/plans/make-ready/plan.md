@@ -6,11 +6,12 @@
 
 ## Goal
 
-Make ready to cut runs the figure check in a child
+`2 Make ready to cut` runs the figure check in a child
 process and returns at once. When the check finds a
-defect, that child writes a ready result. Reimport last
-ready places those correction groups, with a same-color
-label at each arrow-set origin, above the design.
+defect, that child writes a ready result. `4 Reimport
+last ready cut` places those correction groups, with a
+same-color label at each arrow-set origin, above the
+design.
 
 ## Guide
 
@@ -19,12 +20,12 @@ label at each arrow-set origin, above the design.
 - [`../../architecture/preview.md`](../../architecture/preview.md)
 - [`../../architecture/runtime.md`](../../architecture/runtime.md)
 
-The menu names and this two-step are the sentence to
-apply in `host.md` when the stub is implemented. The
-user named the menu. Inkscape 1.2.2 sorts the submenu
-alphabetically and has no divider. The names are
-`Auto generate weedlines…`, `Make ready to cut`,
-`Reimport last ready`, and `Reimport last weedlines`.
+The menu names are in `host.md`. Inkscape sorts the
+submenu alphabetically and has no divider. The number
+is part of each name. None of the names end in an
+ellipsis. The names are `1 Auto generate weedlines`,
+`2 Make ready to cut`, `3 Reimport last weedlines`,
+and `4 Reimport last ready cut`.
 
 ## Checks
 
@@ -34,7 +35,7 @@ alphabetically and has no divider. The names are
 - A defect writes one ready result through
   `write_correction_svg`. A clear check writes none and
   removes a stale ready file.
-- Reimport last ready places one layer, `Weedlines
+- `4 Reimport last ready cut` places one layer, `Weedlines
   corrections`, above the open document. Each present
   kind is one group. Each group has one label at that
   kind's origin, in that arrow color, reading `Dangling

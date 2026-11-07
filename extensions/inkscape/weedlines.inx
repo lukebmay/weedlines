@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
-  <name>Auto generate weedlines…</name>
+  <name>1 Auto generate weedlines</name>
   <id>org.lukebmay.weedlines</id>
   <dependency type="executable" location="extensions">weedlines.py</dependency>
   <dependency type="executable" location="extensions">weedlines_dialog/__init__.py</dependency>
@@ -16,7 +16,7 @@
     <effects-menu>
       <submenu name="Weedlines"/>
     </effects-menu>
-    <menu-tip>Open Weedlines in a separate window (Inkscape stays usable); then Reimport last weedlines</menu-tip>
+    <menu-tip>Open Weedlines in a separate window (Inkscape stays usable); then 3 Reimport last weedlines</menu-tip>
   </effect>
   <script>
     <command location="inx" interpreter="python">weedlines.py</command>

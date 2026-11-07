@@ -20,16 +20,15 @@ paper the architecture with the story.
 
 ## Open
 
-| Seen | What happened | Rule |
-| --- | --- | --- |
-| 2026-11-07, `agents/architecture/algorithms.md` | Modes that cut today still says the private helpers live in `solvers.py`. That file is now the package `src/weedlib/solvers/`. The guide is human-owned, so the sentence was not edited. | [Algorithms](./architecture/algorithms.md). [source-split](./plans/source-split/plan.md). |
-| 2026-11-07, `agents/architecture/preview.md` | The correction return still tells the person to run Import last result. The window now says Reimport last ready. The guide is human-owned. | [Preview](./architecture/preview.md). [make-ready](./plans/make-ready/plan.md). |
-| 2026-11-07, `agents/architecture/runtime.md` | Apply is still followed by Import last result. The weed-line reimport is Reimport last weedlines. The guide is human-owned. | [Runtime](./architecture/runtime.md). [make-ready](./plans/make-ready/plan.md). |
+*(none)*
 
 ## Closed
 
 | Seen | What happened | Rule |
 | --- | --- | --- |
+| 2026-11-07, `agents/architecture/algorithms.md` | Modes that cut today said the private helpers live in `solvers.py`. Fixed. The sentence names the solvers package. | [Algorithms](./architecture/algorithms.md). [source-split](./plans/source-split/plan.md). |
+| 2026-11-07, `agents/architecture/preview.md` | The correction return told the person to run Import last result. Fixed. The line names `4 Reimport last ready cut`. | [Preview](./architecture/preview.md). [make-ready](./plans/make-ready/plan.md). |
+| 2026-11-07, `agents/architecture/runtime.md` | Apply was followed by Import last result. Fixed. The person then runs `3 Reimport last weedlines`. | [Runtime](./architecture/runtime.md). [make-ready](./plans/make-ready/plan.md). |
 | 2026-11-07, `agents/architecture/host.md` | The correction result was described as arrows only. Fixed. A present kind also has one text label at the kind origin, in the arrow color. | [Host](./architecture/host.md). [make-ready](./plans/make-ready/plan.md). |
 | 2026-11-06, `docs/user/surround.md` | The surround user doc said "Join gap (mm)" and that the unset join gap was 6.35. Fixed. The page says **Join gap**. The unset value is a quarter of an inch under the document scale, in the unit the window shows. | [Boundary](./architecture/boundary.md). [surround-doc](./plans/surround-doc/plan.md). |
 | 2026-11-06, `docs/inkscape-extension.md` | The units section said the padding, spacing, and collar spinners were labeled mm, and that the extension treats document user units as mm. Fixed. The labels are **Padding**, **Grid spacing**, and **Collar (island-hop)**. The unit is the display unit. | [Boundary](./architecture/boundary.md). [surround-doc](./plans/surround-doc/plan.md). |

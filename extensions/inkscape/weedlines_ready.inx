@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
-  <name>Make ready to cut</name>
+  <name>2 Make ready to cut</name>
   <id>org.lukebmay.weedlines.ready</id>
   <dependency type="executable" location="extensions">weedlines_ready.py</dependency>
   <dependency type="executable" location="extensions">weedlines.py</dependency>

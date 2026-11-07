@@ -31,7 +31,8 @@ control that returns weed lines. Close, cancel, or an empty
 result returns nothing.
 
 On Apply, the detached window writes the result and does not
-edit the open document. The person then runs Import last result.
+edit the open document. The person then runs
+`3 Reimport last weedlines`.
 The cache directory is `$XDG_CACHE_HOME/weedlines` when that
 variable is set. Otherwise it is `~/.cache/weedlines` on Linux,
 `%LOCALAPPDATA%\weedlines\cache` on Windows, and

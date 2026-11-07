@@ -18,11 +18,11 @@ import.
 ## Send the arrows
 
 - [ ] Choose **Return to Inkscape with correction arrows**. The
-  line changes to "Run Extensions → Weedlines → Import last
-  result to place the arrows." The window stays open.
+  line changes to "Run Extensions → Weedlines → 4 Reimport last
+  ready cut to place the arrows." The window stays open.
 - [ ] Choose **Return to Inkscape**. The window closes.
-- [ ] In Inkscape, choose **Extensions → Weedlines → Import last
-  result**.
+- [ ] In Inkscape, choose **Extensions → Weedlines → 4 Reimport
+  last ready cut**.
 - [ ] In the Layers panel, find the new layer **Weedlines
   corrections** above the rest of the document. It holds a group
   for each kind that has an arrow, and only those kinds:
