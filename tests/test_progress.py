@@ -318,12 +318,11 @@ def test_seal_search_checks_while_it_runs():
     """Island-hop mouth search checks before that search returns."""
     pytest.importorskip('pyclipper')
     _QPainterPath, _QRectF, _generate = _need_solver()
-    from weedlib import solvers
-    from weedlib.solvers import island_hop_weeds
+    from weedlib.solvers import emit, gaps, island_hop_weeds
 
     seen = {'inside': False, 'checks': 0, 'emits': 0, 'during': []}
-    real_mouth = solvers._mouth_seal
-    real_emit = solvers._seg_emit_ok
+    real_mouth = gaps._mouth_seal
+    real_emit = emit._seg_emit_ok
 
     def wrap_mouth(*args, **kwargs):
         seen['inside'] = True
@@ -347,8 +346,8 @@ def test_seal_search_checks_while_it_runs():
         if seen['emits'] > 0:
             seen['during'].append((seen['emits'], outline, line))
 
-    solvers._mouth_seal = wrap_mouth
-    solvers._seg_emit_ok = wrap_emit
+    gaps._mouth_seal = wrap_mouth
+    emit._seg_emit_ok = wrap_emit
     progress.clear()
     try:
         progress.install(focus=on_focus)
@@ -360,8 +359,8 @@ def test_seal_search_checks_while_it_runs():
         assert all(outline is None for _n, outline, _line in seen['during'])
         assert all(line is not None for _n, _outline, line in seen['during'])
     finally:
-        solvers._mouth_seal = real_mouth
-        solvers._seg_emit_ok = real_emit
+        gaps._mouth_seal = real_mouth
+        emit._seg_emit_ok = real_emit
         progress.clear()
 
 
@@ -369,11 +368,10 @@ def test_cancel_during_seal_search_returns_no_path():
     """Cancel inside the mouth search raises before a path is returned."""
     pytest.importorskip('pyclipper')
     _QPainterPath, _QRectF, _generate = _need_solver()
-    from weedlib import solvers
-    from weedlib.solvers import island_hop_weeds
+    from weedlib.solvers import gaps, island_hop_weeds
 
     seen = {'inside': False, 'checks': 0}
-    real_mouth = solvers._mouth_seal
+    real_mouth = gaps._mouth_seal
 
     def wrap_mouth(*args, **kwargs):
         seen['inside'] = True
@@ -389,7 +387,7 @@ def test_cancel_during_seal_search_returns_no_path():
     def cancel():
         return seen['inside'] and seen['checks'] > 0
 
-    solvers._mouth_seal = wrap_mouth
+    gaps._mouth_seal = wrap_mouth
     returned = None
     progress.clear()
     try:
@@ -400,7 +398,7 @@ def test_cancel_during_seal_search_returns_no_path():
         assert returned is None
         assert seen['checks'] > 0
     finally:
-        solvers._mouth_seal = real_mouth
+        gaps._mouth_seal = real_mouth
         progress.clear()
 
 
@@ -423,11 +421,10 @@ def test_pocket_search_checks_while_it_runs():
     """A bay search checks before that search accepts its segment."""
     pytest.importorskip('pyclipper')
     _QPainterPath, _QRectF, _generate = _need_solver()
-    from weedlib import solvers
-    from weedlib.solvers import island_hop_weeds
+    from weedlib.solvers import island_hop_weeds, pockets
 
     seen = {'inside': False, 'checks': 0, 'named': 0}
-    real = solvers._body_pocket_seals
+    real = pockets._body_pocket_seals
 
     def wrap_pocket(*args, **kwargs):
         seen['inside'] = True
@@ -444,7 +441,7 @@ def test_pocket_search_checks_while_it_runs():
         if outline is not None and line is not None:
             seen['named'] += 1
 
-    solvers._body_pocket_seals = wrap_pocket
+    pockets._body_pocket_seals = wrap_pocket
     progress.clear()
     try:
         progress.install(focus=on_focus)
@@ -454,7 +451,7 @@ def test_pocket_search_checks_while_it_runs():
         assert seen['checks'] > 1
         assert seen['named'] >= 1
     finally:
-        solvers._body_pocket_seals = real
+        pockets._body_pocket_seals = real
         progress.clear()
 
 
@@ -484,21 +481,20 @@ def test_hole_splits_reach_the_geometry_hook():
     """Hole splits are reported once, before parallel hugs are dropped."""
     pytest.importorskip('pyclipper')
     QPainterPath, QRectF, _generate = _need_solver()
-    from weedlib import solvers
-    from weedlib.solvers import island_hop_weeds
+    from weedlib.solvers import emit, island_hop_weeds
 
     keep = QPainterPath()
     keep.addRect(QRectF(0, 0, 200, 160))
     keep.addRect(QRectF(10, 10, 180, 140))
     seen = []
     at_drop = []
-    real_drop = solvers._drop_parallel_hugs
+    real_drop = emit._drop_parallel_hugs
 
     def wrap_drop(weed_path, keep_path, min_cut):
         at_drop.append(list(seen))
         return real_drop(weed_path, keep_path, min_cut)
 
-    solvers._drop_parallel_hugs = wrap_drop
+    emit._drop_parallel_hugs = wrap_drop
     progress.clear()
     try:
         progress.install(geometry=lambda seg: seen.append(tuple(seg)))
@@ -514,7 +510,7 @@ def test_hole_splits_reach_the_geometry_hook():
         assert seen == returned
         assert at_drop and at_drop[0] == returned
     finally:
-        solvers._drop_parallel_hugs = real_drop
+        emit._drop_parallel_hugs = real_drop
         progress.clear()
 
 

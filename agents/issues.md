@@ -22,7 +22,7 @@ paper the architecture with the story.
 
 | Seen | What happened | Rule |
 | --- | --- | --- |
-| *(none)* | | |
+| 2026-11-07, `agents/architecture/algorithms.md` | Modes that cut today still says the private helpers live in `solvers.py`. That file is now the package `src/weedlib/solvers/`. The guide is human-owned, so the sentence was not edited. | [Algorithms](./architecture/algorithms.md). [source-split](./plans/source-split/plan.md). |
 
 ## Closed
 

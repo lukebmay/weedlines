@@ -1,0 +1,25 @@
+# solvers
+
+- `__init__.py` Re-exports the public solver names and the public keep names.
+- `rules.py` Mode list and the numeric floors.
+- `dispatch.py` generate_weeds switches mode, and frame stays here.
+- `grid.py` Hatch plus the closed work rectangle.
+- `clip.py` Clips a segment to a rectangle or a region.
+- `clipper.py` Pyclipper offset and collar rings.
+- `geom.py` Point, ray, and ring predicates with no stage policy.
+- `emit.py` Accepts or drops one segment.
+- `rank.py` Ranks candidate seals.
+- `island.py` Island-hop's pass order, with the phase blocks and hole splits.
+- `peel.py` The grow-clearance peel frame.
+- `cluster.py` Nearby keep bodies and a design frame.
+- `bay.py` Bay and peninsula predicates.
+- `pockets.py` One body's bay seal.
+- `frame_peninsulas.py` Frame-to-letter bay seals.
+- `ties.py` A compact island tied to a host.
+- `gaps.py` The gap between two keep bodies.
+- `corridors.py` A channel-core seal.
+- `agglomerate.py` Joins until one island remains.
+- `channels.py` Keep-to-wall channel and tip spokes.
+- `cluster_bays.py` Multi-body bays and hanging gutters.
+- `traps.py` Residual open waste, and it emits no cuts.
+- `stats.py` Segment counts and sample audits.

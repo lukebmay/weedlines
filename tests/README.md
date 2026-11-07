@@ -15,7 +15,17 @@
 - `test_surround.py` Offset, join gap, and the preamble.
 - `test_surround_bridge.py` Inner bridges and their clearance.
 - `test_surround_smooth.py` Fillets out to the surround distance.
-- `test_weeds.py` Weed strategies: even-odd keep/waste, clip to work, no false reliefs.
+- `test_bays.py` Bay, peninsula, and pocket seals.
+- `test_corridors.py` Corridors, agglomerate, and gutters.
+- `test_emit.py` Clearance, alpha, hugs, slivers, and rank.
+- `test_frame.py` Frame and the mode switch.
+- `test_grid.py` Grid, snap, and the region alias.
+- `test_island.py` Island-hop through generate_weeds.
+- `test_keep.py` Keep fill, twins, and samples.
+- `test_peel.py` The peel frame.
+- `test_ties.py` Compact ties.
+- `test_traps.py` Residual waste traps.
+- `weed_shapes.py` Shared shapes for the weed solver tests.
 - `test_window_gate.py` Window gate: figure check before Start, subject region as keep.
 - `test_window_options.py` Option history on the weedlines window.
 - `test_window_preview.py` Window preview: subject, weed area, arrows, swap, and plugin colors.
