@@ -36,7 +36,9 @@ Manual / prerequisites:
    A custom dialog opens: **Start**, **Pause**, **Clear All**, **Apply**,
    and **Close**, expandable
    stdout/stderr log, and a live preview of weed cuts as they are emitted.
-   **Apply layer & Close** writes the Weedlines layer into the document.
+   **Apply** is its own control. On Apply, the detached window writes
+   the result and does not edit the open document. The person then
+   runs `3 Reimport last weedlines`. **Close** is a separate control.
    (No Inkcut travel/TSP planning here — send the layer to Inkcut next.)
 
 Without Inkscape, unit tests and previews still use the shared core:

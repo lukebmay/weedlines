@@ -26,6 +26,7 @@ paper the architecture with the story.
 
 | Seen | What happened | Rule |
 | --- | --- | --- |
+| 2026-11-08, `docs/inkscape-extension.md` | The install step said **Apply layer & Close** writes the Weedlines layer into the document. Fixed. Apply writes a detached result, and Close is separate. | [Runtime](./architecture/runtime.md). [_bugs](./plans/_bugs/plan.md). |
 | 2026-11-08, `README.md`, `docs/user/surround.md` | The pages told the person to open Weedlines from selection…. Fixed. They name `1 Auto generate weedlines`. | [Host](./architecture/host.md). [_bugs](./plans/_bugs/plan.md). |
 | 2026-11-07, `agents/architecture/algorithms.md` | Modes that cut today said the private helpers live in `solvers.py`. Fixed. The sentence names the solvers package. | [Algorithms](./architecture/algorithms.md). [source-split](./plans/source-split/plan.md). |
 | 2026-11-07, `agents/architecture/preview.md` | The correction return told the person to run Import last result. Fixed. The line names `4 Reimport last ready cut`. | [Preview](./architecture/preview.md). [make-ready](./plans/make-ready/plan.md). |
