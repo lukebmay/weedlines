@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 """Inkscape extension: run shared weedlib weed solvers.
 
-Opens an interactive dialog (Start / Cancel, log, live cut preview) so
-Inkscape is not fed stderr chatter, and long island-hop runs can be
-cancelled.
+Opens an interactive dialog (Start, Pause, Clear All, Apply, and Close,
+log, live cut preview) so Inkscape is not fed stderr chatter, and long
+island-hop runs can be stopped.
 
 Install via ``weedlines install``. Requires Qt + weedlib.
 """
