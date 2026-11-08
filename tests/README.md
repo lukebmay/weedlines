@@ -39,3 +39,4 @@
 - `test_window_surround_run.py` Window surround run: hold, pause, Clear All, and the log.
 - `test_window_units.py` Window surround units: display unit, join gap, and padding.
 - `test_window_timing.py` Window timing: library asks run once, after the dialog is visible.
+- `test_window_step_time.py` Window step clock: working time on the step row.

@@ -2,8 +2,17 @@
 """Start, Restart, Pause, Clear All, Apply, Close, the step row, and the status."""
 from __future__ import division
 
+import time
+
 from .form import _SURROUND_MODE
 from .geometry_ask import _pack_path
+
+# A tenth of a second. The label shows that much, and the tick is the same.
+_STEP_TICK_MS = 100
+# Restart of surround discards conquer. The cut modes are not later steps.
+_LATER_STEPS = {
+    'surround': ('conquer',),
+}
 
 _STEP_TITLES = {
     'frame': 'Frame',
@@ -23,9 +32,15 @@ class _RunControls(object):
         label.setObjectName(name + '-label')
         stamp = self.QtWidgets.QLabel(mark)
         stamp.setObjectName(name + '-mark')
+        clock = self.QtWidgets.QLabel('')
+        clock.setObjectName(name + '-time')
         layout.addWidget(label)
         layout.addWidget(stamp)
         layout.addStretch(1)
+        layout.addWidget(clock)
+        if getattr(self, '_step_clocks', None) is None:
+            self._step_clocks = {}
+        self._step_clocks[name] = clock
         return widget, layout, label
 
     def _solver_running(self):
@@ -112,6 +127,7 @@ class _RunControls(object):
         self.surround_step.setVisible(surround)
         self.conquer_step.setVisible(surround)
         self.start_btn.setVisible(True)
+        self._paint_step_times()
 
     def set_controls(self, busy, paused=False):
         self.state['busy'] = busy
@@ -144,6 +160,7 @@ class _RunControls(object):
         self._sync_start_button()
         if busy and self.state.get('ask') == 'border':
             self._relax_border_controls()
+        self._sync_step_clock()
 
     def _relax_border_controls(self):
         # The border ask is not a run. Pause stays up so a wait can see it.
@@ -182,6 +199,7 @@ class _RunControls(object):
             self.state['surround_started'] = True
             self.state['surround_finished'] = False
             self.state['surround_paths'] = []
+            self._reset_step_time('surround')
             self.refresh_preview()
             if not self._ask_surrounds():
                 if self.state.get('ask') == 'border':
@@ -192,6 +210,7 @@ class _RunControls(object):
                 if self.state.get('ask'):
                     return
                 self.state['surround_started'] = False
+                self._forget_step_time('surround')
                 self.set_controls(False)
             return
         self.clear_weed_items()
@@ -205,6 +224,7 @@ class _RunControls(object):
         if mode in self.state['cut_started']:
             self.state['cut_started'][mode] = True
             self.state['cut_finished'][mode] = False
+            self._reset_step_time(mode)
         self.log_view.clear()
         self.append_log('Starting %s…\n' % mode)
         self.refresh_preview()
@@ -218,6 +238,7 @@ class _RunControls(object):
         if request is None or not self._begin_ask(request):
             if mode in self.state['cut_started']:
                 self.state['cut_started'][mode] = False
+            self._forget_step_time(mode)
             self.set_controls(False)
             self.append_log('Error: solver did not start\n')
 
@@ -290,6 +311,7 @@ class _RunControls(object):
         for key in self.state['cut_started']:
             self.state['cut_started'][key] = False
             self.state['cut_finished'][key] = False
+        self._clear_step_times()
         self.apply_btn.setEnabled(False)
         self.refresh_preview()
 
@@ -343,3 +365,122 @@ class _RunControls(object):
 
     def _in_surround(self):
         return self.mode_box.currentData() == _SURROUND_MODE
+
+    def _ensure_step_clock(self):
+        if getattr(self, '_step_seconds', None) is not None:
+            return
+        self._step_seconds = {}
+        self._step_active = None
+        self._step_slice = None
+        timer = self.QtCore.QTimer(self.dialog)
+        timer.setInterval(_STEP_TICK_MS)
+        timer.timeout.connect(self._tick_step_clock)
+        timer.start()
+        self._step_timer = timer
+
+    def _working_step_key(self):
+        # The border ask is not a started step. It does not own a time.
+        if (not self.state.get('busy') or self.state.get('paused')
+                or self.state.get('aborting')):
+            return None
+        ask = self.state.get('ask')
+        if ask == 'solver':
+            mode = self.state.get('run_mode')
+            if mode and self.state['cut_started'].get(mode):
+                return mode
+        if ask == 'surround' and self.state.get('surround_started'):
+            return 'surround'
+        return None
+
+    def _freeze_step_clock(self):
+        key = self._step_active
+        if key is None or self._step_slice is None:
+            self._step_active = None
+            self._step_slice = None
+            return
+        elapsed = time.monotonic() - self._step_slice
+        if elapsed < 0.0:
+            elapsed = 0.0
+        self._step_seconds[key] = self._step_seconds.get(key, 0.0) + elapsed
+        self._step_active = None
+        self._step_slice = None
+
+    def _sync_step_clock(self):
+        self._ensure_step_clock()
+        working = self._working_step_key()
+        if working != self._step_active:
+            self._freeze_step_clock()
+            if working is not None:
+                self._step_active = working
+                self._step_slice = time.monotonic()
+                self._step_seconds.setdefault(working, 0.0)
+        self._paint_step_times()
+
+    def _reset_step_time(self, key):
+        self._ensure_step_clock()
+        if self._step_active == key:
+            self._step_active = None
+            self._step_slice = None
+        self._step_seconds[key] = 0.0
+        for later in _LATER_STEPS.get(key, ()):
+            self._step_seconds.pop(later, None)
+        self._paint_step_times()
+
+    def _forget_step_time(self, key):
+        if getattr(self, '_step_seconds', None) is None:
+            return
+        if self._step_active == key:
+            self._step_active = None
+            self._step_slice = None
+        self._step_seconds.pop(key, None)
+        self._paint_step_times()
+
+    def _clear_step_times(self):
+        if getattr(self, '_step_seconds', None) is None:
+            self._paint_step_times()
+            return
+        self._step_active = None
+        self._step_slice = None
+        self._step_seconds.clear()
+        self._paint_step_times()
+
+    def _shown_step_seconds(self, key):
+        total = 0.0
+        if getattr(self, '_step_seconds', None) is not None:
+            total = self._step_seconds.get(key, 0.0)
+        if self._step_active == key and self._step_slice is not None:
+            live = time.monotonic() - self._step_slice
+            if live > 0.0:
+                total += live
+        if total < 0.0:
+            total = 0.0
+        return total
+
+    def _format_step_time(self, seconds):
+        return '%.1f' % seconds
+
+    def _paint_step_times(self):
+        clocks = getattr(self, '_step_clocks', None)
+        if not clocks or not hasattr(self, 'state'):
+            return
+        mode = self.mode_box.currentData()
+        cut = clocks.get('step-cut')
+        if cut is not None:
+            if mode and self.state['cut_started'].get(mode):
+                cut.setText(self._format_step_time(self._shown_step_seconds(mode)))
+            else:
+                cut.setText('')
+        surround = clocks.get('step-surround')
+        if surround is not None:
+            if self.state.get('surround_started'):
+                surround.setText(self._format_step_time(
+                    self._shown_step_seconds('surround')))
+            else:
+                surround.setText('')
+        conquer = clocks.get('step-conquer')
+        if conquer is not None:
+            conquer.setText('')
+
+    def _tick_step_clock(self):
+        # The tick only rewrites the time labels. It does not ask or repaint.
+        self._paint_step_times()
