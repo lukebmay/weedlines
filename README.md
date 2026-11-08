@@ -1,8 +1,9 @@
 # Weedlines
 
 Inkscape extension and shared solvers for **weed cuts** on vinyl (and
-similar) designs. Algorithms run in a Start / Cancel dialog with a live
-preview of SVG constructions as cuts are emitted.
+similar) designs. Algorithms run in a Start, Pause, Clear All, Apply,
+and Close dialog with a live preview of SVG constructions as cuts are
+emitted.
 
 Extracted from a private Inkcut fork; intended to stay standalone until
 the algorithms are solid, then optionally integrate back into
@@ -62,7 +63,7 @@ The dialog enables level `1` for the run so the live log is useful.
 
 While an algorithm runs, **Pause** freezes the worker at the next
 checkpoint so you can inspect the live preview. **Resume** continues;
-**Cancel** aborts (also works while paused). Programmatically:
+**Clear All** aborts, including while paused. Programmatically:
 
 ```python
 from weedlib import progress, generate_weeds
