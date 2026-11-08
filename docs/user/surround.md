@@ -44,9 +44,15 @@ change the surround.
 
 ## Start
 
+- [ ] Before the step is started, the window shows no time.
 - [ ] Choose **Start Algorithm**. The surround is drawn in the
   **Weed line color**, on top of the checkerboard. That does
   not write a result.
+- [ ] The window shows how long that started step has been
+  working, with that step's status.
+- [ ] Choose **Pause**. The time holds. **Resume** continues
+  that run.
+- [ ] When the step is done, the time stays.
 - [ ] Change **Surround distance** or **Join gap**. The
   surround follows the new length.
 - [ ] Choose **Swap subject and weed area**. The surround follows
@@ -56,6 +62,9 @@ change the surround.
 - [ ] Change to another mode. The lines clear and your numbers
   stay. Choose **Surround and Conquer** again. The surround is
   drawn again.
+- [ ] Choose **Restart**. The time starts from zero.
+- [ ] Choose **Clear All**. The time is discarded with the
+  lines.
 
 ## Change the surround
 

@@ -1,6 +1,6 @@
 # Run page
 
-**Status:** in-progress
+**Status:** done
 
 ## Goal
 
@@ -77,5 +77,25 @@ Start Algorithm, Change surround, library, cavern, or
 Conquer, and they do not name a border label. No other file
 was edited for this task. Status left in-progress.
 
-The reviewer then writes the summary, the context worth keeping,
-and the result.
+Summary: No defects. The Start section shows no time before
+the step is started, then the working time with that step's
+status. Pause holds it, and the time stays when the step is
+done. Restart starts it from zero. Clear All discards it with
+the lines. Conquer is not given a time. The new boxes do not
+say Start Algorithm, Change surround, the library, a border
+label, or a cavern measure. The older Start Algorithm and
+Change surround sentences are still there.
+
+Context worth keeping: Restart and Clear All stay after the
+mode-change box. That box clears the lines, then returns to
+Surround and Conquer and draws the surround again. Leaving
+the mode does not discard the started step, so the time the
+earlier boxes set up is still showing when Restart sets it
+to zero. The pass is `cr-01.md`. `git diff --
+docs/user/surround.md` is only those boxes. Do not treat
+`extensions/inkscape/weedlines_dialog/run_controls.py`, or
+the other dirty files, as this change. There is no automated
+test. No test reads the page.
+
+Result: No defects remain. The named checks passed. There
+is no automated test.
