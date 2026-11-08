@@ -2,9 +2,9 @@
 
 The order of active tasks for design-copy.
 
-(none yet)
+(none — waiting on the human. The host part does not
+say the design copy is the path records. Do not
+invent that sentence.)
 
-Waiting on control-names task extension-sentence. That
-task may edit the opening docstring of
-`extensions/inkscape/weedlines.py`. This plan edits the
-rest of that file.
+[design-records](tasks/inactive/design-records/task.md)
+stays waiting.

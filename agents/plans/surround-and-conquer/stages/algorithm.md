@@ -28,3 +28,13 @@ with this stage. It does not gain a longer guide.
 
 Conquer. A second surround inside a cluster. A smoothing
 control. Those are later stages and have no tasks.
+
+A clip of the surround to the piece, and a rectangle around
+the piece, are [`../../piece-border/`](../../piece-border/).
+They are not this plan.
+
+The cavern allowance on the surround coastline is
+[`../../surround-cavern/`](../../surround-cavern/). The
+measure is [`../../concavity/`](../../concavity/). This
+stage does not add that bridge, and it does not name the
+measure.

@@ -24,11 +24,14 @@ A waiting plan stays under its rank. The notes say why. Skip it.
 | [source-split](plans/source-split/plan.md) | The split stage is met. No open task. Skip it. |
 | [make-ready](plans/make-ready/plan.md) | The stub tasks are done. Cleanup waits on the design meeting and has no tasks. |
 | [surround-doc](plans/surround-doc/plan.md) | The label stage is met. No open task. Skip it. |
+| [piece-border](plans/piece-border/plan.md) | The rectangles, the clip, and the preview are in. Waiting on the human to name the two length labels. Do not invent them. |
+| [step-timer](plans/step-timer/plan.md) | The clock and the page are in. No open task. Skip it. |
+| [concavity](plans/concavity/plan.md) | Waiting on the human. Mouth and reach still have two readings. Do not crown one. |
+| [surround-cavern](plans/surround-cavern/plan.md) | Waiting on concavity to name the measure. The inner rectangle is in place. |
 | [preview-color-picker](plans/preview-color-picker/plan.md) | Waiting on source-split's dialog package. |
 | [start-disabled-reason](plans/start-disabled-reason/plan.md) | Waiting on source-split's run controls file. |
-| [control-names](plans/control-names/plan.md) | The pages still say Cancel, Start Algorithm, and Change surround. After surround-doc. |
-| [piece-border](plans/piece-border/plan.md) | The sentences are in the guide. Follows the plans above. Do not remove island-hop. |
-| [surround-and-conquer](plans/surround-and-conquer/plan.md) | The surround step in the guide. Conquer starts when the human asks. The piece border is not this plan. |
+| [control-names](plans/control-names/plan.md) | The pages name the run controls. No open task. Skip it. |
+| [surround-and-conquer](plans/surround-and-conquer/plan.md) | The surround step except the cavern coastline. That coastline is surround-cavern. Conquer starts when the human asks. |
 | [_bugs](plans/_bugs/plan.md) | No open task. The directory stays open. |
 | [responsive-run](plans/responsive-run/plan.md) | The responsive stage is met. No open task. Skip it. |
 | [segment-publish](plans/segment-publish/plan.md) | The publish stage is met. No open task. Skip it. |
@@ -39,9 +42,10 @@ A waiting plan stays under its rank. The notes say why. Skip it.
 
 | Plan | Notes |
 | --- | --- |
-| [run-log-label](plans/run-log-label/plan.md) | Waiting on source-split's dialog package. |
-| [design-copy](plans/design-copy/plan.md) | Waiting on control-names task extension-sentence. Same file, `weedlines.py`. |
-| [extension-doc-drift](plans/extension-doc-drift/plan.md) | Waiting on surround-doc and control-names. |
+| [weedlib-index](plans/weedlib-index/plan.md) | The index is in. No open task. Skip it. |
+| [run-log-label](plans/run-log-label/plan.md) | Waiting on the human to name the words above the log. Do not invent them. |
+| [design-copy](plans/design-copy/plan.md) | Waiting on the human. The host part does not say the design copy is the path records. Do not invent that sentence. |
+| [extension-doc-drift](plans/extension-doc-drift/plan.md) | The page follows the host menu and the install part. No open task. Skip it. |
 
 ## 2 low
 

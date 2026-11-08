@@ -8,8 +8,9 @@
 
 The window opens on Surround and Conquer. On a clear design the
 person starts the surround, and that surround matches the
-algorithms and preview parts. Conquer is a later stage. Frame,
-grid, and island-hop still cut.
+algorithms and preview parts, except the cavern coastline.
+That coastline is [`../surround-cavern/plan.md`](../surround-cavern/plan.md).
+Conquer is a later stage. Frame, grid, and island-hop still cut.
 
 ## Guide
 

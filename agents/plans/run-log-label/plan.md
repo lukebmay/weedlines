@@ -2,6 +2,8 @@
 
 **Rank:** 3
 
+**Stage:** label
+
 ## Goal
 
 The person can see that the pane is the run's output

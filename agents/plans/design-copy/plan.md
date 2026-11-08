@@ -2,6 +2,8 @@
 
 **Rank:** 3
 
+**Stage:** copy
+
 ## Goal
 
 The weed-line result's design copy is the same path

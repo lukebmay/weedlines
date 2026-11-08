@@ -1,7 +1,8 @@
 # Priority
 
-The order of active tasks for run-log-label.
+The order of active tasks for run-log-label. A path, then
+the reason only when the order would otherwise be a guess.
 
-(none yet)
-
-Waiting on source-split's dialog package.
+(none — the label words are not named.
+[log-label](tasks/inactive/log-label/task.md)
+stays waiting. Do not invent the words.)
