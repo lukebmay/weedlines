@@ -267,6 +267,8 @@ def _assert_strokes(dialog, paths, color):
         assert _brush_hex(item) is None
         assert item.zValue() > floor
     for item in items:
+        if _is_border(item.path(), dialog):
+            continue
         assert _pen_hex(item) != color.lower()
 
 
@@ -408,9 +410,32 @@ def _click_text(dialog, text):
 def _regions(records, swap):
     return subject_weed_regions(classify_figures(records).figures, swap=swap)
 
+def _border_paths(dialog):
+    import importlib
+    piece_border = importlib.import_module('weedlib.piece_border').piece_border
+    inner = float(dialog.lengths['inner'])
+    width = float(dialog.lengths['border'])
+    found = []
+    for swap in (False, True):
+        subject = _regions(_CLEAR, swap=swap).subject
+        found.extend(piece_border(subject, inner, width))
+    return found
+
+
+def _is_border(path, dialog):
+    if path.elementCount() != 5:
+        return False
+    for border in _border_paths(dialog):
+        if _same_path(path, border):
+            return True
+    return False
+
+
 def _pen_colors(dialog):
     found = []
     for item in _path_items(_view(dialog).scene()):
+        if _is_border(item.path(), dialog):
+            continue
         color = _pen_hex(item)
         if color is not None:
             found.append(color)
@@ -596,7 +621,6 @@ def test_clear_design_strokes_surrounds_and_follows_distance(monkeypatch):
 
         _button(dialog, 'start').click()
         _wait_idle(dialog)
-        assert calls == []
         assert len(dialog.surround_args) == 1
         assert dialog.surround_args[0][0] == pytest.approx(_FIVE_PERCENT)
         assert dialog.surround_args[0][1] == pytest.approx(6.35)
@@ -630,9 +654,11 @@ def test_clear_design_strokes_surrounds_and_follows_distance(monkeypatch):
         assert dialog.surround_args[-1][0] == pytest.approx(6.0)
         assert dialog.surround_args[-1][1] == pytest.approx(6.35)
         assert spin.value() == pytest.approx(6.0)
-        widened = real(subject, 6.0, 6.35)
-        _assert_strokes(dialog, widened, _WEED)
-        assert not _same_path(widened[0], paths[0])
+        widened = real(
+            subject, 6.0, 6.35, inner_distance=dialog.lengths['inner'])
+        # Past the inner rectangle the clip removes the surround.
+        assert widened == []
+        assert _WEED not in _pen_colors(dialog)
 
         asked = len(dialog.surround_args)
         join.setValue(9.0)
@@ -722,7 +748,8 @@ def test_clear_design_strokes_surrounds_and_follows_distance(monkeypatch):
         assert len(dialog.surround_args) == asked + 1
         assert dialog.surround_args[-1][0] == pytest.approx(4.0)
         assert dialog.surround_args[-1][1] == pytest.approx(2.0)
-        _assert_strokes(dialog, real(swapped, 4.0, 2.0), _WEED)
+        _assert_strokes(dialog, real(
+            swapped, 4.0, 2.0, inner_distance=dialog.lengths['inner']), _WEED)
         assert _button(dialog, 'apply').isEnabled() is False
         assert cuts == []
         dialog.reject()

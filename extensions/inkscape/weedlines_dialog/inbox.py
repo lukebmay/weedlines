@@ -15,6 +15,7 @@ def _empty_inbox():
         'arrows': [],
         'marks': [],
         'surrounds': [],
+        'borders': [],
         'result': None,
         'error': None,
         'cancelled': False,
@@ -77,12 +78,18 @@ class _Inbox(object):
                 self.state['swaps'].append(bool(msg[2]))
             elif msg[1] == 'surrounds' and len(msg) >= 4:
                 self.state['surround_args'].append((float(msg[2]), float(msg[3])))
+                if len(msg) >= 5:
+                    self.state['surround_inner'].append(float(msg[4]))
+            elif msg[1] == 'piece_border' and len(msg) >= 4:
+                self.state['border_args'].append((float(msg[2]), float(msg[3])))
             elif msg[1] == 'solver' and len(msg) >= 5:
                 self.state['solver_args'].append((
                     [float(value) for value in msg[2]],
                     float(msg[3]),
                     float(msg[4]),
                 ))
+                if len(msg) >= 7:
+                    self.state['solver_border'].append((float(msg[5]), float(msg[6])))
         elif kind == 'figure':
             inbox['figures'].append(msg[1:])
         elif kind == 'defect':
@@ -99,6 +106,8 @@ class _Inbox(object):
             inbox['marks'].append(msg[1:])
         elif kind == 'surround':
             inbox['surrounds'].append((msg[1], msg[2]))
+        elif kind == 'border':
+            inbox['borders'].append((msg[1], msg[2]))
         elif kind == 'cancelled':
             inbox['cancelled'] = True
         elif kind == 'error':
@@ -162,6 +171,8 @@ class _Inbox(object):
                 self._after_subject(inbox)
             elif kind == 'surround':
                 self._after_surround(inbox)
+            elif kind == 'border':
+                self._after_border(inbox)
             elif kind == 'solver':
                 self._after_solver(inbox)
         except Exception as exc:

@@ -14,6 +14,10 @@ _CUT_MODES = ('frame', 'grid', 'island-hop')
 _QUARTER_INCH = 0.25
 
 
+# Eighth inch. The user-unit count is this divided by the document scale.
+_EIGHTH_INCH = 0.125
+
+
 # Inkscape's linear display units. Percent and em are not lengths.
 # q, yd, and km stay off this list. They remain SVG length units.
 _DISPLAY_UNITS = (
@@ -174,19 +178,25 @@ class _Form(object):
     def _on_swap(self):
         if self.state.get('opening') or self._solver_running():
             return
-        if self.state['busy'] and self.state.get('ask') != 'surround':
+        if self.state['busy'] and self.state.get('ask') not in ('surround', 'border'):
             return
         self.state['swapped'] = not self.state['swapped']
         if self.state.get('ask') == 'surround':
             # The swap flag is already toggled. The arrival starts
             # the subject ask. This thread does not wait on the child.
             return
-        if not self._begin_ask(self._subject_request()):
-            self.state['swapped'] = not self.state['swapped']
-            return
         app_loop = self.QtWidgets.QApplication.instance()
-        while self.state.get('ask') == 'subject' and self.dialog.isVisible():
+        while self.state.get('ask') == 'border' and self.dialog.isVisible():
             app_loop.processEvents(self.QtCore.QEventLoop.AllEvents, 50)
+        if self.state['swapped'] != self.state.get('regions_swap'):
+            if self.state.get('ask') != 'subject':
+                if not self._begin_ask(self._subject_request()):
+                    self.state['swapped'] = not self.state['swapped']
+                    return
+            while self.state.get('ask') == 'subject' and self.dialog.isVisible():
+                app_loop.processEvents(self.QtCore.QEventLoop.AllEvents, 50)
+        # The new subject is stored. Ask for its border.
+        self._ask_border()
 
     def _on_mode(self, _index=None):
         self._remember_mode()
@@ -199,7 +209,7 @@ class _Form(object):
             self._show_steps()
             self._sync_start_button()
             return
-        if self._solver_running() or self.state.get('ask') not in (None, 'surround'):
+        if self._solver_running() or self.state.get('ask') not in (None, 'surround', 'border'):
             return
         had_surrounds = bool(self.state['surround_paths'])
         self._show_surround_controls()
@@ -228,6 +238,25 @@ class _Form(object):
             # the in-flight result when it arrives.
             return
         self._ask_surrounds()
+
+    def _on_piece_length(self, key=None):
+        # No spin. A later options task calls this after it stores the length.
+        if not isinstance(key, str):
+            key = None
+        if key not in (None, 'inner', 'border'):
+            return
+        if (self.blocked or self.state.get('opening') or self._solver_running()
+                or self.state.get('drop')):
+            return
+        if self.state.get('ask'):
+            # The stored length is already new. Do not paint this ask.
+            return
+        if self._ask_border():
+            return
+        if key == 'border':
+            return
+        if self._surround_due() and self._surround_stale():
+            self._ask_surrounds()
 
     def _show_lengths(self):
         """Show stored user-unit lengths in the current display unit."""
@@ -381,7 +410,7 @@ class _Form(object):
             lambda edit=edit, value=old: self._restore_color(edit, value))
 
     def _commit_color(self, edit):
-        if self.state['busy']:
+        if self.state['busy'] and self.state.get('ask') != 'border':
             edit.blockSignals(True)
             edit.setText(edit.property('color'))
             edit.blockSignals(False)

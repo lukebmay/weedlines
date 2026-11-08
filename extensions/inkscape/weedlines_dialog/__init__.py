@@ -7,6 +7,7 @@ from collections import deque
 
 from .form import (
     _DISPLAY_UNITS,
+    _EIGHTH_INCH,
     _Form,
     _LENGTH_LIMITS,
     _OptionStack,
@@ -44,11 +45,15 @@ class _Window(_Form, _RunControls, _ReturnLine, _Preview, _Inbox, _Ask):
         on the form are shown in that display unit. Padding, spacing,
         the collar, the surround distance, and the join gap still reach
         the library in document user units. The join gap starts at a
-        quarter inch in those units. *defaults*
+        quarter inch in those units. The inner distance and the border
+        width start at an eighth of an inch in those units. *defaults*
         may include mode, padding, spacing, collar, layer_name. Missing or
         blank mode opens on Surround and Conquer. Start in that mode
         asks for the surround and paints it. It does not run a solver.
         Until that start, the window does not ask for a surround.
+        A clear figure check asks for the piece border without Start,
+        including on open. The child calls the library. This thread
+        paints the paths it returns.
 
         *platform_lines* is an optional deque fed by ``NativeStdioCapture``
         (Qt/OS stderr). Those lines are shown in the log and never reach Inkscape.
@@ -59,9 +64,10 @@ class _Window(_Form, _RunControls, _ReturnLine, _Preview, _Inbox, _Ask):
         *ready*, when given, is called with the dialog once the window is
         shown. The figure check, the subject and weed area, and any arrow
         paths finish after the window is visible and before that call.
-        The surround is not asked until Start. That ask uses
-        the same spawn target. This thread builds the paths and paints
-        them. It does not run the surround or a solver on this thread.
+        The surround is not asked until Start. The piece border is
+        asked off this thread when the check is clear. That ask uses
+        the same spawn target. This thread paints the paths. It does
+        not run the border, the surround, or a solver on this thread.
         """
         self.records = records
         self.platform_lines = platform_lines
@@ -311,7 +317,12 @@ class _Window(_Form, _RunControls, _ReturnLine, _Preview, _Inbox, _Ask):
             'run_mode': None,
             'surround_paths': [],
             'surround_args': [],
+            'surround_inner': [],
             'surround_inflight': None,
+            'border_paths': [],
+            'border_args': [],
+            'border_inflight': None,
+            'solver_border': [],
             'regions_swap': None,
             'asked': False,
             'calls': [],
@@ -341,6 +352,8 @@ class _Window(_Form, _RunControls, _ReturnLine, _Preview, _Inbox, _Ask):
                 'collar': float(defaults.get('collar', 4.0)),
                 'distance': 0.0,
                 'join': _QUARTER_INCH / self.dialog.user_unit_scale,
+                'inner': _EIGHTH_INCH / self.dialog.user_unit_scale,
+                'border': _EIGHTH_INCH / self.dialog.user_unit_scale,
             },
             'limits': dict(_LENGTH_LIMITS),
             'unit': shown_unit,
@@ -352,6 +365,11 @@ class _Window(_Form, _RunControls, _ReturnLine, _Preview, _Inbox, _Ask):
         self.dialog.worker_calls = self.state['calls']
         self.dialog.worker_swaps = self.state['swaps']
         self.dialog.surround_args = self.state['surround_args']
+        self.dialog.surround_inner = self.state['surround_inner']
+        self.dialog.border_args = self.state['border_args']
+        self.dialog.solver_border = self.state['solver_border']
+        self.dialog.lengths = self.state['lengths']
+        self.dialog.change_piece_length = self._on_piece_length
         self.dialog.solver_keeps = self.state['solver_keeps']
         self.dialog.solver_args = self.state['solver_args']
         self.dialog.focus_mark = None
@@ -472,11 +490,15 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     on the form are shown in that display unit. Padding, spacing,
     the collar, the surround distance, and the join gap still reach
     the library in document user units. The join gap starts at a
-    quarter inch in those units. *defaults*
+    quarter inch in those units. The inner distance and the border
+    width start at an eighth of an inch in those units. *defaults*
     may include mode, padding, spacing, collar, layer_name. Missing or
     blank mode opens on Surround and Conquer. Start in that mode
     asks for the surround and paints it. It does not run a solver.
     Until that start, the window does not ask for a surround.
+    A clear figure check asks for the piece border without Start,
+    including on open. The child calls the library. This thread
+    paints the paths it returns.
 
     *platform_lines* is an optional deque fed by ``NativeStdioCapture``
     (Qt/OS stderr). Those lines are shown in the log and never reach Inkscape.
@@ -487,9 +509,10 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     *ready*, when given, is called with the dialog once the window is
     shown. The figure check, the subject and weed area, and any arrow
     paths finish after the window is visible and before that call.
-    The surround is not asked until Start. That ask uses
-    the same spawn target. This thread builds the paths and paints
-    them. It does not run the surround or a solver on this thread.
+    The surround is not asked until Start. The piece border is
+    asked off this thread when the check is clear. That ask uses
+    the same spawn target. This thread paints the paths. It does
+    not run the border, the surround, or a solver on this thread.
     """
     return _Window().run(
         records, defaults=defaults, platform_lines=platform_lines,

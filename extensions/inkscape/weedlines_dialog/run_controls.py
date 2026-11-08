@@ -36,7 +36,9 @@ class _RunControls(object):
         # ask so a newer one can wait. The solver still locks the form.
         if self.state.get('opening') or self._solver_running():
             return True
-        return self.state['busy'] and self.state.get('ask') != 'surround'
+        if self.state.get('ask') in ('surround', 'border'):
+            return False
+        return self.state['busy']
 
     def _current_started(self):
         if self._in_surround():
@@ -70,8 +72,17 @@ class _RunControls(object):
 
     def _sync_start_button(self):
         self.start_btn.setText('Restart' if self._current_started() else 'Start')
-        self.start_btn.setEnabled((not self.state['busy']) and not self.blocked)
+        border = self.state.get('ask') == 'border'
+        self.start_btn.setEnabled(
+            (not self.state['busy'] or border) and not self.blocked)
         self.conquer_btn.setEnabled(False)
+        if border:
+            self.spinner.setVisible(False)
+            if self._current_finished():
+                self.status_label.setText('done')
+            else:
+                self.status_label.setText('ready')
+            return
         self._render_status()
 
     def _end_abort(self):
@@ -131,10 +142,37 @@ class _RunControls(object):
         self._arm_surround_controls()
         self._show_steps()
         self._sync_start_button()
+        if busy and self.state.get('ask') == 'border':
+            self._relax_border_controls()
+
+    def _relax_border_controls(self):
+        # The border ask is not a run. Pause stays up so a wait can see it.
+        self.spinner.setVisible(False)
+        if self._current_finished():
+            self.status_label.setText('done')
+        else:
+            self.status_label.setText('ready')
+        self.start_btn.setEnabled(not self.blocked)
+        self.pad_spin.setEnabled(True)
+        self.space_spin.setEnabled(True)
+        self.collar_spin.setEnabled(True)
+        self.layer_edit.setEnabled(True)
+        self.light_edit.setEnabled(True)
+        self.dark_edit.setEnabled(True)
+        self.weed_edit.setEnabled(True)
+        self.subject_edit.setEnabled(True)
+        self.mode_box.setEnabled(True)
+        self.swap_btn.setEnabled(True)
+        self.apply_btn.setEnabled(self.state['result'] is not None)
+        self._arm_surround_controls()
 
     def on_start(self):
-        if (self.state['busy'] or self.blocked or self.state.get('ask')
-                or self.state.get('aborting')):
+        ask = self.state.get('ask')
+        if self.blocked or self.state.get('aborting'):
+            return
+        if ask not in (None, 'border'):
+            return
+        if self.state['busy'] and ask != 'border':
             return
         self.state['cancel'].clear()
         self.state['pause'].clear()
@@ -146,6 +184,13 @@ class _RunControls(object):
             self.state['surround_paths'] = []
             self.refresh_preview()
             if not self._ask_surrounds():
+                if self.state.get('ask') == 'border':
+                    # The finished tuple still matches this distance.
+                    # The follow would not ask. The lines are already gone.
+                    self.state['surround_inflight'] = None
+                    return
+                if self.state.get('ask'):
+                    return
                 self.state['surround_started'] = False
                 self.set_controls(False)
             return
@@ -163,27 +208,44 @@ class _RunControls(object):
         self.log_view.clear()
         self.append_log('Starting %s…\n' % mode)
         self.refresh_preview()
+        self.state['last_fit'] = 0.0
+        self.state['close_when_done'] = False
+        if self.state.get('ask') == 'border':
+            # The path and the lengths are read when this ask starts.
+            self.state['solver_request'] = mode
+            return
+        request = self._solver_request(mode)
+        if request is None or not self._begin_ask(request):
+            if mode in self.state['cut_started']:
+                self.state['cut_started'][mode] = False
+            self.set_controls(False)
+            self.append_log('Error: solver did not start\n')
+
+    def _solver_request(self, mode):
+        """One solver ask from the subject and lengths stored now."""
+        regions = self._ensure_regions()
+        if regions is None or regions.subject is None:
+            return None
         padding = self.state['lengths']['padding']
         spacing = self.state['lengths']['spacing']
         collar = self.state['lengths']['collar']
-        keep = self.QPainterPath(self.state['regions'].subject)
+        inner = self.state['lengths']['inner']
+        border = self.state['lengths']['border']
+        keep = self.QPainterPath(regions.subject)
         self.state['solved_keep'] = keep
         self.state['solved_pad'] = [padding, padding, padding, padding]
-        self.state['last_fit'] = 0.0
-        self.state['close_when_done'] = False
         elements, rule = _pack_path(keep)
-        if not self._begin_ask({
+        return {
             'kind': 'solver',
             'mode': mode,
             'padding': [padding, padding, padding, padding],
             'spacing': spacing,
             'collar': collar,
+            'inner_distance': inner,
+            'border_width': border,
             'elements': elements,
             'rule': rule,
-        }):
-            self.state['cut_started'][mode] = False
-            self.set_controls(False)
-            self.append_log('Error: solver did not start\n')
+        }
 
     def _sync_worker_flags(self):
         mp_pause = self.state.get('mp_pause')
@@ -198,6 +260,8 @@ class _RunControls(object):
                 mp_cancel.set()
 
     def on_pause_toggle(self):
+        if self.state.get('ask') == 'border':
+            return
         if (not self.state['busy'] or self.state['cancel'].is_set()
                 or self.state.get('aborting')):
             return
@@ -222,6 +286,7 @@ class _RunControls(object):
         self.state['surround_started'] = False
         self.state['surround_finished'] = False
         self.state['surround_inflight'] = None
+        self.state['solver_request'] = None
         for key in self.state['cut_started']:
             self.state['cut_started'][key] = False
             self.state['cut_finished'][key] = False
@@ -252,7 +317,10 @@ class _RunControls(object):
         return
 
     def on_apply(self):
-        if self.state['result'] is None or self.state['busy']:
+        # The border ask is not a run. A finished result can still apply.
+        if self.state['result'] is None:
+            return
+        if self.state['busy'] and self.state.get('ask') != 'border':
             return
         self.state['accepted'] = True
         self.dialog.accept()

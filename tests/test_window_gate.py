@@ -447,6 +447,9 @@ def _pen_names(dialog):
         color = pen().color()
         if color.alpha() == 0:
             continue
+        path = item.path() if hasattr(item, 'path') else None
+        if path is not None and path.elementCount() == 5:
+            continue
         names.add(color.name().lower())
     return names
 

@@ -205,6 +205,15 @@ def _send_call(conn, name, swap=None):
         conn.send(('call', name, bool(swap)))
 
 
+def _optional_length(request, key):
+    if request.get(key) is None:
+        return None
+    try:
+        return float(request.get(key))
+    except (TypeError, ValueError):
+        return None
+
+
 def _arm_solver_log(conn):
     """Same ``WEEDLINES_LOG`` setup the solver used in-process.
 
@@ -258,16 +267,21 @@ def _ask_solver(request, conn, pausing, cancelled):
         collar = float(request.get('collar', 0.0))
     except (TypeError, ValueError):
         collar = 0.0
+    inner_distance = _optional_length(request, 'inner_distance')
+    border_width = _optional_length(request, 'border_width')
     keep = _unpack_path(
         request.get('elements') or [], request.get('rule') or 'odd')
     elements, rule = _pack_path(keep)
     conn.send(('keep', str(mode), elements, rule))
-    conn.send((
+    call = (
         'call', 'solver',
         [float(value) for value in padding],
         float(spacing),
         float(collar),
-    ))
+    )
+    if inner_distance is not None and border_width is not None:
+        call = call + (inner_distance, border_width)
+    conn.send(call)
 
     def on_phase(name):
         conn.send(('phase', str(name)))
@@ -300,6 +314,8 @@ def _ask_solver(request, conn, pausing, cancelled):
             padding=padding,
             spacing=spacing,
             collar=collar,
+            inner_distance=inner_distance,
+            border_width=border_width,
         )
         if cancelled.is_set():
             raise WeedCancelled('weed generation cancelled')
@@ -351,12 +367,38 @@ def _ask_surround(request, conn):
         distance = 0.0
     if join_gap < 0.0:
         join_gap = 0.0
-    conn.send(('call', 'surrounds', distance, join_gap))
+    inner_distance = _optional_length(request, 'inner_distance')
+    if inner_distance is None:
+        conn.send(('call', 'surrounds', distance, join_gap))
+    else:
+        conn.send(('call', 'surrounds', distance, join_gap, inner_distance))
     subject = _unpack_path(
         request.get('elements') or [], request.get('rule') or 'odd')
-    for path in build_surrounds(subject, distance, join_gap):
+    if inner_distance is None:
+        surrounds = build_surrounds(subject, distance, join_gap)
+    else:
+        surrounds = build_surrounds(
+            subject, distance, join_gap, inner_distance=inner_distance)
+    for path in surrounds:
         elements, rule = _pack_path(path)
         conn.send(('surround', elements, rule))
+
+
+def _ask_piece_border(request, conn):
+    """One border ask. The library builds the rectangles. No window."""
+    from weedlib.piece_border import piece_border
+    inner_distance = _optional_length(request, 'inner_distance')
+    border_width = _optional_length(request, 'border_width')
+    if inner_distance is None:
+        inner_distance = 0.0
+    if border_width is None:
+        border_width = 0.0
+    conn.send(('call', 'piece_border', inner_distance, border_width))
+    subject = _unpack_path(
+        request.get('elements') or [], request.get('rule') or 'odd')
+    for path in piece_border(subject, inner_distance, border_width):
+        elements, rule = _pack_path(path)
+        conn.send(('border', elements, rule))
 
 
 def _ask_subject(request, conn):
@@ -428,6 +470,8 @@ def _run_geometry_ask(request, conn, pausing, cancelled):
             _ask_subject(request, conn)
         elif kind == 'surround':
             _ask_surround(request, conn)
+        elif kind == 'border':
+            _ask_piece_border(request, conn)
         elif kind == 'solver':
             _ask_solver(request, conn, pausing, cancelled)
         else:
@@ -505,16 +549,18 @@ class _Ask(object):
             and not self.state.get('drop') and not self.state['cancel'].is_set())
 
     def _surround_stale(self):
-        """True when a newer distance, join, or swap is already waiting."""
+        """True when a newer distance, join, inner distance, or swap is waiting."""
         asked = self.state.get('surround_inflight')
         if not asked:
             return False
-        distance, join_gap, swap = asked
+        distance, join_gap, swap, inner = asked
         if bool(self.state['swapped']) != bool(swap):
             return True
         if abs(self.state['lengths']['distance'] - float(distance)) > 1e-9:
             return True
         if abs(self.state['lengths']['join'] - float(join_gap)) > 1e-9:
+            return True
+        if abs(self.state['lengths']['inner'] - float(inner)) > 1e-9:
             return True
         return False
 
@@ -529,19 +575,21 @@ class _Ask(object):
             return False
         distance = self.state['lengths']['distance']
         join_gap = self.state['lengths']['join']
+        inner = float(self.state['lengths']['inner'])
         if distance < 0.0:
             distance = 0.0
         if join_gap < 0.0:
             join_gap = 0.0
         elements, rule = _pack_path(regions.subject)
         self.state['surround_inflight'] = (
-            distance, join_gap, bool(self.state['swapped']))
+            distance, join_gap, bool(self.state['swapped']), inner)
         return self._begin_ask({
             'kind': 'surround',
             'elements': elements,
             'rule': rule,
             'distance': distance,
             'join_gap': join_gap,
+            'inner_distance': inner,
         })
 
     def _begin_ask(self, request):
@@ -589,6 +637,50 @@ class _Ask(object):
             'defects': self.state['plain_defects'],
         }
 
+    def _border_due(self):
+        return not self.blocked and not self.state.get('drop')
+
+    def _border_stale(self):
+        """True when this border was not asked for the current subject."""
+        asked = self.state.get('border_inflight')
+        if not asked:
+            return True
+        inner, width, swap = asked
+        if bool(self.state['swapped']) != bool(swap):
+            return True
+        if abs(self.state['lengths']['inner'] - float(inner)) > 1e-9:
+            return True
+        if abs(self.state['lengths']['border'] - float(width)) > 1e-9:
+            return True
+        return False
+
+    def _ask_border(self):
+        # The child calls piece_border. This thread only paints the reply.
+        if not self._border_due():
+            return False
+        if self.state['swapped'] != self.state.get('regions_swap'):
+            return False
+        regions = self._ensure_regions()
+        if regions is None or regions.subject is None or regions.subject.isEmpty():
+            return False
+        if self.state.get('ask') or not self._border_stale():
+            return False
+        inner = float(self.state['lengths']['inner'])
+        width = float(self.state['lengths']['border'])
+        elements, rule = _pack_path(regions.subject)
+        self.state['border_inflight'] = (
+            inner, width, bool(self.state['swapped']))
+        started = self._begin_ask({
+            'kind': 'border',
+            'elements': elements,
+            'rule': rule,
+            'inner_distance': inner,
+            'border_width': width,
+        })
+        if not started:
+            self.state['border_inflight'] = None
+        return started
+
     def _follow_surround(self):
         """Start the newer ask, if one was waiting. Do not paint the old one."""
         if self.state.get('ask') or self.state.get('drop'):
@@ -596,10 +688,29 @@ class _Ask(object):
         if self.state['swapped'] != self.state.get('regions_swap'):
             self._begin_ask(self._subject_request())
             return
-        if self._surround_due() and self._surround_stale():
+        if self._border_due() and self._border_stale():
+            if self._ask_border():
+                return
+        waiting = (
+            not self.state.get('surround_finished')
+            and self.state.get('surround_inflight') is None)
+        if self._surround_due() and (self._surround_stale() or waiting):
             self._ask_surrounds()
             return
-        self.state['surround_inflight'] = None
+        pending = self.state.get('solver_request')
+        if pending:
+            self.state['solver_request'] = None
+            if self.mode_box.currentData() != pending:
+                if pending in self.state['cut_started']:
+                    self.state['cut_started'][pending] = False
+                return
+            request = self._solver_request(pending)
+            if request is None:
+                if pending in self.state['cut_started']:
+                    self.state['cut_started'][pending] = False
+                return
+            if not self._begin_ask(request):
+                self.state['solver_request'] = pending
 
     def _after_classify(self, inbox):
         if self.state.get('drop'):
@@ -652,13 +763,17 @@ class _Ask(object):
         self.set_controls(False)
         self._set_ask(None)
         if was_opening:
+            # Ready stays on this turn, after the subject paint. The
+            # border ask is the next turn, still without Start.
+            if not self.blocked and not self.state.get('drop'):
+                self.QtCore.QTimer.singleShot(0, self._ask_border)
             self.root.invalidate()
             self.root.activate()
             self._fit()
             if self.ready is not None:
                 self.ready(self.dialog)
             return
-        if due:
+        if not self._ask_border() and due:
             self._ask_surrounds()
 
     def _after_surround(self, inbox):
@@ -700,6 +815,36 @@ class _Ask(object):
         self.set_controls(False)
         self._follow_surround()
 
+    def _after_border(self, inbox):
+        if self.state.get('drop'):
+            self._set_ask(None)
+            return
+        if inbox.get('cancelled'):
+            self._set_ask(None)
+            self.set_controls(False)
+            self._follow_surround()
+            return
+        if inbox.get('error'):
+            self.append_log('Error: %s\n' % inbox['error'])
+            self._set_ask(None)
+            self.set_controls(False)
+            self._follow_surround()
+            return
+        # A newer length or subject is waiting. Do not paint this one.
+        if not self._border_due() or self._border_stale():
+            self._set_ask(None)
+            self.set_controls(False)
+            self._follow_surround()
+            return
+        paths = []
+        for elements, rule in inbox.get('borders') or []:
+            paths.append(_unpack_path(elements, rule))
+        self.state['border_paths'] = paths
+        self.refresh_preview()
+        self._set_ask(None)
+        self.set_controls(False)
+        self._follow_surround()
+
     def _after_solver(self, inbox):
         if self.state.get('close_when_done'):
             self.state['result'] = None
@@ -725,12 +870,14 @@ class _Ask(object):
             self._set_ask(None)
             self.set_controls(False)
             self.refresh_preview()
+            self._follow_surround()
             return
         if inbox.get('error'):
             self.append_log('Algorithm failed: %s\n' % inbox['error'])
             self.state['result'] = None
             self._set_ask(None)
             self.set_controls(False)
+            self._follow_surround()
             return
         packed = inbox.get('result')
         if packed:
@@ -745,12 +892,14 @@ class _Ask(object):
         if self.state['result'] is None or self.state['result'].isEmpty():
             self.append_log('No weed cuts produced.\n')
             self.apply_btn.setEnabled(False)
+            self._follow_surround()
             return
         self.append_log('Done. Review cuts, then Apply.\n')
         rect = self.scene.itemsBoundingRect()
         if not rect.isNull():
             self.view.fitInView(rect, self.QtCore.Qt.KeepAspectRatio)
         self.apply_btn.setEnabled(True)
+        self._follow_surround()
 
     def _fail_ask(self, exc):
         self._set_ask(None)

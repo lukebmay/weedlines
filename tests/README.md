@@ -30,6 +30,7 @@
 - `test_ties.py` Compact ties.
 - `test_traps.py` Residual waste traps.
 - `weed_shapes.py` Shared shapes for the weed solver tests.
+- `test_window_border.py` Window piece border: paint, lengths, swap, and the form.
 - `test_window_gate.py` Window gate: figure check before Start, subject region as keep.
 - `test_window_options.py` Option history on the weedlines window.
 - `test_window_preview.py` Window preview: subject, weed area, arrows, swap, and plugin colors.

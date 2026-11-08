@@ -333,7 +333,8 @@ def test_clear_surround_waits_until_start(monkeypatch):
         assert correction == []
         start.click()
         _wait_idle(dialog)
-        assert list(dialog.worker_calls) == ['classify', 'subject', 'surrounds']
+        assert list(dialog.worker_calls) == [
+            'classify', 'subject', 'surrounds', 'piece_border']
         assert parent == []
         assert surrounds == []
         assert dialog.isVisible() is True
@@ -576,6 +577,9 @@ def _pen_names(dialog):
             continue
         color = pen().color()
         if color.alpha() == 0:
+            continue
+        path = item.path() if hasattr(item, 'path') else None
+        if path is not None and path.elementCount() == 5:
             continue
         names.add(color.name().lower())
     return names

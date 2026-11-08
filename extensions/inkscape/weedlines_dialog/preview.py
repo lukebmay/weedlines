@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Checkerboard, subject, arrows, surrounds, and accepted segments."""
+"""Checkerboard, subject, arrows, piece border, surrounds, and accepted segments."""
 from __future__ import division
 
 import math
@@ -142,16 +142,22 @@ class _Preview(object):
                 head.setZValue(30)
                 self.state['preview_items'].append(head)
         self.state['arrows'] = arrow_paths
+        weed_pen = _line_pen(self.QtGui, self.QtCore, weed_color)
+        bare = self.QtGui.QBrush(self.QtCore.Qt.NoBrush)
+        if not self.blocked:
+            for path in self.state.get('border_paths') or []:
+                if path is None or path.isEmpty():
+                    continue
+                item = self.scene.addPath(path, weed_pen, bare)
+                item.setZValue(20)
+                self.state['preview_items'].append(item)
         if not self.blocked and self.state['surround_started'] and self._in_surround():
-            surround_pen = _line_pen(self.QtGui, self.QtCore, weed_color)
-            bare = self.QtGui.QBrush(self.QtCore.Qt.NoBrush)
             for path in self.state['surround_paths']:
                 if path is None or path.isEmpty():
                     continue
-                item = self.scene.addPath(path, surround_pen, bare)
+                item = self.scene.addPath(path, weed_pen, bare)
                 item.setZValue(20)
                 self.state['preview_items'].append(item)
-        weed_pen = _line_pen(self.QtGui, self.QtCore, weed_color)
         for item in self.state['weed_items']:
             item.setPen(weed_pen)
             item.setZValue(20)
