@@ -1,7 +1,7 @@
 # Preview
 
-When to use: Preview paint, swap, plugin settings, correction
-arrows, or the return actions.
+When to use: Preview paint, swap, plugin settings, the piece
+border, correction arrows, or the return actions.
 
 **Owner:** human. Agents may propose edits; apply only with explicit
 permission.
@@ -63,8 +63,8 @@ cuts, and that region is checkerboard too.
 When the mode is Surround and Conquer and the figure check
 reports no defect, the window waits. It does not ask for a
 surround, and it paints none, until the person starts that
-step. Start Algorithm starts it. The window then asks the
-library and paints each surround in the weed-line color, on
+step. The Start control starts it. The window then asks
+the library and paints each surround in the weed-line color, on
 top of the checkerboard. That start does not run a solver and
 does not write a result. It asks again when the surround
 distance changes, when the join gap changes, when the person
@@ -81,9 +81,17 @@ set a join gap, the value is the quarter-inch baseline in
 [`boundary.md`](./boundary.md). The window does not allow
 either value below zero.
 
-A control labeled "Change surround" clears the lines and
-returns to the wait. Swap, and a change to another mode, also
-clear them.
+Padding is shown for frame, grid, and island-hop. Grid
+spacing is shown for grid. The collar is shown for
+island-hop. The output layer name is shown for those three
+modes. Surround and Conquer shows none of those. The unit
+suffix follows [`boundary.md`](./boundary.md). The unit is
+not written into the label.
+
+Restart on this step clears the surround lines and runs the
+step again. Clear All clears them and returns to the wait.
+[`runtime.md`](./runtime.md) is those controls. Swap, and a
+change to another mode, also clear them.
 
 The plugin settings are four controls in the form above the
 preview. They change paint only. They do not change the figure
@@ -97,6 +105,58 @@ check. Their initial values are:
 | Default subject color | `#FFFFFF` |
 
 The window does not keep these in a preferences file.
+
+## Piece border
+
+The window paints the two piece-border rectangles when the
+figure check reports no defect. The library builds them.
+The window paints the paths it is given, in the weed-line
+color. It does not build the rectangles. It paints them
+without waiting for Start.
+
+The form shows one option for the distance from the piece
+size to the inner rectangle, and one option for the border
+width, in every mode, once those labels are named. Until
+the labels are named, the form does not show the two
+options. The library still emits the default rectangles,
+and the window still paints them. Naming the labels does
+not bring back padding, grid spacing, the collar, or the
+layer name.
+
+A change to either length asks the library again, off the
+GUI thread, and repaints the border. It asks because the
+length changed, not on a clock. When a surround is
+showing, a change to the inner distance asks for the
+surround again. A change to the border width does not.
+Swap asks for the border again, because the piece is the
+subject. [`runtime.md`](./runtime.md) is the thread.
+[`algorithms.md`](./algorithms.md) is the two lengths and
+the clip.
+
+## Option history
+
+The person can undo and redo committed changes to option
+values across the form. The history covers the mode, the
+length options, the output layer name, and the four preview
+colors. An edit still being typed undoes as text in that
+field until it commits. Undo does not include swap, the run
+controls, the log, work marks, or any cut.
+
+## Work marks
+
+While a run is going, the window can paint two temporary
+marks: the one object outline the library names, and the one
+candidate line it names. The outline is a dashed `#7A5CFF`.
+The candidate line is a solid `#15803D`. At most one of each
+is on screen. They sit above the subject and the
+checkerboard, and below weed lines. They are not weed lines,
+not surrounds, and not correction arrows, and they are not
+written into the result. The control is "Show work marks".
+It defaults off. Turning it on or off does not restart the
+run and does not change the cuts. The window paints a
+mark only for an object or a line the library names for
+this moment. It does not invent marks by reading the log.
+A rejected probe is a log line, not a mark.
 
 ## Correction arrows
 
@@ -131,6 +191,8 @@ preview.
 The line reads: "Correct the marked problems in Inkscape before
 weed lines will run." It names each kind that is present, using
 the words dangling ends, figure overlaps, and self-overlaps.
+Each of those names is preceded by a swatch of that arrow's
+color. The words stay in the label color.
 
 The actions are labeled "Return to Inkscape" and "Return to
 Inkscape with correction arrows". The second action is present

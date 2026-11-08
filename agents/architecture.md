@@ -58,7 +58,9 @@ is for when the guide itself looks like the mistake.
 Weedlines is an Inkscape extension plus a geometry library. The
 person selects a design, the extension opens a window, and the
 window shows a live preview. An algorithm then emits weed lines:
-cuts that let the person peel waste vinyl away from the design.
+cuts that let the person peel each weed area away in one motion.
+A cavern is that problem.
+[`architecture/algorithms.md`](./architecture/algorithms.md) is the rule.
 
 Three layers do this work. The host talks to Inkscape. The window
 shows the preview and takes the person's choices. The library
@@ -67,7 +69,8 @@ another layer's job.
 
 Every algorithm waits on the same figure check. Surround and
 Conquer is the mode the window opens on. Its first step is the
-surround. Conquer is not specified yet. The check, the preview,
+surround. Conquer is the next step and is not specified yet.
+The check, the preview,
 and the way correction arrows go back to Inkscape are specified,
 and they apply to every algorithm.
 
@@ -109,9 +112,9 @@ inner workings there too. This index only points.
 | --- | --- |
 | A product word | [`architecture/glossary.md`](./architecture/glossary.md) |
 | Figures, dangling ends, overlap, the gate | [`architecture/preflight.md`](./architecture/preflight.md) |
-| Preview paint, swap, arrows, return actions | [`architecture/preview.md`](./architecture/preview.md) |
+| Preview paint, swap, arrows, the piece border, return actions | [`architecture/preview.md`](./architecture/preview.md) |
 | The job, the result, import | [`architecture/host.md`](./architecture/host.md) |
-| Frame, grid, island-hop, Surround and Conquer | [`architecture/algorithms.md`](./architecture/algorithms.md) |
-| Pause, cancel, logging, the cache | [`architecture/runtime.md`](./architecture/runtime.md) |
+| Frame, grid, island-hop, Surround and Conquer, a cavern | [`architecture/algorithms.md`](./architecture/algorithms.md) |
+| Pause, cancel, logging, how long a step took, the cache | [`architecture/runtime.md`](./architecture/runtime.md) |
 | Install and update | [`architecture/install.md`](./architecture/install.md) |
 | SVG conversion, the Qt binding, or units | [`architecture/boundary.md`](./architecture/boundary.md) |

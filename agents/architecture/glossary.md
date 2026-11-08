@@ -21,6 +21,8 @@ in [`../glossary.md`](../glossary.md).
 | **self-overlap** | One figure whose outline crosses itself. [`preflight.md`](./preflight.md) |
 | **figure check** | The library's three defect detections. [`preflight.md`](./preflight.md) |
 | **subject** | The region the person keeps. Solvers call this keep. [`preview.md`](./preview.md) |
+| **piece** | The subject, taken as one. [`algorithms.md`](./algorithms.md) |
+| **piece size** | The axis-aligned rectangle of the piece. [`algorithms.md`](./algorithms.md) |
 | **weed area** | The region a weed line may cut. Solvers call this waste. [`preview.md`](./preview.md) |
 | **swap** | The window action that exchanges subject and weed area. [`preview.md`](./preview.md) |
 | **plugin setting** | A window control that changes a preview color. [`preview.md`](./preview.md) |
@@ -29,8 +31,12 @@ in [`../glossary.md`](../glossary.md).
 | **overlap arrow** | The correction arrow for a separate-figure overlap. [`preview.md`](./preview.md) |
 | **self-overlap arrow** | The correction arrow for a self-overlap. [`preview.md`](./preview.md) |
 | **weed line** | A cut an algorithm emits in the weed area. [`algorithms.md`](./algorithms.md) |
-| **Surround and Conquer** | The weed-line algorithm the window opens on. Its first step is the surround. [`algorithms.md`](./algorithms.md) |
+| **cavern** | A concavity in the coastline of a weed area. [`algorithms.md`](./algorithms.md) |
+| **cavern allowance** | The one length the person sets for how large a cavern may stay. [`algorithms.md`](./algorithms.md) |
+| **Surround and Conquer** | The weed-line algorithm the window opens on. Its steps are the surround, then conquer. [`algorithms.md`](./algorithms.md) |
 | **surround distance** | The clearance between the subject and a surround. [`algorithms.md`](./algorithms.md) |
 | **surround** | The outer weed line around one cluster. [`algorithms.md`](./algorithms.md) |
+| **piece border** | The two rectangles around the piece size. [`algorithms.md`](./algorithms.md) |
 | **cluster** | The subject one surround encloses. [`algorithms.md`](./algorithms.md) |
 | **join gap** | The length within which separate surrounds are joined. [`algorithms.md`](./algorithms.md) |
+| **display unit** | The length unit the window shows. [`boundary.md`](./boundary.md) |

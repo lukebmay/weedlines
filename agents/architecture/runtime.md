@@ -1,6 +1,6 @@
 # Runtime
 
-When to use: Pause, cancel, logging, or the job cache.
+When to use: Pause, cancel, logging, how long a step took, or the job cache.
 
 **Owner:** human. Agents may propose edits; apply only with explicit
 permission.
@@ -23,12 +23,61 @@ dialog defaults. [`host.md`](./host.md) is that record. The
 window runs the figure check before Start.
 [`preflight.md`](./preflight.md) is the gate.
 
-Start runs the solver on a worker thread. The preview adds each
-accepted segment. Pause freezes the worker at the next progress
-check. Resume clears that flag. Cancel aborts, including while
-paused. Close while a run is going aborts too. Apply is the
-control that returns weed lines. Close, cancel, or an empty
-result returns nothing.
+The window's GUI thread keeps handling paint and input from
+the moment the window is shown. That includes the figure
+check, the surround, and every solver. Geometry does not run
+on that thread. Qt objects the window paints stay on it. A
+run that still leaves the window or Inkscape not responding
+has not met this. Moving the work off the GUI thread is not
+a widget and not a second solver.
+
+The run controls are Start, Pause, Clear All, Apply, and
+Close. Start reads Restart after that step has been started,
+until Clear All. Restart discards that step's lines and any
+later step's lines, then runs the step again. It stays
+disabled while the step is actively running. Pause holds the
+run at the next progress check and leaves the lines up.
+Resume continues that same run. Clear All aborts, including
+while paused, and discards this visit's lines and result.
+Option values, swap, and colors stay. Close while a run is
+going aborts too and returns nothing. Apply is the control
+that returns weed lines. Close, Clear All, or an empty result
+returns nothing.
+
+A mode this guide gives no steps the person starts is one
+step. Frame, grid, and island-hop are each one step.
+Surround and Conquer has two steps: the surround, then
+conquer. Conquer is not specified yet, so its Start stays
+disabled and the library emits no conquer cuts. The window
+shows it as the step that is left. The window shows one
+status for the run: ready, working, paused, or done. A
+spinner shows only while the run is working and is not
+paused. A phase name from the library can appear in that
+status. The window does not turn those names into steps
+the person starts. The preview adds each accepted segment.
+
+When a mode has steps the person starts, each step has its
+own Start control. That control reads Restart after the
+step has been started. Restart on an earlier step discards
+that step and every later step, then runs the earlier step
+again. The window shows those steps, which one is current,
+and which are left.
+
+The window times each step the person has started. Conquer
+has no time while its Start stays disabled. While the step
+is working, the time advances and is shown with that step's
+status. A phase name may appear in the status and is not
+its own time. While the step is paused, the time holds, so
+a pause is not counted as the algorithm running. When the
+step finishes, the window keeps showing that working time
+until the step is discarded. Restart starts that step's
+time from zero and discards every later step's time with
+its lines. Earlier steps keep theirs. A step not started
+has no time. Each started step has its own time. The
+window owns the clock. The library does not. Ticking the
+clock does not run geometry. The time is not a log line.
+The time does not change the cuts. Clear All discards the
+times with the lines.
 
 On Apply, the detached window writes the result and does not
 edit the open document. The person then runs
@@ -36,8 +85,10 @@ edit the open document. The person then runs
 The cache directory is `$XDG_CACHE_HOME/weedlines` when that
 variable is set. Otherwise it is `~/.cache/weedlines` on Linux,
 `%LOCALAPPDATA%\weedlines\cache` on Windows, and
-`~/Library/Caches/weedlines` on macOS. The detached window's
-stdout and stderr go to `host.log` in that directory.
+`~/Library/Caches/weedlines` on macOS. The window shows the
+run's stdout and stderr while the run is going. The detached
+window's stdout and stderr also go to `host.log` in that
+directory.
 
 The detached split exists so the extension can return. A long
 run must not hold Inkscape's main thread, and solver stderr
@@ -47,9 +98,20 @@ must not come back as Inkscape's additional-data dialog.
 
 The host installs one run's hooks: a phase label, each accepted
 segment as `(x0, y0, x1, y1)`, pause, and cancel. Pause blocks
-inside the progress check until the host clears it. Cancel
-raises `WeedCancelled` and still applies while paused. The
-solvers call the hooks. They do not decide the widgets.
+inside the progress check until the host clears it. Clear All
+raises `WeedCancelled` through the cancel hook, including
+while paused. The solvers call the hooks. They do not decide
+the widgets.
+
+Every long run calls those checks during the work. That
+includes the figure check, the surround, and frame, grid,
+and island-hop. A check only at the start, or only when a
+segment is accepted, does not cover a stretch that can run
+long. Between checks the GUI thread has to be able to paint
+and take input. Pause and Clear All take effect at the next
+check. A check may name one object outline and one candidate
+line. That naming is not a cut.
+[`preview.md`](./preview.md) is how the window paints it.
 
 ## Logging
 
