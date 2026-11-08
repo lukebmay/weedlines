@@ -12,13 +12,13 @@ is drawn until you start that step.
 ## Read the line
 
 - [ ] Read the line under the preview. When it names problems,
-  no surround is shown and **Start Algorithm** stays off. Follow
+  no surround is shown and **Start** stays off. Follow
   [Place correction arrows](correction-arrows.md). When that
   line is empty, continue.
 
 ## Wait
 
-- [ ] Leave **Start Algorithm** unpressed. The preview shows the
+- [ ] Leave **Start** unpressed. The preview shows the
   subject and the weed area, and it shows no surround. Setting
   either length below does not draw one.
 
@@ -45,9 +45,10 @@ change the surround.
 ## Start
 
 - [ ] Before the step is started, the window shows no time.
-- [ ] Choose **Start Algorithm**. The surround is drawn in the
+- [ ] Choose **Start**. The surround is drawn in the
   **Weed line color**, on top of the checkerboard. That does
-  not write a result.
+  not write a result. After that step has been started, the
+  control reads **Restart** until **Clear All**.
 - [ ] The window shows how long that started step has been
   working, with that step's status.
 - [ ] Choose **Pause**. The time holds. **Resume** continues
@@ -68,9 +69,7 @@ change the surround.
 
 ## Change the surround
 
-- [ ] Choose **Change surround**. The lines clear. Your numbers
-  stay. No surround is drawn until you choose **Start
-  Algorithm** again.
+- [ ] Choose **Clear All**. The lines clear. Your numbers
+  stay. No surround is drawn until you choose **Start** again.
 - [ ] Leave this mode and come back. The numbers are still
-  there. No surround is drawn until the next **Start
-  Algorithm**.
+  there. No surround is drawn until the next **Start**.
