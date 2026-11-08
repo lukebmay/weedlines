@@ -5,8 +5,8 @@ is drawn until you start that step.
 
 ## Open the window
 
-- [ ] In Inkscape, choose **Extensions → Weedlines → Weedlines
-  from selection…**. The window opens on **Surround and
+- [ ] In Inkscape, choose **Extensions → Weedlines → 1 Auto
+  generate weedlines**. The window opens on **Surround and
   Conquer**.
 
 ## Read the line

@@ -42,7 +42,7 @@ weedlines install --dry-run
 weedlines update           # git pull if clean, then install
 ```
 
-Restart Inkscape → **Extensions → Weedlines → Weedlines from selection…**
+Restart Inkscape → **Extensions → Weedlines → 1 Auto generate weedlines**
 
 ## Logging
 
