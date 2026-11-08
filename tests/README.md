@@ -16,6 +16,7 @@
 - `test_self_overlap.py` Self-overlap on the real border, not the painted close.
 - `test_surround.py` Offset, join gap, and the preamble.
 - `test_surround_bridge.py` Inner bridges and their clearance.
+- `test_surround_clip.py` Surround clip to the inner rectangle.
 - `test_surround_smooth.py` Fillets out to the surround distance.
 - `test_bays.py` Bay, peninsula, and pocket seals.
 - `test_corridors.py` Corridors, agglomerate, and gutters.

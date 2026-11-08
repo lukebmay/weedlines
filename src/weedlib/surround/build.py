@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Dilate, cluster, bridge, and smooth, in today's order."""
+"""Dilate, cluster, bridge, and smooth, then clip to the inner rectangle."""
 from __future__ import division
 
 from .. import progress
+from ..paths import split_painter_path
+from ..piece_border import piece_border
 from ..qt import QPainterPath, Qt
 
 from .offset import (
@@ -13,14 +15,15 @@ from .offset import (
     _nested_loops,
     _outer_boundaries,
     _ring_points,
+    _segments,
 )
 from .union import _bridge_outlines, _meeting_outers, _ring_sits_inside
 from .bridge import _bridge_inner_outers
 from .smooth import _finish_outline
 
 
-def build_surrounds(subject, distance, join_gap=0.0):
-    """One smoothed outline for each cluster, as closed paths.
+def build_surrounds(subject, distance, join_gap=0.0, inner_distance=None):
+    """One smoothed outline for each cluster.
 
     ``subject`` is the subject region in document user units, holes
     included. ``distance`` and ``join_gap`` are lengths in those
@@ -29,6 +32,12 @@ def build_surrounds(subject, distance, join_gap=0.0):
     join. Surrounds that meet, overlap, or lie within ``join_gap``
     are one outline. That outline stays at least ``distance`` from
     the subject. A loop that only follows a hole is not returned.
+
+    When ``inner_distance`` is omitted, those outlines stay as they
+    are. When it is passed, each outline is clipped to the inner
+    piece-border rectangle. A run that meets the rectangle is left
+    open, without the rectangle side between its ends. A run that
+    stays inside stays closed. A run the clip removes is absent.
     """
     if not isinstance(subject, QPainterPath):
         raise TypeError(
@@ -36,6 +45,8 @@ def build_surrounds(subject, distance, join_gap=0.0):
                 type(subject).__name__))
     distance = float(distance)
     join_gap = float(join_gap)
+    if inner_distance is not None:
+        inner_distance = float(inner_distance)
     if distance < 0.0:
         raise ValueError(
             'surround distance must not be negative, got: {}'.format(distance))
@@ -91,7 +102,162 @@ def build_surrounds(subject, distance, join_gap=0.0):
             # fill the pocket the bridges just kept open.
             surrounds.append(_finish_outline(
                 outline, distance, dilated, len(kept) == 1))
-    return surrounds
+    if inner_distance is None:
+        return surrounds
+    return _clip_to_inner_rectangle(subject, surrounds, inner_distance)
+
+
+# A point this close to a side lies on the inner rectangle.
+_CLIP_EDGE = 1e-4
+# Bounds at least this far inside are not clipped.
+_INSIDE_MARGIN = 1e-6
+
+
+def _clip_to_inner_rectangle(subject, surrounds, inner_distance):
+    """Clip each surround to the inner piece-border rectangle.
+
+    The border width is not this clip. ``piece_border`` still
+    builds the rectangle, and only the inner one is used.
+    """
+    border = piece_border(subject, inner_distance, 0.0)
+    if not border:
+        return []
+    inner = border[0]
+    rect = inner.boundingRect()
+    if not rect.isValid():
+        return []
+    clipped = []
+    for surround in surrounds:
+        clipped.extend(_clip_surround(surround, inner, rect))
+    return clipped
+
+
+def _clip_surround(path, inner, rect):
+    if _bounds_inside(path, rect):
+        return [path]
+    inter = path.intersected(inner)
+    if inter.isEmpty():
+        return []
+    # A flattened curve's chords fall inside the subject. Keep the
+    # lines and curves from the intersection, and drop only a side
+    # of the inner rectangle.
+    runs, dropped = _kept_runs(inter, rect)
+    if not dropped:
+        return [path]
+    return [run for run in runs if run.elementCount() > 1]
+
+
+def _bounds_inside(path, rect):
+    bounds = path.boundingRect()
+    margin = _INSIDE_MARGIN
+    return (
+        bounds.left() >= rect.left() + margin
+        and bounds.top() >= rect.top() + margin
+        and bounds.right() <= rect.right() - margin
+        and bounds.bottom() <= rect.bottom() - margin
+    )
+
+
+def _kept_runs(path, rect):
+    """Open runs of lines and curves that are not a rectangle side.
+
+    Nothing dropped means the surround never lay on the rectangle,
+    so the caller returns the original outline.
+    """
+    runs = []
+    dropped = False
+    for subpath in split_painter_path(path):
+        segments = list(_segments(subpath))
+        if not segments:
+            continue
+        chains, sub_dropped = _chain_segments(segments, rect)
+        dropped = dropped or sub_dropped
+        for chain in chains:
+            run = _path_from_segments(chain)
+            if run is not None:
+                runs.append(run)
+    return runs, dropped
+
+
+def _chain_segments(segments, rect):
+    dropped = False
+    runs = []
+    current = []
+    for kind, points in segments:
+        if _lies_on_rectangle(points, rect):
+            dropped = True
+            if current:
+                runs.append(current)
+                current = []
+            continue
+        current.append((kind, points))
+    if current:
+        runs.append(current)
+    if (
+        len(runs) >= 2
+        and _near(runs[-1][-1][1][-1], runs[0][0][1][0])
+    ):
+        runs[0] = runs[-1] + runs[0]
+        del runs[-1]
+    return runs, dropped
+
+
+def _lies_on_rectangle(points, rect):
+    shared = None
+    for point in points:
+        sides = _sides(point, rect)
+        if shared is None:
+            shared = sides
+        else:
+            shared &= sides
+        if not shared:
+            return False
+    return True
+
+
+def _sides(point, rect):
+    x_coord, y_coord = point
+    edge = _CLIP_EDGE
+    sides = set()
+    if abs(x_coord - rect.left()) <= edge:
+        sides.add('left')
+    if abs(x_coord - rect.right()) <= edge:
+        sides.add('right')
+    if abs(y_coord - rect.top()) <= edge:
+        sides.add('top')
+    if abs(y_coord - rect.bottom()) <= edge:
+        sides.add('bottom')
+    return sides
+
+
+def _near(left, right, tol=1e-6):
+    return (
+        abs(left[0] - right[0]) <= tol
+        and abs(left[1] - right[1]) <= tol
+    )
+
+
+def _path_from_segments(segments):
+    if not segments:
+        return None
+    path = QPainterPath()
+    start = segments[0][1][0]
+    path.moveTo(start[0], start[1])
+    for kind, points in segments:
+        end = points[-1]
+        if kind == 'line':
+            path.lineTo(end[0], end[1])
+        elif kind == 'quad':
+            control = points[1]
+            path.quadTo(control[0], control[1], end[0], end[1])
+        else:
+            first = points[1]
+            second = points[2]
+            path.cubicTo(
+                first[0], first[1], second[0], second[1], end[0], end[1])
+    if _near(start, segments[-1][1][-1]):
+        path.closeSubpath()
+    return path
 
 
 def _join_groups(subject, outers, distance, join_gap):
