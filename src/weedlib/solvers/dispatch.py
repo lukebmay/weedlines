@@ -7,12 +7,14 @@ from ..keep import (
     _normalize_padding,
     _padded_rect,
 )
+from ..piece_border import piece_border
 
 from .rules import (
     DEFAULT_GRID_SPACING,
     DEFAULT_WEED_MODE,
     WEED_MODES,
 )
+from . import clip as _sol_clip
 from . import emit as _sol_emit
 from . import grid as _sol_grid
 from . import island as _sol_island
@@ -33,7 +35,9 @@ def generate_weeds(keep_path,
                    peninsula_ratio=None,
                    body_clearance=None,
                    alpha_min=None,
-                   frame_clearance=None):
+                   frame_clearance=None,
+                   inner_distance=None,
+                   border_width=None):
     """Build a weed QPainterPath for keep geometry.
 
     Parameters
@@ -52,6 +56,10 @@ def generate_weeds(keep_path,
         Island-hop physical knobs (ignored by other modes).
     body_clearance, alpha_min, frame_clearance
         D012 floors (island-hop + grid). ``frame`` mode is a closed box.
+    inner_distance, border_width
+        Piece-border lengths in user units. Omit either and today's
+        path is unchanged. When both are set, mode lines stay inside
+        the inner rectangle, then that pair is emitted, inner then outer.
     """
     if keep_path is None or keep_path.isEmpty():
         return QPainterPath()
@@ -64,31 +72,53 @@ def generate_weeds(keep_path,
     padding = _normalize_padding(padding)
     spacing = max(float(spacing or DEFAULT_GRID_SPACING), 1e-6)
     rules = _sol_rules._cut_rules(body_clearance, alpha_min, frame_clearance)
-
-    if mode == 'frame':
-        return frame_weeds(keep_path, padding)
-    if mode == 'grid':
-        return _sol_grid.grid_weeds(
-            keep_path, padding, spacing, rules=rules)
-    if mode == 'region':
-        return _sol_grid.grid_weeds(
-            keep_path, padding, spacing, rules=rules)
-    return _sol_island.island_hop_weeds(
-        keep_path,
-        padding=padding,
-        spacing=spacing,
-        max_chunk=max_chunk,
-        bridge_width=bridge_width,
-        clearance=clearance,
-        min_cut=min_cut,
-        delicate_angle_deg=delicate_angle_deg,
-        collar=collar,
-        max_spokes=max_spokes,
-        peninsula_ratio=peninsula_ratio,
-        body_clearance=rules.body_clearance,
-        alpha_min=rules.alpha_min,
-        frame_clearance=rules.frame_clearance,
-    )
+    borders = None
+    inner_rect = None
+    if inner_distance is not None and border_width is not None:
+        pair = piece_border(keep_path, inner_distance, border_width)
+        if len(pair) == 2:
+            borders = pair
+            inner_rect = pair[0].boundingRect()
+    # None leaves a published segment unchanged.
+    _sol_emit._set_border_clip(inner_rect)
+    try:
+        if mode == 'frame':
+            weed = frame_weeds(keep_path, padding)
+        elif mode == 'grid':
+            weed = _sol_grid.grid_weeds(
+                keep_path, padding, spacing, rules=rules)
+        elif mode == 'region':
+            weed = _sol_grid.grid_weeds(
+                keep_path, padding, spacing, rules=rules)
+        else:
+            weed = _sol_island.island_hop_weeds(
+                keep_path,
+                padding=padding,
+                spacing=spacing,
+                max_chunk=max_chunk,
+                bridge_width=bridge_width,
+                clearance=clearance,
+                min_cut=min_cut,
+                delicate_angle_deg=delicate_angle_deg,
+                collar=collar,
+                max_spokes=max_spokes,
+                peninsula_ratio=peninsula_ratio,
+                body_clearance=rules.body_clearance,
+                alpha_min=rules.alpha_min,
+                frame_clearance=rules.frame_clearance,
+            )
+    finally:
+        _sol_emit._set_border_clip(None)
+    if borders is None:
+        return weed
+    inner, outer = borders
+    weed = _sol_clip._clip_path_to_rect(weed, inner_rect)
+    # The pair is not clipped. Nothing sits between the two rectangles.
+    weed.addPath(inner)
+    weed.addPath(outer)
+    _sol_emit._publish_path_segments(inner)
+    _sol_emit._publish_path_segments(outer)
+    return weed
 
 
 def frame_weeds(keep_path, padding=None):

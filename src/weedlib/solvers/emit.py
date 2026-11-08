@@ -19,6 +19,7 @@ from .rules import (
     DEFAULT_MIN_CUT,
     _ALPHA_GRAZE,
 )
+from . import clip as _sol_clip
 from . import gaps as _sol_gaps
 from . import geom as _sol_geom
 from . import rank as _sol_rank
@@ -33,6 +34,29 @@ _A_SLIVER = 8.0
 _H_SLIVER = 2.5
 _A_GAIN_MIN = 12.0
 
+# Piece-border inner rectangle. None leaves a published segment unchanged.
+_border_clip_rect = None
+
+
+def _set_border_clip(rect):
+    """Clip published segments to *rect*. None stops the clip."""
+    global _border_clip_rect
+    _border_clip_rect = rect
+
+
+def _clip_published_seg(seg):
+    """Segment the host sees. None drops it. No rect returns *seg*."""
+    rect = _border_clip_rect
+    if rect is None or seg is None:
+        return seg
+    clipped = _sol_clip._clip_seg_to_rect(
+        seg[0], seg[1], seg[2], seg[3], rect)
+    if clipped is None:
+        return None
+    if math.hypot(clipped[2] - clipped[0], clipped[3] - clipped[1]) < 1e-9:
+        return None
+    return clipped
+
 
 def _publish_path_segments(path):
     """Push each line segment to the live-preview geometry hook."""
@@ -40,6 +64,9 @@ def _publish_path_segments(path):
         return
     from .. import progress as _progress
     for seg in _sol_geom._iter_line_segs(path):
+        seg = _clip_published_seg(seg)
+        if seg is None:
+            continue
         _progress.report_segment(seg)
 
 
@@ -493,8 +520,11 @@ def _add_seg(out, seg, min_cut, keep_path=None, rules=None, report=True):
     out.lineTo(x1, y1)
     _wdbg.log('emit.accept', seg=seg)
     # The seen copy is the same seal, not a second cut.
+    # Piece-border clip, when one is set. The stored seal stays whole.
     if report:
-        _progress.report_segment(seg)
+        published = _clip_published_seg(seg)
+        if published is not None:
+            _progress.report_segment(published)
 
 
 def _add_path_segs(out, path, min_cut, keep_path=None, rules=None):
