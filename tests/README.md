@@ -25,6 +25,7 @@
 - `test_island.py` Island-hop through generate_weeds.
 - `test_keep.py` Keep fill, twins, and samples.
 - `test_peel.py` The peel frame.
+- `test_piece_border.py` Piece border: two rectangles from the subject bounds.
 - `test_ties.py` Compact ties.
 - `test_traps.py` Residual waste traps.
 - `weed_shapes.py` Shared shapes for the weed solver tests.
