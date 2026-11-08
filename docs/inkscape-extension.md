@@ -1,37 +1,57 @@
-# Inkcut weed lines (Inkscape extension)
+# Weedlines (Inkscape extension)
 
-Same **deterministic weed solvers** as Inkcut (`inkcut.weedlib`), exposed
-inside Inkscape so you can edit weed cuts as ordinary paths/layers before
-send.
+Weed lines run inside Inkscape as ordinary paths and layers.
 
 ## Install
 
-Preferred (also installs send extensions — selection / page / document):
-
 ```sh
-inkcut install-plugin
-inkcut install-plugin --dry-run   # preview only
+weedlines install
+weedlines install --dry-run   # preview only
 ```
 
-See `plugins/inkscape/README.md` for `--uninstall` / `--copy` / `--dest`.
+`weedlines install` symlinks `extensions/inkscape/` into the user
+extensions directory. `--copy` copies instead. An existing symlink
+that already points at this source is left alone. A symlink that
+points elsewhere is replaced. A real file is skipped unless
+`--force`. `--dry-run` prints and writes nothing. `--uninstall`
+removes only destinations that resolve to this checkout.
 
-Manual / prerequisites:
+The destination is `--dest`, else `$INKSCAPE_PROFILE_DIR/extensions`,
+else the platform Inkscape config `extensions` folder. On Linux
+that is `$XDG_CONFIG_HOME/inkscape/extensions` or
+`~/.config/inkscape/extensions`. The checkout is `$WEEDLINES_ROOT`
+when that tree contains `extensions/inkscape/weedlines.inx`.
+Otherwise it is the repo that contains the package. The extension
+files are not inside the installed wheel. A tree without those
+sources fails the install instead of inventing them.
 
-1. Install Inkcut (or keep this repo on disk) so `inkcut.weedlib` imports.
-2. Install a Qt binding usable from the **same Python** Inkscape’s
+`weedlines update` installs the current tree when this is not a
+git checkout, or when `git status --porcelain` is non-empty. It
+does not pull in those cases. A clean checkout runs
+`git pull --ff-only` and, on failure, stops without installing.
+`--dry-run` neither pulls nor writes links.
+
+`./install` sets `WEEDLINES_ROOT` to the checkout and, unless
+`--skip-pip`, `--dry-run`, or `--uninstall`, runs `pip install -e .`
+when `import weedlib` fails. The `weedlines` console script does
+not run pip. Restart Inkscape after a real install so it reloads
+the extension.
+
+Symlinks are the default so a later pull is what Inkscape loads.
+
+Prerequisites:
+
+1. Install a Qt binding usable from the **same Python** Inkscape’s
    extensions use: `PyQt5` / `PyQt6` / `PySide2` / `PySide6` (or run from
    an environment that already has `enaml.qt`).
-3. Install `pyclipper` for full **auto** mode (optional for frame/grid).
-4. Or symlink just the weed files:
-
-   ```sh
-   ln -s /path/to/inkcut/extensions/inkscape/inkcut_weeds.py \
-         /path/to/inkcut/extensions/inkscape/inkcut_weeds_dialog.py \
-         /path/to/inkcut/extensions/inkscape/inkcut_weeds.inx \
-         ~/.config/inkscape/extensions/
-   ```
-
-5. Restart Inkscape → **Extensions → Inkcut → Auto-gen Weedlines layer from selection…**
+2. Install `pyclipper` for full **auto** mode (optional for frame/grid).
+3. Restart Inkscape. The menu is **Extensions → Weedlines**.
+   Inkscape sorts the entries by name. The number is part of each
+   name, and none of the names end in an ellipsis. The entries are
+   `1 Auto generate weedlines`, `2 Make ready to cut`,
+   `3 Reimport last weedlines`, and `4 Reimport last ready cut`.
+   There is no divider. `1 Auto generate weedlines` opens the
+   detached window.
 
    A custom dialog opens: **Start**, **Pause**, **Clear All**, **Apply**,
    and **Close**, expandable
@@ -39,7 +59,6 @@ Manual / prerequisites:
    **Apply** is its own control. On Apply, the detached window writes
    the result and does not edit the open document. The person then
    runs `3 Reimport last weedlines`. **Close** is a separate control.
-   (No Inkcut travel/TSP planning here — send the layer to Inkcut next.)
 
 Without Inkscape, unit tests and previews still use the shared core:
 
@@ -54,19 +73,17 @@ QT_QPA_PLATFORM=offscreen PYTHONPATH=. python3 -m pytest tests/test_weeds.py -q
 - **Filled design geometry** = keep (land on the liner).
 - **Empty / transparent regions** = waste (water / weedable vinyl).
 
-Weed cuts run in waste. The extension does not fork solvers; it calls
-`inkcut.weedlib.generate_weeds`.
+Weed cuts run in waste. The extension does not fork solvers.
 
 ## Design note (hosts + units)
 
-### One algorithm, two hosts
+### Inkscape host
 
 | Host | Entry | Path type at core |
 | --- | --- | --- |
-| **Inkcut** | `inkcut.job.weeds` → `inkcut.weedlib.solvers` | `QPainterPath` |
-| **Inkscape** | `extensions/inkscape/inkcut_weeds.py` | `QPainterPath` via edge convert |
+| **Inkscape** | `extensions/inkscape/` | `QPainterPath` via edge convert |
 
-Do not fork peel logic. Change solvers only under `inkcut/weedlib/`.
+Do not fork peel logic.
 
 ### Layer naming
 
@@ -95,8 +112,6 @@ Do not fork peel logic. Change solvers only under `inkcut/weedlib/`.
   it still exports as a subpath (may close via start=end points). Auto
   channels remain open and must meet keep/other weeds at both ends (same
   as Inkcut).
-- Edge helpers: `inkcut.weedlib.svg_paths` (`svg_d_to_qpainterpath`,
-  `qpainterpath_to_svg_d`, `weed_path_to_open_d_list`).
 
 ### Modes
 
@@ -106,15 +121,9 @@ Do not fork peel logic. Change solvers only under `inkcut/weedlib/`.
 | `grid` | Axis-aligned grid; omit even-odd keep |
 | `auto` | Collar + channels / bays (D007); needs pyclipper |
 
-Inkcut default remains `frame` — do not switch the app default to `auto`
-until preview pictures are accepted.
-
 ### Layout in the repo
 
 | Path | Role |
 | --- | --- |
-| `inkcut/weedlib/solvers.py` | Frame / grid / enclosure solvers |
-| `inkcut/weedlib/svg_paths.py` | SVG `d` ↔ `QPainterPath` |
-| `inkcut/job/weeds.py` | Thin re-export for Inkcut |
 | `extensions/inkscape/` | This extension (`.inx` + entry) |
 | `tests/test_weeds.py` | Shared core tests (no Inkscape) |

@@ -1,8 +1,6 @@
 # Priority
 
-The order of active tasks for extension-doc-drift.
+The order of active tasks for extension-doc-drift. A path, then
+the reason only when the order would otherwise be a guess.
 
-(none yet)
-
-Waiting on surround-doc and on control-names. Both may
-edit `docs/inkscape-extension.md`.
+(none — the page follows the host menu and the install part.)
