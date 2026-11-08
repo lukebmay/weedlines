@@ -33,7 +33,8 @@ Manual / prerequisites:
 
 5. Restart Inkscape → **Extensions → Inkcut → Auto-gen Weedlines layer from selection…**
 
-   A custom dialog opens: **Start Algorithm** / **Cancel…**, expandable
+   A custom dialog opens: **Start**, **Pause**, **Clear All**, **Apply**,
+   and **Close**, expandable
    stdout/stderr log, and a live preview of weed cuts as they are emitted.
    **Apply layer & Close** writes the Weedlines layer into the document.
    (No Inkcut travel/TSP planning here — send the layer to Inkcut next.)
