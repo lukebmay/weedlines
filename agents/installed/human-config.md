@@ -1,6 +1,5 @@
 ---
 title: Human config
-read_when: Writing a config a person reads
 order: 55
 ---
 

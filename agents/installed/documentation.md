@@ -1,11 +1,12 @@
 ---
 title: Documentation
-read_when: Writing architecture, user docs, human-facing checklists, or choosing where “why” lives
 order: 60
-version: 4.9.0
+version: 4.9.1
 ---
 
 # Documentation
+
+When to use: Writing architecture, user docs, human-facing checklists, or choosing where “why” lives.
 
 ## Audience (FIRM)
 

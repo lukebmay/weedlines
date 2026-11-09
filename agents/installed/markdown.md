@@ -1,10 +1,11 @@
 ---
 title: Markdown
-read_when: Writing or editing markdown docs, plans, tasks, or README prose
 order: 90
 ---
 
 # Markdown
+
+When to use: Writing or editing markdown docs, plans, tasks, or README prose.
 
 ## Lists
 

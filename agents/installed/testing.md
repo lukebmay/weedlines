@@ -1,10 +1,11 @@
 ---
 title: Testing
-read_when: Adding tests, changing test strategy, enabling optional features, checking Grok durable --leader mode, or reattaching headless Grok for the human
 order: 70
 ---
 
 # Testing
+
+When to use: Adding tests, changing test strategy, or enabling an optional feature.
 
 Rule vocabulary: **FIRM** / **GUIDELINE** / **MAY**. The words are in the project's `agents/glossary.md`.
 
@@ -41,14 +42,7 @@ When implementing/debugging an optional feature: **turn it on** in local/dev for
 
 Do not chase coverage numbers. Prefer one test that would have caught a real bug.
 
-A test covers one check. Name the check. Write it when inverting
-that result would still pass the tests that already exist. Another
-direction, another fixture, or another pixel is the same test when
-the result is the same kind. The slice has enough tests when each
-of its checks has one such test. When you cannot name a result
-that would pass the existing tests and still break a check, stop.
-Report any unnamed check in one line. Do not add a sibling test
-to raise confidence.
+A test covers one check. Add it only when a wrong result would still pass the tests you already have. Stop when you cannot name such a mistake. Do not add a test only to feel safer.
 
 ## Lifecycle
 
@@ -120,83 +114,10 @@ meet. Do not fail a story because an invisible peer is still settling.
 
 Prefer observable outputs, stable fixtures, injected time/random, temp dirs. Avoid real clocks, important live data (see `security.md`).
 
-## plog log-contract tests (GUIDELINE)
+## Logger contract
 
-When the project uses **plog** / `plog-query` / an app log wrapper: bugs found
-via hunts should prefer a small **log-contract** regression (stable JSONL
-token + optional field + state oracle) when the harness can see the tape.
-Anti-brittleness, regression discipline, and out-of-scope rules live in
-catalog **`plog.md`** § Log-contract testing — do not snapshot full TRACE or
-assert ANSI/pretty.
+When the project has a logger, test that logger's contract. The logger's own page has the details.
 
 ## CI (GUIDELINE)
 
 Unit green on every change when CI exists. Critical integration should not be “never run.”
-
-## Grok leader mode (FIRM for safety choices)
-
-Agent tool subprocesses may run under a durable Grok **leader** (`grok --leader` /
-shellrc `bin/grok` wrapper). Mid-flight work then survives TTY/window death; closing
-the terminal is **not** a reliable “kill the agent” signal.
-
-### Detect leader mode
-
-Probe in order; first yes wins:
-
-```bash
-# 1) Preferred — Grok exports this for tools under a leader client
-[[ -n "${GROK_LEADER_SOCKET:-}" ]]
-
-# 2) Socket actually present (stronger than env alone)
-[[ -n "${GROK_LEADER_SOCKET:-}" && -S "${GROK_LEADER_SOCKET}" ]]
-
-# 3) Parent is the leader process (tools are often reparented under it)
-ps -o args= -p "$PPID" 2>/dev/null | grep -q 'agent leader'
-```
-
-Optional status (human/debug, not required each turn):
-
-```bash
-grok --status   # shellrc wrapper: leader reachable + pid + socket
-```
-
-| Signal | Meaning |
-| --- | --- |
-| `GROK_LEADER_SOCKET` set | Running with a leader socket (durable path) |
-| `GROK_AGENT=1` | Tool is inside a Grok agent turn — **not** leader-specific |
-| Parent `agent leader` | Tool process is under the durable leader |
-
-### Safe vs unsafe when leader is on
-
-| Safe / preferred | Avoid or gate carefully |
-| --- | --- |
-| Long builds, tests, `sleep`, network I/O | Assuming “close the window kills this turn” |
-| Writing markers/logs for later reattach | Destructive desk ops without user intent (`forge layout clean`) |
-| `grok --list` / `--status` for recovery | Stopping the shared leader mid-session (`grok --stop`) unless asked |
-| User-facing launches via `user-env` (see `scripting.md`) | Leaving monochrome agent env on GUI/layout commands |
-
-When **not** in leader mode, treat the agent process as TTY-scoped: window death can
-abort mid-work; prefer shorter critical sections and explicit checkpoints.
-
-### Reattach for the human (FIRM after headless / detached work)
-
-When agent work used **headless or detached** Grok (`grok --detach`, background
-leader, headless `-p`, or tests that may **close** the terminal that launched
-Grok), after that work is **complete**: open a **user-visible terminal** and
-**reattach the head** so the operator can see results live. Do not leave them
-with only a chat summary when a live leader/session still holds the work.
-
-```bash
-user-env grok                 # durable TUI attach (shellrc wrapper)
-user-env grok --attach        # same intent
-user-env grok -r <session-id> # known session
-grok --list                   # discover session ids if needed
-```
-
-| Do | Don’t |
-| --- | --- |
-| Reattach after acceptance / wrap-up of headless work | Assume the human read the transcript only |
-| Use `user-env` so the TUI is not monochrome (`scripting.md`) | Start a second unrelated session when reattach would show the same work |
-| Prefer the existing leader/session | `grok --stop` just to “clean up” after a successful turn |
-
-Skip only if the user said not to, or there was never a durable/headless session.

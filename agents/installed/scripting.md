@@ -1,25 +1,15 @@
 ---
 title: Scripting
-read_when: Writing or changing shell/Python scripts, installers, CLI tools, bin entries, or launching user-visible apps from a Grok agent
 order: 40
 ---
 
 # Scripting
 
+When to use: Writing or changing shell/Python scripts, installers, CLI tools, bin entries, or launching user-visible apps from a Grok agent.
+
 Assume **Linux** (Ubuntu LTS unless stated). Prefer portable choices when cheap.
 
 Language style: `agents/languages/<lang>.md` when relevant. In-repo formatter/LSP wins.
-
-## Scripts → `bin/`
-
-`installer/build-scripts.py` flattens tools into `$shellrc/bin/`.
-
-| Kind | How |
-| --- | --- |
-| Standalone | `scripts/foo.zsh` → `bin/foo` |
-| Multi-file | Package markers; only entry lands in `bin/` |
-
-Do not treat a shebang alone as “this is a bin entry.” See `agents/scripts-build.md` when present.
 
 ## All scripts
 
@@ -27,8 +17,7 @@ Do not treat a shebang alone as “this is a bin entry.” See `agents/scripts-b
 - Support `--help` and `--version`; list dependencies
 - Check deps before run; on TTY offer preferred installer when known
 - Fail gracefully; solid errors/exit codes
-- Colors: `ansi-colors.md`; print stack: prefer `pansi` when needed; logging:
-  prefer `plog` (query, never raw `tail` at TRACE) — see those catalog files
+- Colors: `ansi-colors.md`. `NO_COLOR` and `TERM=dumb` stay on for output the agent parses, and come off only for a program a person will look at.
 - Comments: `comments.md`
 - Prefer single-file ~500–1000 lines; larger → multi-file project.
   Not the rule for all source; that is `Source files` in `agents/handbook.md`
@@ -38,7 +27,7 @@ Do not treat a shebang alone as “this is a bin entry.” See `agents/scripts-b
 
 Before first use of a required tool: `command -v` / `shutil.which`. Message names the tool + preferred install. Exit **127** for missing binary.
 
-Install path preference: (1) shellrc `install-<tool>` / `user-install-<tool>`, (2) distro package, (3) upstream. Do not invent names.
+Name the tool and a real install command. Do not invent names.
 
 | Mode | Behavior |
 | --- | --- |
@@ -68,10 +57,10 @@ The user runs the command in their normal shell. They do not prefix it with `sud
 When a step needs root, the script elevates that step. The rest stays the invoking user, so files under `$HOME` are not created as root.
 
 - Interactive: `sudo` may prompt. Say which step needs it.
-- Non-interactive: do not hang on a password. Use `sudo-nopw` only after a non-interactive proof that it yields uid 0 (`pdsh.md`). Otherwise print the command and exit.
+- Non-interactive: do not hang on a password. If the step cannot elevate without a prompt, print the command and exit.
 - Do not re-exec the whole script as root.
 
-An agent still needs the current message to contain **explicit** before it runs `sudo`. That gate is `security.md`. This section is how the script is written, not permission for the agent to elevate.
+Whether the agent may elevate is `security.md`. This section is how the script is written, not permission to elevate.
 
 ## Interactive vs script mode
 
@@ -87,50 +76,9 @@ overwrite, wipe, or foreign-host apply. This is the script. A delete,
 overwrite, or wipe the current message already names does not need a
 second ask. Foreign-host apply still follows `security.md`.
 
-## User-facing launches from Grok (FIRM)
+## Color for people and for parsers
 
-Grok agent tools often run with a **monochrome sandbox**: `NO_COLOR=1`,
-`FORCE_COLOR=0`, `TERM=dumb`, plus tool-specific `*_NO_COLOR` / `CLICOLOR=0`.
-That is correct for machine-parsed tool output. It is **wrong** for anything the
-human will look at in a real terminal or desktop window.
-
-**Always** strip the agent sandbox when launching user-visible work, for example:
-
-- Desk/layout: `forge layout dev`, `forge layout <name>`, `forge launch …`
-- Terminals/editors/browsers opened for the user
-- Interactive CLIs the user will read (colored status, TUI apps)
-
-### Recipe
-
-Prefer the shellrc helper (on PATH after `shellrc` install):
-
-```bash
-user-env forge layout dev
-user-env ghostty -e zsh -lic 'cd ~/dev/me/forge && exec zsh'
-user-env -- npm run dev   # -- ends flags
-```
-
-If `user-env` is missing, equivalent minimal reset:
-
-```bash
-env -u NO_COLOR -u PIP_NO_COLOR -u NPM_CONFIG_COLOR \
-  -u CARGO_TERM_COLOR -u CLICOLOR -u CLICOLOR_FORCE \
-  TERM="${TERM/#dumb/xterm-256color}" \
-  FORCE_COLOR=1 CLICOLOR_FORCE=1 \
-  forge layout dev
-```
-
-| Keep | Drop / override |
-| --- | --- |
-| `PATH`, `DISPLAY`, `XDG_*`, credentials, project env | `NO_COLOR`, `FORCE_COLOR=0`, `CLICOLOR=0`, `TERM=dumb` |
-| `GROK_LEADER_SOCKET` (harmless for most apps) | Agent-only monochrome `*_NO_COLOR` / `*_COLOR=never` |
-
-Do **not** wrap pure agent/CI tool steps in `user-env` — keep monochrome there so
-logs stay parseable. Leader-mode detection: `testing.md`.
-
-After **headless / detached** Grok work (or tests that closed the launch TTY):
-open a terminal and **reattach** the durable head for the human
-(`user-env grok` / `grok --attach` / `grok -r …`) — full rule in `testing.md`.
+`NO_COLOR` and `TERM=dumb` stay on for output the agent parses, and come off only for a program a person will look at.
 
 ## Args
 

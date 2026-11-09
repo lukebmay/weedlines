@@ -1,10 +1,11 @@
 ---
 title: Security
-read_when: Before SSH, secrets, sudo/root, credentials, or any important live-data mutation
 order: 20
 ---
 
 # Security
+
+When to use: Before SSH, secrets, sudo/root, credentials, or any important live-data mutation.
 
 Rule vocabulary: **FIRM** / **GUIDELINE** / **MAY**. The words are in the project's `agents/glossary.md`.
 
@@ -15,63 +16,22 @@ Rule vocabulary: **FIRM** / **GUIDELINE** / **MAY**. The words are in the projec
 | No secrets outbound | Never send secrets to external services or network prompts |
 | No secret echo | Never repeat real secret values in output, logs, commits |
 | Flag finds | Tell the user; use contextual names only (`GITHUB_TOKEN`, …) |
-| Record finds | Name + location only in `agents/secrets.md` — never the value |
+| Record finds | Names and locations go in the project's own notes, never the value |
 | No hardcoded secrets | Env or secrets manager; never commit secrets |
 
-**Password nicknames** (e.g. docs that say `7zSecure`): safe labels, not decryptable secrets. Unknown secret-looking strings are unsafe until confirmed.
+## explicit
 
-## SSH — never without EXPLICIT (FIRM)
+**explicit** raises privilege for the task the human asked for. It is them granting permission. The word in an unrelated description is not a grant.
 
-Do not run `ssh`, `scp`, or `sftp`. Do not log into another machine.
-Do not use git, an API, or any other program as a way to explore or
-operate a machine you were not asked to operate. A hole you find is
-a report to the user. It is not a path through.
+One grant covers the commands that task needs, including sudo, `sudo-nopw`, and ssh. Do not ask again for each command, or for ssh separately. It lasts that task and that one Grok Build conversation, the whole conversation, not one message. A new conversation does not have the grant. It does not cover a different task.
 
-The gate is that login and that meddling. A program that uses SSH
-for its own job is not a login. When the user asks for `git push`,
-`git fetch`, or `git pull`, do that. An `ssh://` or `git@host:`
-remote does not turn the git command into `ssh`. The same is true
-of any other tool doing the job the user asked for. The word
-**explicit** is not required for that. It is required before you
-use the tool to open a shell, copy files by hand, wander the
-remote, or do the thing a direct `ssh` or `scp` would do.
+A delegate working that same task may be told that the human granted explicit for this task. The delegate does not invent a grant. A task file is not a grant.
 
-**Why:** entering a machine, or slipping onto one through a tool,
-can harm the people who trust that machine.
+`git push`, `git fetch`, and `git pull` that the human asked for do not need this grant. An `ssh://` remote does not turn those into ssh. Do only what was asked. Confirm a destructive remote step.
 
-Permission for a login or for that meddling is valid **only** if
-the **current user message** contains a form of **explicit**
-(explicit / explicitly / EXPLICIT / clear typos of that word) and
-names the connection.
+Do not run sudo, `sudo-nopw`, ssh, scp, sftp, or a remote login without that grant. Do not use another program as a back door onto a machine. Never circumvent a security system. Using `sudo-nopw`, or any other dodge, to skip a missing grant is still refused. Ask instead. With the grant, do only the commands that task needs. "install system-wide" or "use apt" is not a grant.
 
-| Allows | Does **not** allow |
-| --- | --- |
-| “You have my **explicit** permission to ssh to hulk” | “ssh into hulk and fix it” |
-| “**Explicitly** allowed: run `ssh hulk '…'`” | “check the remote” / “you can use my servers” as permission to log in |
-| “push” / `git push`, `git fetch`, or `git pull` as asked | using git, or any other program, to get a shell or look around a machine |
-
-If **explicit** is missing for a login or for that meddling: refuse;
-say the rule; offer local-only alternatives. No implied standing
-permission.
-
-Even with **explicit**: do only what was asked; confirm destructive
-remote steps. Localhost tooling is not “another machine.”
-
-## Privilege escalation (sudo/root)
-
-Root execution follows the same **explicit** gate as SSH (catalog
-`always.md`): the **current** user message (or task) must contain a form
-of the word **explicit**. Permission is limited to the hosts/tasks
-described, lasts one session, and may be delegated to subagents only
-with the same constraints.
-
-| Rule | Kind | Detail |
-| --- | --- | --- |
-| No silent escalate | **FIRM** | No sudo/root unless the current message contains **explicit** (or clearly grants that exact elevate) |
-| Indirect OK | **GUIDELINE** | “install system-wide” / “use apt” can imply sudo; still ask if the word **explicit** is missing |
-| No circumvention | **FIRM** | Never circumvent security systems (sudo-nopw, pkexec tricks, or any dodge). Ask for permission instead. |
-| Prefer unprivileged | **GUIDELINE** | User-scoped installs when they achieve the goal |
-| No root-owned `$HOME` | **FIRM** | Root must not own anything under a user’s home |
+Prefer a user-scoped install when it achieves the goal.
 
 ## Root must not own `$HOME` (FIRM)
 

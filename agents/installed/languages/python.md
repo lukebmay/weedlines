@@ -1,29 +1,17 @@
 ---
 title: Python
-read_when: Writing or reviewing Python
 order: 200
 ---
 
 # Python
 
-**Precedence:** `pyproject.toml`, `ruff`/`yapf`/`black`, `pyrightconfig.json`/`mypy`, `.editorconfig` override this file.
+When to use: Writing or reviewing Python.
 
-shellrc inspiration: line length **100**; ruff F/E/W; yapf pep8 + `split_before_logical_operator`; mypy strict where enabled; pyright 3.12.
+**Precedence:** `pyproject.toml`, `ruff`/`yapf`/`black`, `pyrightconfig.json`/`mypy`, `.editorconfig` override this file.
 
 ## When
 
 Complex logic, rich options, data processing, anything heavier than a shell one-liner.
-
-## shellrc scripts layout
-
-| Size | Layout |
-| --- | --- |
-| Small tool | Single file `scripts/…/name.py` → `bin/name` |
-| Multi-module app | Package under `scripts/…/<name>/` with `__init__.py` + `__main__.py` |
-
-Package trees are **not** flattened into `bin/`. Only the package with `__main__.py` gets a launcher at `bin/<name>`. Library modules may keep shebangs and `if __name__ == "__main__":` smoke tests — that does **not** install them.
-
-Full installer rules (and other languages): `agents/scripts-build.md`. Example: `scripts/devices/displays/gdisplays/` → `bin/gdisplays`.
 
 ## Style
 

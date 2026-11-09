@@ -1,16 +1,17 @@
 ---
 title: Bash
-read_when: Writing or reviewing Bash scripts
 order: 200
 ---
 
 # bash
 
+When to use: Writing or reviewing Bash scripts.
+
 **Precedence:** in-repo `.editorconfig`, `shfmt`, shellcheck, and project scripts override this file.
 
 ## When
 
-Use when the script must run on systems without zsh, or when targeting pure bash/POSIX. Prefer **zsh** inside shellrc.
+Use when the script must run on systems without zsh, or when targeting pure bash/POSIX.
 
 ## Style
 

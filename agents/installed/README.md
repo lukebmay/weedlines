@@ -1,5 +1,7 @@
 # Catalog
 
+When to use: Refreshing or reading the installed catalog copies.
+
 Portable agent guidelines (security, git, languages, logging, …).
 
 Prefer refreshing these from the shellrc `agent-handbook` catalog (`agent-handbook install` / `agent-handbook update`) rather than editing them here.

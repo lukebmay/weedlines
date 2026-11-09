@@ -1,10 +1,11 @@
 ---
 title: Git
-read_when: Before any commit, push, branch, merge, rebase, or release-ladder work
 order: 30
 ---
 
 # Git
+
+When to use: Before any commit, push, branch, merge, rebase, or release-ladder work.
 
 Rule vocabulary: **FIRM** / **GUIDELINE** / **MAY**. The words are in the project's `agents/glossary.md`.
 
@@ -40,7 +41,7 @@ Agents **never** auto-merge/push `test` or `prod` unless user **explicitly** ask
 | No origin → no push | Skip push entirely; local commit only |
 | Broken origin | Report once; keep local commits |
 | No secret push | Never commit/push secrets |
-| No force-push published | Unless user clearly asks |
+| No force-push published | No force-push or amend of published history unless the user clearly asks |
 
 ## Branch strategy (FIRM default)
 
@@ -57,41 +58,13 @@ Agents **never** auto-merge/push `test` or `prod` unless user **explicitly** ask
 
 If on a side branch: re-merge default regularly; refactor may defer product merges but still pull **`agents/`** from default. Merge back when complete + tested + no serious doubt.
 
-## Commit / push discretion
+## Commit and push
 
-| Situation | Commit? | Push? |
-| --- | --- | --- |
-| Successful wrap-up on default | Yes | Yes if origin |
-| Solid slice of the work in progress | Yes | Same as a wrap-up. See Acceptance and push |
-| Side branch wrap-up | Yes | Push side; merge→default when gated |
-| User said don’t | No | No |
-| Secrets in diff | No | No |
-| Architecture miss / code review not approved | No wrap-up | No |
-
-User veto always wins.
-
-## Acceptance and push (FIRM)
-
-Test the change you just made. Use the checks that change names.
-Do not use a full acceptance run as that test.
-
-Full acceptance is periodic. Run it after a large workload, about
-once or twice a week, or once at the end of a stretch of active
-development that is landing many changes. The product checks live
-in `agents/acceptance.md`. That run is not a gate on every commit.
-
-A push waits on acceptance only when the commit can change product
-behavior. That is code. Handbook, documentation, and any other
-change that cannot change product behavior do not wait. Push those
-when the slice is solid.
-
-A project git file may add a gate for code. It may not hold a
-handbook change, a documentation change, or another change that
-cannot change product behavior for an acceptance run.
+Commit when a task is complete. The reviewer commits if they approve. If they approve only with changes, the developer makes those changes and then commits. If no one is reviewing, the developer commits when the task is complete. Only one of them commits that task. Do not push until the work is functional and usable. That wait is not a full acceptance run. Branches are not required.
 
 ## Merge side branch → default (when used)
 
 Gates: the change's own checks passed · default merged into the
 feature first · tests for that change are green · no serious doubt ·
-no queue interference. Full acceptance follows the schedule above.
-Then merge and push default if origin works.
+no queue interference. Then merge. Push follows the commit and push
+rule above.
