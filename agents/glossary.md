@@ -26,10 +26,10 @@ the law for the target words.
 | **leftover** | Code or an old name that lags a settled handbook rule. Track it under **Leftovers** in `conflicts.md`. Do not mint more of it. |
 | **active conflict** | Two living rules disagree. Track it under **Active** in `conflicts.md`. Do not implement either side until the human picks. |
 | **one home per fact** | A rule lives in exactly one file. Other files link; they do not restate. |
-| **catalog** | Portable guideline fragments under `agents/installed/`, refreshed by `agent-handbook`. Handbook files win on conflict. |
+| **catalog** | Portable guideline fragments under `agents/installed/`, refreshed by `agent-handbook`. Who owns a handbook file is [`handbook.md`](handbook.md). |
 | **extension** | Project file at `agents/<same-path-as-installed>` (or `*.extend.md`) that amends a catalog file. |
 | **override** | Project file `agents/<stem>.override.md` that replaces an installed catalog file for that id. Rare. |
-| **human-owned** | File agents may propose edits to; apply only with explicit permission in the current message. |
+| **human-owned** | A file the agent-handbook has delegated to a human. The rule is [`handbook.md`](handbook.md). |
 | **agent-owned** | File agents update as ordinary work (`glossary.md`, `priority.md`, `conflicts.md`, `conflicts-resolved.md` append-only, the note on the task). |
 | **explicit** | Permission word in the **current** user message for `ssh`, `scp`, `sftp`, a remote login, root, or using another program as a back door onto a machine. Not required for `git push`, `git fetch`, or `git pull` the user asked for. See catalog `security.md`. |
 

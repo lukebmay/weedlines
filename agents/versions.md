@@ -1,7 +1,6 @@
 # Versions
 
-When to use: Installing a handbook, moving a project off an older
-handbook, or deciding which migration to run.
+When to use: Installing a handbook, moving a project off an older handbook, or deciding which migration to run.
 
 **Owner:** agent. The groups and the steps below are the migration
 record. A new group is a new row. Do not invent a migration that
@@ -23,8 +22,8 @@ first version, and less than the next group's first version.
 | `agent-handbook` | >= 0.7.0 | `agent-handbook`. No composer. |
 
 In the `agents` group, root `agents.py` composes `AGENTS.md`.
-In the `agent-handbook` group, `AGENTS.md` is the hand-owned
-kernel and the procedure is `agents/handbook.md`.
+In the `agent-handbook` group, there is no composer. The
+procedure is `agents/handbook.md`.
 
 `agent-handbook` has no upper bound yet. It is the latest group.
 When the next group starts, set this row's upper bound to that
@@ -85,9 +84,9 @@ into `agents/installed/`.
 
 ### 2. Install the current handbook
 
-Run `agent-handbook init` in the project. That seeds the handbook
-and the core set. It does not overwrite a file that is already
-there, and it does not write a composer.
+Run `agent-handbook init` in the project. That seeds missing
+handbook files and the core set. It does not write a composer.
+Which files it overwrites is [`handbook.md`](handbook.md).
 
 Then install the languages and kits this project still needs.
 Look at `agents/.quarantine/installed/`, including

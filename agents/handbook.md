@@ -1,10 +1,9 @@
 # Handbook
 
-When to use: Every agent reads this file once, from the line in
-`AGENTS.md`. It is how the handbook works. It is not product design.
+When to use: ALWAYS
 
-**Owner:** human. Apply edits only with permission in the current
-message.
+The agent-handbook owns its files first. It may delegate control
+or ownership of a file to a human or an agent.
 
 The handbook is the `agents/` directory. It is the rules for agents
 working on this project. Product behavior lives in the guide, not
@@ -12,15 +11,20 @@ in this file.
 
 ## What is in force
 
-`AGENTS.md` is injected on every turn. It holds the security kernel.
-This file is the rest of what every agent needs.
+`AGENTS.md` is injected on every turn. It only tells the agent to
+read `agents/installed/security.md`, `agents/installed/git.md`, and
+`agents/handbook.md`. `agent-handbook init` and `agent-handbook
+update` overwrite root `AGENTS.md` from the catalog seed. They do
+not rewrite the other handbook files. Do not restore `agents.py`.
+Do not hand-edit `agents/installed/`.
+
+If `project.md` or `architecture.md` is still the blank template,
+the orchestrator asks the human whether to proceed without them,
+and does not delegate and does not guess. A delegate does not ask
+the human. It returns the question in the summary and does not edit.
 
 `agents/.quarantine/` is not in force. A listing hides it.
-Do not follow a file there.
-There is no `agents.py`. `AGENTS.md` is the project's kernel, not a
-generated index. `agent-handbook update` refreshes `agents/installed/`
-from the catalog. It does not rewrite `AGENTS.md` and it does not
-restore `agents.py`. Do not hand-edit `agents/installed/`.
+Do not follow a file there. There is no `agents.py`.
 
 The procedure is this file, [`roles/`](roles/),
 [`plans/README.md`](plans/README.md), and
@@ -28,16 +32,15 @@ The procedure is this file, [`roles/`](roles/),
 
 ## Finding a rule
 
-Do not keep a second index of when to open each file. The old
-index drifted, and it was injected on every turn.
+Do not keep a second index. Open every file whose `When to use:`
+line is `ALWAYS`. Every other file has exactly one such line.
+Search `agents/` for that line. Skip `agents/.quarantine/`. Open
+the file whose sentence matches the task. Do not search
+`read_when`.
 
-When this file does not state the rule, search `agents/` for lines
-that start with `When to use:`. Skip `agents/.quarantine/`. Open the
-file whose line matches the task. Do not search the old `read_when`
-field. That field was copied into the retired index.
-
-The orchestrator reads the whole architecture. Another agent opens
-the part the task names.
+The orchestrator reads only the relevant architecture files. Another
+agent opens the parts the task needs. That rule is
+[`roles/orchestrator.md`](roles/orchestrator.md).
 
 ## Source files
 
@@ -48,6 +51,15 @@ it before adding more.
 A file under 500 lines stays whole. Do not split it to
 hit a count. From 500 to 1000, split only when the new
 code is a separate responsibility. Over 1000, split first.
+
+Write code an average developer can read and change. Prefer the
+direct structure. Keep the common path cheap to run. A highly
+complicated or specialized algorithm may be dense when density is
+what makes it correct. It may also be split into files or stages
+when each part already has a name. Do not make it dense only
+because this sentence allows it. The rest of the architecture
+stays easy to follow. Name a long or dense algorithm in the
+directory index.
 
 Split on a responsibility that already has a name. A
 window, a widget that is not trivial, an algorithm, or
@@ -90,15 +102,16 @@ extension and override rows in [`glossary.md`](glossary.md).
 
 Human-owned files change only when the current message gives
 permission. Those files are the product README, `project.md`,
-`architecture.md`, the files under `architecture/`, `acceptance.md`,
-`documentation.md`, `testing.md`, `plog.md`, and this file.
+`architecture.md`, the files under `architecture/`, and
+`acceptance.md`.
 `agents/installed/` is refreshed by `agent-handbook update`. Do not
-hand-edit it. On conflict, this handbook wins over a catalog file.
+hand-edit it.
 
 ## Asking
 
 Ask in the chat when a fact blocks the work, and include the
-context. Do not use the `ask_user_question` tool.
+context. Do not use the `ask_user_question` tool. Stop. Do not
+edit, commit, or delegate until the human answers in this chat.
 
 A chat answer is for this session. It is not a file. Write it
 down only when it changes the guide or a product check and the
