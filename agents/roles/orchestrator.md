@@ -90,8 +90,11 @@ this order:
 Do not paste this handbook into the prompt. Children do not spawn.
 A code reviewer starts after the developer has returned.
 
-Start a new subagent for each assignment. Do not resume an old
-one unless the human asks.
+Resume the delegate that already holds the role. A developer
+stays the developer. A reviewer stays the reviewer. The author
+of a change does not review it. Start a new subagent when no
+delegate holds that role yet, or when the one you would resume
+has compacted more than once.
 
 For an ordinary code task, the same developer reads the code and
 implements. A short read-only look is fine for unfamiliar code.
