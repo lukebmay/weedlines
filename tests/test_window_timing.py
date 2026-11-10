@@ -640,6 +640,8 @@ def test_cut_shows_one_step_and_a_phase_does_not_add_one():
         assert _spinner(dialog).isVisible() is True
         assert start.text() == 'Restart'
         assert start.isEnabled() is False
+        assert start.toolTip() == ''
+        assert _button(dialog, 'conquer-start').toolTip() == ''
         assert _visible_steps(dialog) == ['step-cut']
         _wait_idle(dialog)
         assert _status(dialog).text() == 'done'
@@ -656,6 +658,7 @@ def test_cut_shows_one_step_and_a_phase_does_not_add_one():
         assert _status(dialog).text().startswith('working')
         assert _spinner(dialog).isVisible() is True
         assert start.isEnabled() is False
+        assert start.toolTip() == ''
         _wait_idle(dialog)
         assert dialog.worker_calls.count('solver') == 2
         assert '#123456' in _pen_names(dialog)
@@ -667,6 +670,7 @@ def test_cut_shows_one_step_and_a_phase_does_not_add_one():
         assert _spinner(dialog).isVisible() is False
         assert start.text() == 'Start'
         assert start.isEnabled() is True
+        assert start.toolTip() == ''
         assert _button(dialog, 'apply').isEnabled() is False
         mode = dialog.findChild(QtWidgets.QComboBox, 'mode')
         assert mode.currentData() == 'frame'

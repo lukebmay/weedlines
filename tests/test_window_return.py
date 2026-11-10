@@ -112,6 +112,18 @@ def _line(dialog):
     return widget
 
 
+def _status(dialog):
+    label = dialog.findChild(QtWidgets.QLabel, 'status')
+    assert label is not None
+    return label
+
+
+def _names(sentence):
+    prefix = _PROBLEM + ' '
+    assert sentence.startswith(prefix) and sentence.endswith('.')
+    return sentence[len(prefix):-1]
+
+
 def _line_chars(line):
     doc = QtGui.QTextDocument()
     doc.setHtml(line.text())
@@ -357,10 +369,16 @@ def test_defect_line_and_actions_sit_under_the_preview():
         _below(line_rect, _rect(dialog, arrows))
         assert not preview_rect.intersects(line_rect)
         start = _button(dialog, 'start')
+        conquer = _button(dialog, 'conquer-start')
         box = _mode_box(dialog)
+        names = _names(_ALL_KINDS)
         for index in range(box.count()):
             box.setCurrentIndex(index)
             assert start.isEnabled() is False
+            assert start.toolTip() == names
+            assert _status(dialog).text() == 'ready'
+            assert conquer.toolTip() == ''
+        assert start.testAttribute(QtCore.Qt.WA_AlwaysShowToolTips)
         start.click()
         assert _button(dialog, 'apply').isEnabled() is False
         dialog.reject()
@@ -373,11 +391,22 @@ def test_line_names_only_the_kinds_present():
         _assert_swatches(dialog, _OPEN, _DANGLING_ONLY)
         assert 'figure overlaps' not in _line(dialog).text()
         assert 'self-overlaps' not in _line(dialog).text()
+        start = _button(dialog, 'start')
+        assert start.isEnabled() is False
+        assert start.toolTip() == _names(_DANGLING_ONLY)
+        assert 'figure overlaps' not in start.toolTip()
+        assert 'self-overlaps' not in start.toolTip()
+        assert _status(dialog).text() == 'ready'
         dialog.reject()
 
     def drive_two(dialog):
         _assert_swatches(dialog, _TWO, _TWO_KINDS)
         assert 'figure overlaps' not in _line(dialog).text()
+        start = _button(dialog, 'start')
+        assert start.isEnabled() is False
+        assert start.toolTip() == _names(_TWO_KINDS)
+        assert 'figure overlaps' not in start.toolTip()
+        assert _status(dialog).text() == 'ready'
         dialog.reject()
 
     _run(_OPEN, drive_one)
@@ -402,6 +431,8 @@ def test_clear_check_has_an_empty_line_and_start_works():
         for index in range(box.count()):
             box.setCurrentIndex(index)
             assert start.isEnabled() is True
+            assert start.toolTip() == ''
+            assert _status(dialog).text() == 'ready'
         _set_mode(dialog, 'frame')
         apply_btn = _button(dialog, 'apply')
         start.click()

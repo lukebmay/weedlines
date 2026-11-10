@@ -85,11 +85,24 @@ class _RunControls(object):
         self.status_label.setText(text)
         self.spinner.setVisible(not self.state['paused'])
 
+    def _sync_start_tip(self):
+        # A border ask is not a run. Stopping a step is not a defect.
+        running = self.state.get('aborting') or (
+            self.state.get('busy') and self.state.get('ask') != 'border')
+        tip = ''
+        if self.blocked and not running:
+            tip = self._marked_problem_text()
+        # A disabled button does not show a tooltip unless this is set.
+        self.start_btn.setAttribute(
+            self.QtCore.Qt.WA_AlwaysShowToolTips, True)
+        self.start_btn.setToolTip(tip)
+
     def _sync_start_button(self):
         self.start_btn.setText('Restart' if self._current_started() else 'Start')
         border = self.state.get('ask') == 'border'
         self.start_btn.setEnabled(
             (not self.state['busy'] or border) and not self.blocked)
+        self._sync_start_tip()
         self.conquer_btn.setEnabled(False)
         if border:
             self.spinner.setVisible(False)
@@ -170,6 +183,7 @@ class _RunControls(object):
         else:
             self.status_label.setText('ready')
         self.start_btn.setEnabled(not self.blocked)
+        self._sync_start_tip()
         self.pad_spin.setEnabled(True)
         self.space_spin.setEnabled(True)
         self.collar_spin.setEnabled(True)
@@ -332,6 +346,7 @@ class _RunControls(object):
         self.pause_btn.setText('Pause')
         self.pause_btn.setEnabled(False)
         self.start_btn.setEnabled(False)
+        self._sync_start_tip()
         self._render_status()
 
     def on_conquer(self):

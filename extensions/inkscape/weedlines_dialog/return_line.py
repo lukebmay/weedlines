@@ -44,15 +44,37 @@ def _arrow_colors(arrow_paths):
     return colors
 
 
+def _join_words(words):
+    if len(words) == 1:
+        return words[0]
+    if len(words) == 2:
+        return '%s and %s' % (words[0], words[1])
+    return '%s, %s, and %s' % (words[0], words[1], words[2])
+
+
+def _present_kinds(defects):
+    present = set()
+    for defect in defects or ():
+        present.add(defect.kind)
+    return present
+
+
+def _marked_problems(defects):
+    """Plain names of the kinds that are present. Empty when none are."""
+    words = [
+        word for kind, word in _KIND_WORDS if kind in _present_kinds(defects)]
+    if not words:
+        return ''
+    return _join_words(words)
+
+
 def _defect_line(defects, colors=None):
     """Name each defect kind that is present. Empty when the check is clear.
 
     ``colors`` maps a kind to that arrow's color. A swatch of the
     color precedes the name. The name itself is not colored.
     """
-    present = set()
-    for defect in defects or ():
-        present.add(defect.kind)
+    present = _present_kinds(defects)
     names = []
     for kind, word in _KIND_WORDS:
         if kind not in present:
@@ -65,13 +87,7 @@ def _defect_line(defects, colors=None):
             names.append(word)
     if not names:
         return ''
-    if len(names) == 1:
-        named = names[0]
-    elif len(names) == 2:
-        named = '%s and %s' % (names[0], names[1])
-    else:
-        named = '%s, %s, and %s' % (names[0], names[1], names[2])
-    return '%s %s.' % (_PROBLEM_SENTENCE, named)
+    return '%s %s.' % (_PROBLEM_SENTENCE, _join_words(names))
 
 
 class _Defect(object):
@@ -87,6 +103,11 @@ class _Check(object):
 
 
 class _ReturnLine(object):
+
+    def _marked_problem_text(self):
+        if self.check is None:
+            return ''
+        return _marked_problems(self.check.defects)
 
     def _show_return_line(self):
         # The import sentence replaces this line. A later subject
