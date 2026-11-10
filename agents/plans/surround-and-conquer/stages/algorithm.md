@@ -26,8 +26,11 @@ with this stage. It does not gain a longer guide.
 
 ## Not yet
 
-Conquer. A second surround inside a cluster. A smoothing
-control. Those are later stages and have no tasks.
+Conquer. It is specified in [`conquer.md`](conquer.md)
+and has no tasks until a cavern measure and threshold
+are named. A second surround inside a cluster. A
+smoothing control. Those are later stages and have no
+tasks.
 
 A clip of the surround to the piece, and a rectangle around
 the piece, are [`../../piece-border/`](../../piece-border/).

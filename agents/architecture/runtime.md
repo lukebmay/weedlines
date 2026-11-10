@@ -47,9 +47,11 @@ returns nothing.
 A mode this guide gives no steps the person starts is one
 step. Frame, grid, and island-hop are each one step.
 Surround and Conquer has two steps: the surround, then
-conquer. Conquer is not specified yet, so its Start stays
-disabled and the library emits no conquer cuts. The window
-shows it as the step that is left. The window shows one
+conquer. [`algorithms.md`](./algorithms.md) is what
+conquer cuts. Conquer's Start stays disabled, and the
+library emits no conquer cuts, until that part names
+the cavern measures and their thresholds. The window
+shows conquer as the step that is left. The window shows one
 status for the run: ready, working, paused, or done. A
 spinner shows only while the run is working and is not
 paused. A phase name from the library can appear in that
@@ -85,10 +87,15 @@ edit the open document. The person then runs
 The cache directory is `$XDG_CACHE_HOME/weedlines` when that
 variable is set. Otherwise it is `~/.cache/weedlines` on Linux,
 `%LOCALAPPDATA%\weedlines\cache` on Windows, and
-`~/Library/Caches/weedlines` on macOS. The window shows the
-run's stdout and stderr while the run is going. The detached
-window's stdout and stderr also go to `host.log` in that
-directory.
+`~/Library/Caches/weedlines` on macOS. The label above the run pane is **Algorithm output**.
+The pane shows one line when the library enters a stage,
+and one line when it enters a substage. It does not show
+a line for each accepted segment. Those segments still
+update the preview. A reject stays out of the pane unless
+the log level below asks for it. The lines do not change
+the cuts. The run's stdout and stderr still arrive in
+that pane. The detached window's stdout and stderr also
+go to `host.log` in that directory.
 
 The detached split exists so the extension can return. A long
 run must not hold Inkscape's main thread, and solver stderr

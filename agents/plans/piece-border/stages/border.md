@@ -13,13 +13,13 @@ The window paints the paths it is given. It does not
 build or clip them. Paint does not wait for Start, and
 it waits until the figure check is clear.
 
-The two option labels are not named. A task that shows
-those options stays waiting on the human. The library
-emission and the default paint do not wait on the names.
-Once the names exist, both lengths are on the form in
-every mode. A change repaints the border off the GUI
-thread. Only the inner distance rebuilds a surround
-that is already showing.
+The labels are named in the preview part. The library
+rounds both rectangles when Border Rounded Corners is
+on, and the clip follows that inner border. The form
+task waits until that geometry is in. A change repaints
+the border off the GUI thread. Border padding, the
+checkbox, and the radius rebuild a surround that is
+already showing. The border width does not.
 
 ## Not yet
 

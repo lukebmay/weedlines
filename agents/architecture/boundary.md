@@ -27,9 +27,11 @@ numbers on screen. Percent and em are not on that list. The
 library still receives document user units.
 
 A length this guide names in inches, including the join gap
-baseline of a quarter inch, is that real length in user
-units under the document scale. It is not a fixed count of
-6.35. Padding, grid spacing, and the island-hop collar keep
+baseline of a quarter inch and the border corner radius of
+a quarter inch, is that real length in user units under the
+document scale. It is not a fixed count of 6.35. The border
+padding and the border width are the same kind of length.
+Their eighth-inch starts are in [`algorithms.md`](./algorithms.md). Padding, grid spacing, and the island-hop collar keep
 the solver's user-unit counts. The window shows those counts
 in the display unit. It does not relabel the digits.
 

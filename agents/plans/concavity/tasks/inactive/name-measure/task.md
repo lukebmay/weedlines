@@ -1,13 +1,11 @@
 # Name the measure
 
-**Status:** waiting
+**Status:** parked
 
-**Blocker:** [`../../../notes.md`](../../../notes.md)
-still has two readings of mouth and reach. The
-candidate score is not one construction. This task
-does not start until that note has one construction
-and no second reading. Do not pick a reading to
-clear this. Do not edit the note from here.
+**Blocker:** the plan changed. Concavity is an
+exploration of several numbers, not one construction
+to write into the guide. Do not revive this task to
+crown mouth and reach.
 
 ## Goal
 

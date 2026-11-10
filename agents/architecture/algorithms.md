@@ -34,16 +34,29 @@ large size can fall onto the subject. Vinyl has thickness.
 A short flap drops less readily than a long one. Absolute
 size is part of the difficulty, with the shape.
 
-The aim of every algorithm is that every cavern in a weed
-area stays within the allowance the person sets, and that
-the algorithm does not make more weed areas than that
-requires. A cavern over the allowance becomes its own weed
-area. A milder one can remain. The allowance is one length.
-It is not the surround distance, the join gap, or either
-piece-border length. Those already mean clearance, joining,
-and the border. This part does not name how a cavern is
-measured. No algorithm uses a measure this part does not
-name.
+The aim of every algorithm is that a cavern which would
+make the peel fail is sealed by a weed line, and a cavern
+which would still peel in one motion is left. Vinyl has
+thickness, so the same zig-zag can need a seal on each
+tooth when the teeth are large and need none when the
+teeth are small.
+
+A measure is a number the library can compute for one
+cavern. One cavern may need more than one number. Each
+measure this part names has a threshold the person sets.
+This part does not name the measures yet. No cutting
+algorithm seals a cavern, and the window offers no cavern
+threshold, until this part names the measure and the
+threshold. The library may compute candidate numbers. A
+candidate is not a measure this part has named. The
+calculation is local to the outline. It does not search
+over sets of caverns. It stays fast enough to run while
+the person is looking.
+
+A threshold is not the surround distance, the join gap,
+or a piece-border length. Those already mean clearance,
+joining, and the border. None of them stands in for
+another.
 
 ## Modes that cut today
 
@@ -94,14 +107,28 @@ bounds.
 
 The piece border is two rectangles around the piece size.
 The inner rectangle starts one eighth of an inch outside
-the piece size. The person can change that distance. The
-outer rectangle starts one eighth of an inch outside the
-inner one. The person can change that width on its own.
-That strip is the material of the border.
-[`boundary.md`](./boundary.md) is both lengths. The window
-does not build the rectangles. The outer rectangle is the
-only cut outside the inner rectangle. No other weed line
-passes outside it.
+the piece size. That gap is border padding. The outer
+rectangle starts one eighth of an inch outside the inner
+one. That strip is the border width, and it is the
+material of the border. The person can change each length
+on its own. [`boundary.md`](./boundary.md) is both
+lengths, and the corner radius. The window does not build
+the rectangles. The outer border is the only cut outside
+the inner border. No other weed line passes outside it.
+
+Border padding is not the padding of frame, grid, or
+island-hop. Those modes keep their own padding control.
+
+With rounded corners off, both rectangles have square
+corners. With rounded corners on, the library rounds
+every corner of both rectangles by the border corner
+radius. The radius starts at one quarter of an inch.
+Zero is a square corner. The radius is at most half the
+shorter side of the inner rectangle, so the corner arcs
+do not cross and the strip stays an even width. The
+window does not allow a value outside that range. The
+radius applies only while rounded corners are on. The
+window keeps the number while it is open.
 
 The library emits the two rectangles together, either before
 the other weed lines or after them. It does not split the
@@ -112,9 +139,14 @@ pair around those lines. Island-hop remains a mode.
 Surround and Conquer is the mode the window opens on. It uses
 the same figure check, the same subject and weed area, and the
 same preview colors as the other modes. It does not own those.
-Conquer is the next step. It is not specified yet, so the
-window leaves its Start disabled and the library does not
-emit conquer cuts. This work does not define those cuts.
+Conquer is the next step. It closes each cavern that is
+over a named threshold with a weed line, and it cuts
+every closed loop of weed material so that waste peels
+in one pull. It does not run, and the library emits no
+conquer cuts, until this part names the cavern measures
+and their thresholds. The window leaves Conquer's Start
+disabled until then. Conquer does not change the
+surround step.
 
 The first step is the surround. The library builds it from the
 subject. The window does not.
@@ -125,17 +157,25 @@ design bounds, and the person can change it. The window does
 not allow a value below zero. Zero is the outer boundary of
 the subject. Units stay as [`boundary.md`](./boundary.md)
 describes. The other mode knobs do not change the surround.
-The inner piece-border distance does, because the clip
-uses that rectangle. The border width does not.
+Border padding does, because the clip uses the inner
+border. The corner radius does too, when rounded
+corners are on, because the clip follows those corners.
+The border width does not.
 
 The library keeps the surround at least the surround distance
 from the subject, except at an end the piece-border clip
-leaves on the inner rectangle. A cavern within the allowance
-is traced at that distance. A straight edge of a traced
-cavern is a straight line at that distance. A cavern over
-the allowance is not traced. The surround crosses that
-cavern's mouth. It may sit farther from the subject than
-the surround distance there, and it does not come closer.
+leaves on the inner border. Once this part names a
+cavern measure and its threshold, a cavern within every
+named threshold is traced at that distance. A straight
+edge of a traced cavern is a straight line at that
+distance. A cavern over a named threshold is not traced.
+The surround crosses that cavern's mouth. It may sit
+farther from the subject than the surround distance
+there, and it does not come closer. Until a measure and
+its threshold are named, the surround does not apply
+this test and does not bridge a cavern from a candidate
+number.
+
 That bridge has no sharp corner. The weed area inside the
 bridged cavern is not part of the outer peel. This step
 does not cut that cavern up. A turn is no tighter than the
@@ -164,18 +204,20 @@ waste a pass and can lift the vinyl or mark the backing.
 
 There is no smoothing control. The surround distance is the
 clearance. The join gap joins surrounds. The two
-piece-border lengths are the border. The cavern allowance
-is separate from all of those. None of them stands in for
-another. The join gap does not decide which cavern is
-traced.
+piece-border lengths and the corner radius are the
+border. A cavern threshold is separate from all of
+those. None of them stands in for another. The join
+gap does not decide which cavern is traced.
 
 The step does not run again inside a cluster. It does not draw
 weed lines from the surround to the subject edges.
 
-The library clips a surround that meets the inner rectangle
-to the inside of that rectangle and leaves the surround
-open. The cavern test does not close those ends, and it
-does not call that gap a cavern. The window does not.
+The library clips a surround that meets the inner border
+to the inside of that border and leaves the surround
+open. When rounded corners are on, the clip follows the
+rounded inner border. The cavern test does not close
+those ends, and it does not call that gap a cavern. The
+window does not.
 The clip keeps the surround off the outer edges of the
 subject, so the cutter does not trace those edges again. Four equal squares set in a
 rectangle are why: their outer sides must not be the

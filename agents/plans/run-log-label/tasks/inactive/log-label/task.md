@@ -1,11 +1,10 @@
 # Log label
 
-**Status:** waiting
+**Status:** parked
 
-**Blocker:** the human has not named the words on the
-label above the log. The guide does not name them.
-Do not invent the words. This task does not start
-until the human names them.
+**Blocker:** the plan changed. The label is Algorithm
+output, and the pane must show stage and substage
+lines. Do not revive this task as a rename only.
 
 ## Goal
 

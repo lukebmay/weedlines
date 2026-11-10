@@ -88,6 +88,10 @@ check reports no defect. The window has no control that starts
 anyway. This gate is in front of frame, grid, island-hop, and
 any later algorithm, including Surround and Conquer.
 
+Make ready may propose a fix for a defect the check reports.
+[`host.md`](./host.md) is the approval and what each fix does.
+The check itself does not change the path.
+
 The check does not change how a solver cuts a keep path it is
 given. A design that fails the check never reaches the solver
 from the window.

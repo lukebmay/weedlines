@@ -1,27 +1,22 @@
-# Candidate
+# Probes
 
 Open this when the task says the attempt matters. This
-note is not the guide.
+note is not the guide. None of these is a named measure.
 
-The candidate score of one cavern is reach squared,
-divided by reach plus mouth. The person would set one
-maximum length. A rectangle has no mouth and no score.
-A shallow bay stays small. A C whose reach is about its
-mouth scores about half the reach. A long tube scores
-toward its reach. Scaling the polyline scales the score
-by the same factor. A comb is one score per gap. An
-inner cavern is not added into the outer reach.
+One old candidate score is reach squared, divided by
+reach plus mouth. Mouth and reach were never one
+construction. Do not write that score into the guide.
 
-Mouth and reach are not constructions yet. One reading
-takes each mouth as a convex-hull edge of a reflex run
-that is not already a polyline edge, then takes reach
-as the farthest geodesic distance inside that pocket
-from the mouth segment. Another reading can turn "the
-farthest pair" into one mouth for a whole comb. Do not
-write either reading into the guide until one
-construction is the only reading.
+The kinds of number worth probing, as examples only:
 
-The score stays a length. It does not become an area
-ratio, a vertex count, a scale-free ratio, or one
-average for the outline. The surround does not become
-the convex hull.
+- Depth, or the length of the cavern.
+- A ratio of that depth to the width of the mouth.
+- An angle, as motion past 90 degrees from a starting
+  point.
+- How quickly the coast becomes concave.
+
+A 90-degree zig-zag is the picture. Large teeth would
+need each cave closed. The same teeth, small enough
+that the vinyl thickness keeps the waste off the
+piece, would not. A probe should show that size
+difference as a number. It should stay fast.

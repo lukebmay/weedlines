@@ -1,8 +1,8 @@
 # Priority
 
-The order of active tasks for piece-border. A path, then
-the reason only when the order would otherwise be a guess.
+The order of active tasks for piece-border.
 
-(none — the two option labels are not named.
+1. [border-corners](tasks/active/border-corners/task.md)
+
 [border-options](tasks/inactive/border-options/task.md)
-stays waiting. Do not invent the labels.)
+stays waiting on border-corners. The labels are named.

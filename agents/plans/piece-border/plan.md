@@ -8,10 +8,11 @@
 
 Every algorithm can cut the piece border around the
 piece, and the window paints that border when the figure
-check is clear. The two length options update that
-preview once their labels are named. The surround clip
-uses the inner rectangle. The surround does not cut the
-subject. Island-hop stays.
+check is clear. The form shows Border Padding, Border
+Width, and Border Rounded Corners. The radius shows
+while that box is on. The surround clip follows the
+inner border. The surround does not cut the subject.
+Island-hop stays.
 
 ## Guide
 
@@ -27,20 +28,22 @@ subject. Island-hop stays.
 - The preview paints both rectangles when the figure
   check is clear, without waiting for Start. The window
   does not build them.
-- A change to either length repaints the border. Only the
-  inner distance asks again for a surround that is
-  already showing. The border width does not. Swap asks
-  for the border again.
-- The two option labels stay unnamed until the human
-  names them. Until then the form does not show those
-  options, and the library still emits the defaults.
+- A change to border padding, the checkbox, or the radius
+  repaints the border and, when a surround is showing,
+  asks for that surround. The border width asks for the
+  border only. Swap asks for the border again.
+- The labels are Border Padding, Border Width, Border
+  Rounded Corners, and Border Corner Radius. The radius
+  starts at one quarter of an inch and shows only while
+  the box is on.
 - Each border length is the real length in the boundary
-  part.
+  part. The radius is at most half the shorter side of
+  the inner rectangle.
 - Do not remove island-hop. No weed line passes outside
-  the inner rectangle except the outer border rectangle.
+  the inner border except the outer border.
 - The border is not a surround, not the surround distance,
-  and not padding.
+  and not the padding of frame, grid, or island-hop.
 - Geometry tests do not need Inkscape. Window tests run
   offscreen when Qt is available.
 - The user page that shows the border matches the preview
-  part. Do not invent the two labels there.
+  part, including the four control names.

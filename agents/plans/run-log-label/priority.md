@@ -1,8 +1,10 @@
 # Priority
 
-The order of active tasks for run-log-label. A path, then
-the reason only when the order would otherwise be a guess.
+The order of active tasks for run-log-label.
 
-(none — the label words are not named.
-[log-label](tasks/inactive/log-label/task.md)
-stays waiting. Do not invent the words.)
+(none yet — the architect files the stage-line task
+from the stages stage.)
+
+[log-label](tasks/inactive/log-label/task.md) is
+parked. Renaming the label was not the whole ask.
+The words are Algorithm output.

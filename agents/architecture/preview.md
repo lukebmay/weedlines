@@ -114,31 +114,35 @@ The window paints the paths it is given, in the weed-line
 color. It does not build the rectangles. It paints them
 without waiting for Start.
 
-The form shows one option for the distance from the piece
-size to the inner rectangle, and one option for the border
-width, in every mode, once those labels are named. Until
-the labels are named, the form does not show the two
-options. The library still emits the default rectangles,
-and the window still paints them. Naming the labels does
-not bring back padding, grid spacing, the collar, or the
-layer name.
+The form shows these controls in every mode. **Border
+Padding** is the gap from the piece size to the inner
+rectangle. **Border Width** is the width of the strip.
+**Border Rounded Corners** is a checkbox. While it is
+off, the radius control is hidden and the corners are
+square. While it is on, the form shows **Border Corner
+Radius**, starting at one quarter of an inch. The frame
+padding, grid spacing, collar, and layer name stay the
+controls they already are. Border Padding is not that
+padding.
 
-A change to either length asks the library again, off the
-GUI thread, and repaints the border. It asks because the
-length changed, not on a clock. When a surround is
-showing, a change to the inner distance asks for the
-surround again. A change to the border width does not.
-Swap asks for the border again, because the piece is the
-subject. [`runtime.md`](./runtime.md) is the thread.
-[`algorithms.md`](./algorithms.md) is the two lengths and
-the clip.
+A change to border padding, the checkbox, or the radius
+asks the library again, off the GUI thread, and repaints
+the border. It asks because that value changed, not on
+a clock. When a surround is showing, that same change
+asks for the surround again. A change to the border
+width asks for the border only. Swap asks for the
+border again, because the piece is the subject.
+[`runtime.md`](./runtime.md) is the thread.
+[`algorithms.md`](./algorithms.md) is the lengths, the
+radius, and the clip.
 
 ## Option history
 
 The person can undo and redo committed changes to option
 values across the form. The history covers the mode, the
-length options, the output layer name, and the four preview
-colors. An edit still being typed undoes as text in that
+length options, the border checkbox and radius, the
+choice to include the original design, the output layer
+name, and the four preview colors. An edit still being typed undoes as text in that
 field until it commits. Undo does not include swap, the run
 controls, the log, work marks, or any cut.
 

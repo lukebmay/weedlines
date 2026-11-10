@@ -69,7 +69,9 @@ another layer's job.
 
 Every algorithm waits on the same figure check. Surround and
 Conquer is the mode the window opens on. Its first step is the
-surround. Conquer is the next step and is not specified yet.
+surround. Conquer is the next step.
+[`architecture/algorithms.md`](./architecture/algorithms.md)
+says when it runs.
 The check, the preview,
 and the way correction arrows go back to Inkscape are specified,
 and they apply to every algorithm.
@@ -91,9 +93,11 @@ A run moves in this order.
    island-hop, or start the surround. The library emits the
    weed lines for the mode that cuts. It emits the surround
    only after the person starts that step. The window paints
-   them in the weed-line color. Conquer does not run.
-5. Import reads the result file. A weed-line result brings in a
-   copy of the design and the cuts. A correction-arrow result
+   them in the weed-line color. Conquer does not run until
+   the algorithms part names the cavern measures and thresholds.
+5. Import reads the result file. A weed-line result brings in
+   the border and the weed lines, and the original design only
+   when the person included it. A correction-arrow result
    brings in only the arrow groups, above the open document.
 
 | Piece | Owns | Must not own |

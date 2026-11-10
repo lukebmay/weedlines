@@ -1,11 +1,10 @@
 # Priority
 
-The order of active tasks for concavity. A path, then
-the reason only when the order would otherwise be a guess.
+The order of active tasks for concavity.
 
-(none — mouth-reach stopped. One construction was
-not made.)
+(none yet — the architect files the first probe
+from the explore stage. Do not crown a measure.)
 
 [name-measure](tasks/inactive/name-measure/task.md)
-stays waiting. The note still has two readings.
-Do not name the measure from the candidate.
+is parked. The plan no longer asks for one
+construction.

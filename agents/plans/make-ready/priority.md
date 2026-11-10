@@ -2,5 +2,5 @@
 
 The order of active tasks for make-ready.
 
-The stub stage has no active task. Cleanup waits
-on the design meeting and has no tasks.
+The stub stage has no active task. The fix flow is
+[ready-fixes](../ready-fixes/plan.md).

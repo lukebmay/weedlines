@@ -22,16 +22,17 @@ A waiting plan stays under its rank. The notes say why. Skip it.
 | Plan | Notes |
 | --- | --- |
 | [source-split](plans/source-split/plan.md) | The split stage is met. No open task. Skip it. |
-| [make-ready](plans/make-ready/plan.md) | The stub tasks are done. Cleanup waits on the design meeting and has no tasks. |
+| [make-ready](plans/make-ready/plan.md) | The stub tasks are done. Fixes are [ready-fixes](plans/ready-fixes/plan.md). |
 | [surround-doc](plans/surround-doc/plan.md) | The label stage is met. No open task. Skip it. |
-| [piece-border](plans/piece-border/plan.md) | The rectangles, the clip, and the preview are in. Waiting on the human to name the two length labels. Do not invent them. |
+| [piece-border](plans/piece-border/plan.md) | The labels are named. border-corners is ready. border-options waits on it. |
 | [step-timer](plans/step-timer/plan.md) | The clock and the page are in. No open task. Skip it. |
-| [concavity](plans/concavity/plan.md) | Waiting on the human. Mouth and reach still have two readings. Do not crown one. |
-| [surround-cavern](plans/surround-cavern/plan.md) | Waiting on concavity to name the measure. The inner rectangle is in place. |
+| [ready-fixes](plans/ready-fixes/plan.md) | The approval flow is in the host part. No tasks yet. File them before coding. It may run beside other plans. |
+| [concavity](plans/concavity/plan.md) | Exploration is open. A probe is not a named measure. It may run beside other plans. Do not crown one number. |
+| [surround-cavern](plans/surround-cavern/plan.md) | Waiting until the algorithms part names a measure and a threshold. A probe is not that name. |
 | [preview-color-picker](plans/preview-color-picker/plan.md) | The picker is in. No open task. Skip it. |
 | [start-disabled-reason](plans/start-disabled-reason/plan.md) | The tooltip is in. No open task. Skip it. |
 | [control-names](plans/control-names/plan.md) | The pages name the run controls. No open task. Skip it. |
-| [surround-and-conquer](plans/surround-and-conquer/plan.md) | The surround step except the cavern coastline. That coastline is surround-cavern. Conquer starts when the human asks. |
+| [surround-and-conquer](plans/surround-and-conquer/plan.md) | The surround step except the cavern coastline. Conquer is specified and waits on a named measure and threshold. Do not emit conquer cuts. |
 | [_bugs](plans/_bugs/plan.md) | No open task. The directory stays open. |
 | [responsive-run](plans/responsive-run/plan.md) | The responsive stage is met. No open task. Skip it. |
 | [segment-publish](plans/segment-publish/plan.md) | The publish stage is met. No open task. Skip it. |
@@ -43,8 +44,8 @@ A waiting plan stays under its rank. The notes say why. Skip it.
 | Plan | Notes |
 | --- | --- |
 | [weedlib-index](plans/weedlib-index/plan.md) | The index is in. No open task. Skip it. |
-| [run-log-label](plans/run-log-label/plan.md) | Waiting on the human to name the words above the log. Do not invent them. |
-| [design-copy](plans/design-copy/plan.md) | Waiting on the human. The host part does not say the design copy is the path records. Do not invent that sentence. |
+| [run-log-label](plans/run-log-label/plan.md) | The label is Algorithm output. The pane shows stage and substage lines. No tasks yet. File them before coding. |
+| [design-copy](plans/design-copy/plan.md) | Default export is the border and the weed lines. Include original design is optional. No tasks yet. File them before coding. |
 | [extension-doc-drift](plans/extension-doc-drift/plan.md) | The page follows the host menu and the install part. No open task. Skip it. |
 
 ## 2 low

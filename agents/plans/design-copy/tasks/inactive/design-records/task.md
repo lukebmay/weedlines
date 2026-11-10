@@ -1,11 +1,11 @@
 # Design records
 
-**Status:** waiting
+**Status:** parked
 
-**Blocker:** the human has not said the design copy
-is the path records the figure check sees. The host
-part does not say that. Do not invent it. This task
-does not start until that sentence is in the guide.
+**Blocker:** the plan changed. The default export is
+the border and the weed lines. The original design is
+the Include original design checkbox. Do not revive
+this task as an always-on design copy.
 
 ## Goal
 

@@ -2,7 +2,7 @@
 
 **Rank:** 4
 
-**Stage:** stub
+**Stage:** cleanup
 
 ## Goal
 
@@ -44,3 +44,6 @@ and `4 Reimport last ready cut`.
   design copy and no message box.
 - The window's correction return uses that same writer.
 - Arrow colors stay `#FF00FF`, `#FF6A00`, and `#00E5FF`.
+
+The fix flow is [`../ready-fixes/plan.md`](../ready-fixes/plan.md).
+This plan does not grow those tasks.

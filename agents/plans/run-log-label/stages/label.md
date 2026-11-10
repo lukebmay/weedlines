@@ -1,15 +1,7 @@
 # Label
 
-## This stage
+Not the current stage. The current stage is
+[`stages.md`](stages.md).
 
-The words on the label above the log pane. The window
-already shows the run's stdout and stderr. The guide
-does not name those words. The human names them. Do
-not invent them. The library's log does not change.
-
-The dialog package is in place. That is not a wait.
-
-## Not yet
-
-Nothing. This stage is the plan. The pane's contents
-and the library log are not a later stage.
+The label text is Algorithm output. Do not invent a
+different name. Do not stop at renaming the label.

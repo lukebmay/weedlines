@@ -31,8 +31,9 @@ Conquer stays unspecified.
 - The bridge keeps a smooth corner. The join gap, the
   surround distance, and the border lengths keep their
   own meanings.
-- This plan does not start until the cavern measure is
-  named in the algorithms part. The inner rectangle is
-  in place.
+- This plan does not start until the algorithms part
+  names a cavern measure and its threshold. A probe in
+  the concavity plan is not that name. The inner
+  border is in place.
 - Conquer stays unspecified. Geometry tests do not
   need Inkscape.
