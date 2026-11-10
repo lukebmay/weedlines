@@ -28,7 +28,7 @@ A waiting plan stays under its rank. The notes say why. Skip it.
 | [step-timer](plans/step-timer/plan.md) | The clock and the page are in. No open task. Skip it. |
 | [concavity](plans/concavity/plan.md) | Waiting on the human. Mouth and reach still have two readings. Do not crown one. |
 | [surround-cavern](plans/surround-cavern/plan.md) | Waiting on concavity to name the measure. The inner rectangle is in place. |
-| [preview-color-picker](plans/preview-color-picker/plan.md) | Waiting on source-split's dialog package. |
+| [preview-color-picker](plans/preview-color-picker/plan.md) | The picker is in. No open task. Skip it. |
 | [start-disabled-reason](plans/start-disabled-reason/plan.md) | Waiting on source-split's run controls file. |
 | [control-names](plans/control-names/plan.md) | The pages name the run controls. No open task. Skip it. |
 | [surround-and-conquer](plans/surround-and-conquer/plan.md) | The surround step except the cavern coastline. That coastline is surround-cavern. Conquer starts when the human asks. |

@@ -301,8 +301,28 @@ def _run_dialog(records, drive, defaults=None):
 
 
 def _color_edit(dialog, QtWidgets):
-    edit = dialog.findChild(QtWidgets.QLineEdit, 'weed-line-color')
+    edit = dialog.findChild(QtWidgets.QPushButton, 'weed-line-color')
     assert edit is not None
+    return edit
+
+
+def _pick_color(dialog, QtCore, QtWidgets, text):
+    from weedlib.qt import load_widgets
+    _core, QtGui, _widgets = load_widgets()
+    edit = _color_edit(dialog, QtWidgets)
+
+    def choose():
+        opened = [
+            picker for picker in dialog.findChildren(
+                QtWidgets.QColorDialog, 'color-picker')
+            if picker.isVisible()
+        ]
+        assert len(opened) == 1
+        opened[0].setCurrentColor(QtGui.QColor(text))
+        opened[0].accept()
+
+    QtCore.QTimer.singleShot(0, choose)
+    edit.click()
     return edit
 
 
@@ -311,8 +331,7 @@ def test_closed_window_returns_no_color():
         edit = _color_edit(dialog, QtWidgets)
         assert edit.text() == _RED
         assert edit.property('color') == _RED
-        edit.setText('#00aa00')
-        edit.editingFinished.emit()
+        _pick_color(dialog, _QtCore, QtWidgets, '#00aa00')
         dialog.reject()
 
     assert _run_dialog(_RECT, drive) == (None, None, None)
@@ -324,10 +343,8 @@ _FRAME = {'mode': 'frame'}
 
 
 def _apply(dialog, QtCore, QtWidgets, text):
-    edit = _color_edit(dialog, QtWidgets)
     if text is not None:
-        edit.setText(text)
-        edit.editingFinished.emit()
+        _pick_color(dialog, QtCore, QtWidgets, text)
     start = dialog.findChild(QtWidgets.QPushButton, 'start')
     apply_btn = dialog.findChild(QtWidgets.QPushButton, 'apply')
     assert start is not None and start.isEnabled()

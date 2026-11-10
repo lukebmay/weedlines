@@ -130,6 +130,12 @@ def _line_edit(dialog, name):
     return widget
 
 
+def _color_setting(dialog, name):
+    widget = dialog.findChild(QtWidgets.QPushButton, name)
+    assert widget is not None, name
+    return widget
+
+
 def _label_text(dialog, text):
     found = [
         label for label in dialog.findChildren(QtWidgets.QLabel)
@@ -167,7 +173,7 @@ def _assert_mode_knobs(dialog, mode):
     assert _mode_box(dialog).isVisible() is True
     assert _button(dialog, 'swap').isVisible() is True
     for name in _COLOR_NAMES:
-        assert _line_edit(dialog, name).isVisible() is True, name
+        assert _color_setting(dialog, name).isVisible() is True, name
 
 
 def _view(dialog):
@@ -876,10 +882,20 @@ def test_start_paints_without_a_solver_or_a_result(monkeypatch, tmp_path):
         apply_btn.click()
         assert dialog.isVisible() is True
 
-        edit = dialog.findChild(QtWidgets.QLineEdit, 'weed-line-color')
-        assert edit is not None
-        edit.setText('#123456')
-        edit.editingFinished.emit()
+        edit = _color_setting(dialog, 'weed-line-color')
+
+        def choose():
+            opened = [
+                picker for picker in dialog.findChildren(
+                    QtWidgets.QColorDialog, 'color-picker')
+                if picker.isVisible()
+            ]
+            assert len(opened) == 1
+            opened[0].setCurrentColor(QtGui.QColor('#123456'))
+            opened[0].accept()
+
+        QtCore.QTimer.singleShot(0, choose)
+        edit.click()
         assert calls == []
         assert len(dialog.surround_args) == 1
         assert spin.isEnabled() is True

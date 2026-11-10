@@ -611,11 +611,24 @@ def _run_busy_for(dialog):
 
 def test_cut_shows_one_step_and_a_phase_does_not_add_one():
     def drive(dialog):
-        color = dialog.findChild(QtWidgets.QLineEdit, 'weed-line-color')
+        color = dialog.findChild(QtWidgets.QPushButton, 'weed-line-color')
         assert color is not None
-        color.setText('#123456')
-        color.editingFinished.emit()
+
+        def choose():
+            opened = [
+                picker for picker in dialog.findChildren(
+                    QtWidgets.QColorDialog, 'color-picker')
+                if picker.isVisible()
+            ]
+            assert len(opened) == 1
+            opened[0].setCurrentColor(QtGui.QColor('#123456'))
+            opened[0].accept()
+
+        QtCore.QTimer.singleShot(0, choose)
+        color.click()
         assert color.property('color') == '#123456'
+        # The picker runs the event loop, so the opening border ask can start.
+        _wait_idle(dialog)
         _set_mode(dialog, 'frame')
         assert _visible_steps(dialog) == ['step-cut']
         assert _button(dialog, 'conquer-start').isVisible() is False
@@ -774,7 +787,7 @@ def test_clear_all_from_pause_drops_the_cut(monkeypatch):
     dialog_mod._ASK_HOLD = 8000000
 
     def drive(dialog):
-        color = dialog.findChild(QtWidgets.QLineEdit, 'weed-line-color')
+        color = dialog.findChild(QtWidgets.QPushButton, 'weed-line-color')
         try:
             _set_mode(dialog, 'frame')
             _button(dialog, 'start').click()

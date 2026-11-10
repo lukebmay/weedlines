@@ -188,9 +188,21 @@ def test_clear_design_paints_both_rectangles_without_start(monkeypatch):
         _assert_border(dialog, pair, _WEED)
         asked = len(dialog.border_args)
         calls = len(dialog.worker_calls)
-        edit = dialog.findChild(QtWidgets.QLineEdit, 'weed-line-color')
-        edit.setText('#0000ff')
-        edit.editingFinished.emit()
+        edit = dialog.findChild(QtWidgets.QPushButton, 'weed-line-color')
+        assert edit is not None
+
+        def choose():
+            opened = [
+                picker for picker in dialog.findChildren(
+                    QtWidgets.QColorDialog, 'color-picker')
+                if picker.isVisible()
+            ]
+            assert len(opened) == 1
+            opened[0].setCurrentColor(QtGui.QColor('#0000ff'))
+            opened[0].accept()
+
+        QtCore.QTimer.singleShot(0, choose)
+        edit.click()
         assert edit.property('color') == '#0000FF'
         assert len(dialog.border_args) == asked
         assert len(dialog.worker_calls) == calls

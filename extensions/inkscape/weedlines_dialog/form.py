@@ -54,7 +54,10 @@ def _tint_edit(edit, color):
         + int(color[3:5], 16) * 0.59
         + int(color[5:7], 16) * 0.11)
     ink = '#000000' if luma > 140 else '#ffffff'
-    edit.setStyleSheet('background-color: %s; color: %s;' % (color, ink))
+    # Without a border, the button style does not paint the fill.
+    edit.setStyleSheet(
+        'background-color: %s; color: %s; border: 1px solid %s;'
+        % (color, ink, ink))
 
 
 def _opening_mode(defaults):
@@ -142,12 +145,51 @@ class _OptionStack(object):
 class _Form(object):
 
     def _color_edit(self, name, initial):
-        edit = self.QtWidgets.QLineEdit(initial)
+        edit = self.QtWidgets.QPushButton(initial)
         edit.setObjectName(name)
-        edit.setMaxLength(7)
+        edit.setAutoDefault(False)
+        edit.setDefault(False)
         edit.setProperty('color', initial)
         _tint_edit(edit, initial)
+        edit.clicked.connect(lambda _checked=False, edit=edit: self._open_color(edit))
         return edit
+
+    def _hide_saved_colors(self, picker):
+        # Custom colors are written to a Qt preferences file.
+        add = picker.tr('&Add to Custom Colors')
+        heading = picker.tr('&Custom colors')
+        for button in picker.findChildren(self.QtWidgets.QPushButton):
+            if button.text() == add:
+                button.hide()
+        for label in picker.findChildren(self.QtWidgets.QLabel):
+            if label.text() != heading:
+                continue
+            label.hide()
+            buddy = label.buddy()
+            if buddy is not None:
+                buddy.hide()
+
+    def _open_color(self, edit):
+        if not edit.isEnabled():
+            return
+        if self.state['busy'] and self.state.get('ask') != 'border':
+            return
+        picker = self.QtWidgets.QColorDialog(self.dialog)
+        picker.setObjectName('color-picker')
+        # The platform dialog cannot be driven offscreen, and it can store colors.
+        picker.setOption(
+            self.QtWidgets.QColorDialog.DontUseNativeDialog, True)
+        picker.setCurrentColor(self.QtGui.QColor(edit.property('color')))
+        self._hide_saved_colors(picker)
+        accepted = picker.exec_() == self.QtWidgets.QDialog.Accepted
+        chosen = picker.selectedColor() if accepted else None
+        picker.setObjectName('')
+        picker.deleteLater()
+        self.dialog.activateWindow()
+        if chosen is None or not chosen.isValid():
+            return
+        edit.setText(chosen.name())
+        self._commit_color(edit)
 
     def _show_surround_controls(self):
         show = self._in_surround()
@@ -442,18 +484,13 @@ class _Form(object):
 
     def _install_option_keys(self):
         layer_edit = self.layer_edit
-        light_edit = self.light_edit
-        dark_edit = self.dark_edit
-        weed_edit = self.weed_edit
-        subject_edit = self.subject_edit
         QtCore = self.QtCore
         QtGui = self.QtGui
         QtWidgets = self.QtWidgets
         dialog = self.dialog
         option_stack = self.option_stack
         _is_shift_redo = self._is_shift_redo
-        _text_edits = (
-            layer_edit, light_edit, dark_edit, weed_edit, subject_edit)
+        _text_edits = (layer_edit,)
 
         class _OptionKeyFilter(QtCore.QObject):
             def __init__(self, parent):
@@ -463,7 +500,16 @@ class _Form(object):
                 if event.type() != QtCore.QEvent.KeyPress:
                     return False
                 app = QtWidgets.QApplication.instance()
-                if app is None or app.activeWindow() is not dialog:
+                if app is None:
+                    return False
+                # A color picker is its own window, so this stack does not see it.
+                for picker in dialog.findChildren(
+                        QtWidgets.QColorDialog, 'color-picker'):
+                    if picker.isVisible():
+                        return False
+                if (app.activeWindow() is not dialog
+                        and obj is not dialog
+                        and not dialog.isAncestorOf(obj)):
                     return False
                 undo = bool(event.matches(QtGui.QKeySequence.Undo))
                 redo = (
@@ -471,7 +517,7 @@ class _Form(object):
                     or _is_shift_redo(event))
                 if not undo and not redo:
                     return False
-                # A layer name or color still being typed undoes in the field.
+                # A layer name still being typed undoes in the field.
                 # A spin value is already committed, so the key is the history.
                 focus = app.focusWidget()
                 if focus in _text_edits and (

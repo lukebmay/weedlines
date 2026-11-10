@@ -403,9 +403,6 @@ class _Window(_Form, _RunControls, _ReturnLine, _Preview, _Inbox, _Ask):
         self._remember_length('spacing', self.space_spin, None)
         self._remember_length('collar', self.collar_spin, None)
         self.unit_box.currentIndexChanged.connect(self._on_unit)
-        for _edit in (self.light_edit, self.dark_edit, self.weed_edit, self.subject_edit):
-            _edit.editingFinished.connect(
-                lambda edit=_edit: self._commit_color(edit))
 
         self.option_stack = _OptionStack()
 

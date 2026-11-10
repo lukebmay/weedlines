@@ -102,7 +102,7 @@ def _set_mode(dialog, mode):
 
 
 def _edit(dialog, name):
-    widget = dialog.findChild(QtWidgets.QLineEdit, name)
+    widget = dialog.findChild(QtWidgets.QPushButton, name)
     assert widget is not None, name
     return widget
 
@@ -163,8 +163,19 @@ def _sample(view, rect, points):
 
 def _set_color(dialog, name, color):
     edit = _edit(dialog, name)
-    edit.setText(color)
-    edit.editingFinished.emit()
+
+    def choose():
+        opened = [
+            picker for picker in dialog.findChildren(
+                QtWidgets.QColorDialog, 'color-picker')
+            if picker.isVisible()
+        ]
+        assert len(opened) == 1, name
+        opened[0].setCurrentColor(QtGui.QColor(color))
+        opened[0].accept()
+
+    QtCore.QTimer.singleShot(0, choose)
+    edit.click()
     return edit
 
 

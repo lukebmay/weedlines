@@ -130,6 +130,12 @@ def _line_edit(dialog, name):
     return widget
 
 
+def _color_setting(dialog, name):
+    widget = dialog.findChild(QtWidgets.QPushButton, name)
+    assert widget is not None, name
+    return widget
+
+
 def _label_text(dialog, text):
     found = [
         label for label in dialog.findChildren(QtWidgets.QLabel)
@@ -167,7 +173,7 @@ def _assert_mode_knobs(dialog, mode):
     assert _mode_box(dialog).isVisible() is True
     assert _button(dialog, 'swap').isVisible() is True
     for name in _COLOR_NAMES:
-        assert _line_edit(dialog, name).isVisible() is True, name
+        assert _color_setting(dialog, name).isVisible() is True, name
 
 
 def _view(dialog):
