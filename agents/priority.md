@@ -28,7 +28,7 @@ A waiting plan stays under its rank. The notes say why. Skip it.
 | [border-ask](plans/border-ask/plan.md) | The ask stage is met. No open task. Skip it. |
 | [step-timer](plans/step-timer/plan.md) | The clock and the page are in. No open task. Skip it. |
 | [ready-fixes](plans/ready-fixes/plan.md) | The weld is in. No open task. propose-span, propose-corner, and the window wait on a split the guide does not name. Do not invent that number. |
-| [concavity](plans/concavity/plan.md) | The zig-zag probe is in. No open task. A probe is not a named measure. Do not crown one number. |
+| [concavity](plans/concavity/plan.md) | The explore stage is met. No open task. Skip it. A probe is not a named measure. Do not crown one number. |
 | [surround-cavern](plans/surround-cavern/plan.md) | Waiting until the algorithms part names a measure and a threshold. A probe is not that name. |
 | [preview-color-picker](plans/preview-color-picker/plan.md) | The picker is in. No open task. Skip it. |
 | [start-disabled-reason](plans/start-disabled-reason/plan.md) | The tooltip is in. No open task. Skip it. |
