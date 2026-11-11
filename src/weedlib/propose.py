@@ -5,10 +5,11 @@ from __future__ import division
 from dataclasses import dataclass
 
 from .figures.borders import _same_point
+from .figures.check import _painted_parts
 from .figures.types import Defect
 from .keep import _subpath_is_closed
 from .paths import join_painter_paths, split_painter_path
-from .qt import QPainterPath, QPointF
+from .qt import QPainterPath, QPointF, Qt
 
 
 @dataclass
@@ -25,8 +26,8 @@ def propose(check):
     *check* is the figure check the caller already ran. A dangling
     end is joined by a line between the two open ends of its subpath.
     Each self-overlap stays, with no path. The check does not separate
-    a smooth stack, a corner stack, and a larger overlap. A separate
-    overlap is omitted.
+    a smooth stack, a corner stack, and a larger overlap. Figures that
+    overlap are welded by the union of their painted areas.
     """
     proposals = []
     figures = list(check.figures)
@@ -35,6 +36,8 @@ def propose(check):
             proposals.append(Proposal(defect, _join_open_ends(figures, defect.target)))
         elif defect.kind == "self-overlap":
             proposals.append(Proposal(defect, None))
+        elif defect.kind == "overlap":
+            proposals.append(Proposal(defect, _weld(figures, defect.target)))
     return proposals
 
 
@@ -53,6 +56,21 @@ def _join_open_ends(figures, target):
             parts[index] = closed
             return join_painter_paths(parts)
     return None
+
+
+def _weld(figures, target):
+    owners = []
+    for figure in figures:
+        interior = _painted_parts(split_painter_path(figure.path))
+        if interior.contains(target):
+            owners.append(interior)
+    if len(owners) < 2:
+        return None
+    acc = QPainterPath(owners[0])
+    for other in owners[1:]:
+        acc = acc.united(other)
+    acc.setFillRule(Qt.OddEvenFill)
+    return acc
 
 
 def _has_end(subpath, target):

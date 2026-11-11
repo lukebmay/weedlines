@@ -1,6 +1,10 @@
 # Open proposals
 
-**Status:** ready
+**Status:** waiting
+
+Blocked. The proposal window does not exist yet.
+That window is waiting on propose-span and
+propose-corner.
 
 ## Goal
 

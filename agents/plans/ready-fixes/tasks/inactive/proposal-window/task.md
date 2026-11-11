@@ -1,6 +1,12 @@
 # Proposal window
 
-**Status:** ready
+**Status:** waiting
+
+Blocked. propose-span and propose-corner are waiting.
+The host part names no number that separates a smooth
+stack from a corner stack, and the figure check does
+not either. This window waits until those proposal
+tasks are done. Do not invent the number.
 
 ## Goal
 

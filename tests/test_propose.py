@@ -7,6 +7,7 @@ import pytest
 try:
     from weedlib.figures import classify_figures
     from weedlib.propose import propose
+    from weedlib.qt import QPointF
 except ImportError as exc:
     pytest.skip("Qt cannot load: %s" % exc, allow_module_level=True)
 
@@ -67,13 +68,17 @@ def test_self_overlaps_follow_the_check_and_carry_no_path():
     self_overlaps = [item for item in defects if item.kind == "self-overlap"]
     assert len(self_overlaps) == 2
     assert any(item.kind == "dangling" for item in defects)
-    answered = [item for item in defects if item.kind != "overlap"]
-    assert [item.defect for item in proposals] == answered
+    assert [item.defect for item in proposals] == list(defects)
     self_proposals = [
         item for item in proposals if item.defect.kind == "self-overlap"
     ]
     assert [item.defect for item in self_proposals] == self_overlaps
     assert [item.path for item in self_proposals] == [None, None]
+    assert all(
+        item.path is not None
+        for item in proposals
+        if item.defect.kind != "self-overlap"
+    )
 
 
 def test_dangling_end_joins_the_two_open_ends():
@@ -135,20 +140,40 @@ def test_open_hole_joins_its_ends_and_keeps_the_outline():
     assert [item.kind for item in fixed.defects if item.kind == "dangling"] == []
 
 
-def test_separate_overlap_is_not_a_proposal():
+def _square(element_id, d):
+    return {
+        "id": element_id,
+        "d": d,
+        "closed": [True],
+        "fill": "#111111",
+    }
+
+
+def test_overlap_welds_the_two_figures():
     check = classify_figures([
-        {
-            "id": "left",
-            "d": "M 0,0 L 4,0 L 4,4 L 0,4 Z",
-            "closed": [True],
-            "fill": "#111111",
-        },
-        {
-            "id": "right",
-            "d": "M 2,2 L 6,2 L 6,6 L 2,6 Z",
-            "closed": [True],
-            "fill": "#222222",
-        },
+        _square("left", "M 0,0 L 4,0 L 4,4 L 0,4 Z"),
+        _square("right", "M 2,2 L 6,2 L 6,6 L 2,6 Z"),
     ])
-    assert any(item.kind == "overlap" for item in check.defects)
-    assert propose(check) == []
+    defects = check.defects
+    assert [item.kind for item in defects] == ["overlap"]
+    counts = [figure.path.elementCount() for figure in check.figures]
+    proposals = propose(check)
+    assert check.defects is defects
+    assert [figure.path.elementCount() for figure in check.figures] == counts
+    assert len(proposals) == 1
+    proposal = proposals[0]
+    assert proposal.defect is defects[0]
+    path = proposal.path
+    assert path is not None
+    assert path.contains(QPointF(1, 1))
+    assert path.contains(QPointF(3, 3))
+    assert path.contains(QPointF(5, 5))
+    assert path.contains(QPointF(5, 1)) is False
+    assert path.contains(QPointF(1, 5)) is False
+    fixed = classify_figures([{
+        "id": "weld",
+        "path": path,
+        "closed": [True],
+        "fill": "#111111",
+    }])
+    assert fixed.defects == []
