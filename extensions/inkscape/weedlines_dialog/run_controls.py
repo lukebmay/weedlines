@@ -5,7 +5,7 @@ from __future__ import division
 import time
 
 from .form import _SURROUND_MODE
-from .geometry_ask import _pack_path
+from .geometry_ask import _optional_length, _pack_path, _with_corner_radius
 
 # A tenth of a second. The label shows that much, and the tick is the same.
 _STEP_TICK_MS = 100
@@ -266,11 +266,12 @@ class _RunControls(object):
         collar = self.state['lengths']['collar']
         inner = self.state['lengths']['inner']
         border = self.state['lengths']['border']
+        radius = _optional_length(self.state['lengths'], 'corner_radius')
         keep = self.QPainterPath(regions.subject)
         self.state['solved_keep'] = keep
         self.state['solved_pad'] = [padding, padding, padding, padding]
         elements, rule = _pack_path(keep)
-        return {
+        return _with_corner_radius({
             'kind': 'solver',
             'mode': mode,
             'padding': [padding, padding, padding, padding],
@@ -280,7 +281,7 @@ class _RunControls(object):
             'border_width': border,
             'elements': elements,
             'rule': rule,
-        }
+        }, radius)
 
     def _sync_worker_flags(self):
         mp_pause = self.state.get('mp_pause')

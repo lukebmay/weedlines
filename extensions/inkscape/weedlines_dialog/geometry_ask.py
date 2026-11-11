@@ -214,6 +214,25 @@ def _optional_length(request, key):
         return None
 
 
+def _radius_moved(asked, current):
+    if asked is None or current is None:
+        return asked is not current
+    return abs(float(asked) - float(current)) > 1e-9
+
+
+def _with_corner_radius(request, radius):
+    # Only a stored radius goes on the call. Omitted stays square.
+    if radius is not None:
+        request['corner_radius'] = radius
+    return request
+
+
+def _radius_kwargs(radius):
+    if radius is None:
+        return {}
+    return {'corner_radius': radius}
+
+
 def _arm_solver_log(conn):
     """Same ``WEEDLINES_LOG`` setup the solver used in-process.
 
@@ -269,6 +288,7 @@ def _ask_solver(request, conn, pausing, cancelled):
         collar = 0.0
     inner_distance = _optional_length(request, 'inner_distance')
     border_width = _optional_length(request, 'border_width')
+    corner_radius = _optional_length(request, 'corner_radius')
     keep = _unpack_path(
         request.get('elements') or [], request.get('rule') or 'odd')
     elements, rule = _pack_path(keep)
@@ -316,6 +336,7 @@ def _ask_solver(request, conn, pausing, cancelled):
             collar=collar,
             inner_distance=inner_distance,
             border_width=border_width,
+            **_radius_kwargs(corner_radius),
         )
         if cancelled.is_set():
             raise WeedCancelled('weed generation cancelled')
@@ -368,6 +389,7 @@ def _ask_surround(request, conn):
     if join_gap < 0.0:
         join_gap = 0.0
     inner_distance = _optional_length(request, 'inner_distance')
+    corner_radius = _optional_length(request, 'corner_radius')
     if inner_distance is None:
         conn.send(('call', 'surrounds', distance, join_gap))
     else:
@@ -375,10 +397,12 @@ def _ask_surround(request, conn):
     subject = _unpack_path(
         request.get('elements') or [], request.get('rule') or 'odd')
     if inner_distance is None:
-        surrounds = build_surrounds(subject, distance, join_gap)
+        surrounds = build_surrounds(
+            subject, distance, join_gap, **_radius_kwargs(corner_radius))
     else:
         surrounds = build_surrounds(
-            subject, distance, join_gap, inner_distance=inner_distance)
+            subject, distance, join_gap, inner_distance=inner_distance,
+            **_radius_kwargs(corner_radius))
     for path in surrounds:
         elements, rule = _pack_path(path)
         conn.send(('surround', elements, rule))
@@ -389,6 +413,7 @@ def _ask_piece_border(request, conn):
     from weedlib.piece_border import piece_border
     inner_distance = _optional_length(request, 'inner_distance')
     border_width = _optional_length(request, 'border_width')
+    corner_radius = _optional_length(request, 'corner_radius')
     if inner_distance is None:
         inner_distance = 0.0
     if border_width is None:
@@ -396,7 +421,9 @@ def _ask_piece_border(request, conn):
     conn.send(('call', 'piece_border', inner_distance, border_width))
     subject = _unpack_path(
         request.get('elements') or [], request.get('rule') or 'odd')
-    for path in piece_border(subject, inner_distance, border_width):
+    for path in piece_border(
+            subject, inner_distance, border_width,
+            **_radius_kwargs(corner_radius)):
         elements, rule = _pack_path(path)
         conn.send(('border', elements, rule))
 
@@ -549,11 +576,12 @@ class _Ask(object):
             and not self.state.get('drop') and not self.state['cancel'].is_set())
 
     def _surround_stale(self):
-        """True when a newer distance, join, inner distance, or swap is waiting."""
+        """True when a newer distance, join, inner distance, radius, or swap is waiting."""
         asked = self.state.get('surround_inflight')
         if not asked:
             return False
-        distance, join_gap, swap, inner = asked
+        distance, join_gap, swap, inner = asked[:4]
+        asked_radius = asked[4] if len(asked) > 4 else None
         if bool(self.state['swapped']) != bool(swap):
             return True
         if abs(self.state['lengths']['distance'] - float(distance)) > 1e-9:
@@ -561,6 +589,9 @@ class _Ask(object):
         if abs(self.state['lengths']['join'] - float(join_gap)) > 1e-9:
             return True
         if abs(self.state['lengths']['inner'] - float(inner)) > 1e-9:
+            return True
+        radius = _optional_length(self.state['lengths'], 'corner_radius')
+        if _radius_moved(asked_radius, radius):
             return True
         return False
 
@@ -581,16 +612,17 @@ class _Ask(object):
         if join_gap < 0.0:
             join_gap = 0.0
         elements, rule = _pack_path(regions.subject)
+        radius = _optional_length(self.state['lengths'], 'corner_radius')
         self.state['surround_inflight'] = (
-            distance, join_gap, bool(self.state['swapped']), inner)
-        return self._begin_ask({
+            distance, join_gap, bool(self.state['swapped']), inner, radius)
+        return self._begin_ask(_with_corner_radius({
             'kind': 'surround',
             'elements': elements,
             'rule': rule,
             'distance': distance,
             'join_gap': join_gap,
             'inner_distance': inner,
-        })
+        }, radius))
 
     def _begin_ask(self, request):
         # Looked up on the package each call. A test replaces it.
@@ -641,16 +673,20 @@ class _Ask(object):
         return not self.blocked and not self.state.get('drop')
 
     def _border_stale(self):
-        """True when this border was not asked for the current subject."""
+        """True when this border was not asked for the current subject or radius."""
         asked = self.state.get('border_inflight')
         if not asked:
             return True
-        inner, width, swap = asked
+        inner, width, swap = asked[:3]
+        asked_radius = asked[3] if len(asked) > 3 else None
         if bool(self.state['swapped']) != bool(swap):
             return True
         if abs(self.state['lengths']['inner'] - float(inner)) > 1e-9:
             return True
         if abs(self.state['lengths']['border'] - float(width)) > 1e-9:
+            return True
+        radius = _optional_length(self.state['lengths'], 'corner_radius')
+        if _radius_moved(asked_radius, radius):
             return True
         return False
 
@@ -668,15 +704,16 @@ class _Ask(object):
         inner = float(self.state['lengths']['inner'])
         width = float(self.state['lengths']['border'])
         elements, rule = _pack_path(regions.subject)
+        radius = _optional_length(self.state['lengths'], 'corner_radius')
         self.state['border_inflight'] = (
-            inner, width, bool(self.state['swapped']))
-        started = self._begin_ask({
+            inner, width, bool(self.state['swapped']), radius)
+        started = self._begin_ask(_with_corner_radius({
             'kind': 'border',
             'elements': elements,
             'rule': rule,
             'inner_distance': inner,
             'border_width': width,
-        })
+        }, radius))
         if not started:
             self.state['border_inflight'] = None
         return started
