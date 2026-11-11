@@ -2,9 +2,7 @@
 
 The order of active tasks for run-log-label.
 
-(none yet — the architect files the stage-line task
-from the stages stage.)
+1. [stage-lines](tasks/active/stage-lines/task.md)
 
-[log-label](tasks/inactive/log-label/task.md) is
-parked. Renaming the label was not the whole ask.
-The words are Algorithm output.
+[log-label](tasks/inactive/log-label/task.md) stays
+parked. Do not revive it as a rename only.

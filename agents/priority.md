@@ -45,7 +45,7 @@ A waiting plan stays under its rank. The notes say why. Skip it.
 | Plan | Notes |
 | --- | --- |
 | [weedlib-index](plans/weedlib-index/plan.md) | The index is in. No open task. Skip it. |
-| [run-log-label](plans/run-log-label/plan.md) | The label is Algorithm output. The pane shows stage and substage lines. No tasks yet. File them before coding. |
+| [run-log-label](plans/run-log-label/plan.md) | stage-lines is ready. log-label stays parked. Do not revive it as a rename only. |
 | [design-copy](plans/design-copy/plan.md) | Default export is the border and the weed lines. Include original design is optional. No tasks yet. File them before coding. |
 | [extension-doc-drift](plans/extension-doc-drift/plan.md) | The page follows the host menu and the install part. No open task. Skip it. |
 
