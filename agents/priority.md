@@ -27,7 +27,7 @@ A waiting plan stays under its rank. The notes say why. Skip it.
 | [piece-border](plans/piece-border/plan.md) | The border stage is met. No open task. Skip it. |
 | [border-ask](plans/border-ask/plan.md) | The ask stage is met. No open task. Skip it. |
 | [step-timer](plans/step-timer/plan.md) | The clock and the page are in. No open task. Skip it. |
-| [ready-fixes](plans/ready-fixes/plan.md) | ready-group is in. propose-span is back with the developer. The guide names no number for a smooth stack, and the figure check does not make that split. |
+| [ready-fixes](plans/ready-fixes/plan.md) | ready-group is in. propose-span and propose-corner wait on a split the guide does not name. propose-join is next. Do not invent that number. |
 | [concavity](plans/concavity/plan.md) | Exploration is open. A probe is not a named measure. It may run beside other plans. Do not crown one number. |
 | [surround-cavern](plans/surround-cavern/plan.md) | Waiting until the algorithms part names a measure and a threshold. A probe is not that name. |
 | [preview-color-picker](plans/preview-color-picker/plan.md) | The picker is in. No open task. Skip it. |

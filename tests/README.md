@@ -11,6 +11,7 @@
 - `test_job_records.py` Job path records: open geometry, computed fill, correction skip.
 - `test_overlap.py` Separate-figure overlap: one defect for each connected shared area.
 - `test_progress.py` Progress / cancel / pause hooks for long-running solvers.
+- `test_propose.py` Self-overlap proposals follow the check and carry no path.
 - `test_ready.py` Correction marks: one label per present kind, at that kind origin.
 - `test_ready_menu.py` Make ready returns at once; reimport places the ready file.
 - `test_self_overlap.py` Self-overlap on the real border, not the painted close.

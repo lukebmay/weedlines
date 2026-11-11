@@ -4,17 +4,23 @@ The order of active tasks for ready-fixes. A path,
 then the reason only when the order would otherwise
 be a guess.
 
-1. [propose-span](tasks/active/propose-span/task.md)
+1. [propose-join](tasks/active/propose-join/task.md)
+
+[propose-span](tasks/inactive/propose-span/task.md) is
+waiting. The guide names no number that separates a
+smooth stack from a corner stack, and the figure check
+does not either. Do not invent that number.
+
+[propose-corner](tasks/inactive/propose-corner/task.md)
+is waiting on that same split.
 
 [ready-group](tasks/inactive/ready-group/task.md) is done.
 
-1. [propose-corner](tasks/active/propose-corner/task.md)
-1. [propose-join](tasks/active/propose-join/task.md)
 1. [propose-weld](tasks/active/propose-weld/task.md)
 
-Those three share `src/weedlib/propose.py` and
-`tests/test_propose.py` with propose-span. They
-stay serial.
+It shares `src/weedlib/propose.py` and
+`tests/test_propose.py` with propose-join. It stays
+serial.
 
 1. [proposal-window](tasks/active/proposal-window/task.md)
 

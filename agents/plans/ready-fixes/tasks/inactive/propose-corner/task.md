@@ -1,6 +1,12 @@
 # Propose corner
 
-**Status:** ready
+**Status:** waiting
+
+Blocked. The host part names a smooth stack, a corner
+stack, and a larger self-overlap in words, and it names
+no angle and no gap fraction. The figure check's kind
+`self-overlap` does not make that split. Do not invent
+the number. This task stays behind that split.
 
 ## Goal
 
