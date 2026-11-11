@@ -24,7 +24,7 @@ A waiting plan stays under its rank. The notes say why. Skip it.
 | [source-split](plans/source-split/plan.md) | The split stage is met. No open task. Skip it. |
 | [make-ready](plans/make-ready/plan.md) | The stub tasks are done. Fixes are [ready-fixes](plans/ready-fixes/plan.md). |
 | [surround-doc](plans/surround-doc/plan.md) | The label stage is met. No open task. Skip it. |
-| [piece-border](plans/piece-border/plan.md) | border-options is in progress. It may edit form.py and tests/test_window_border.py only. |
+| [piece-border](plans/piece-border/plan.md) | The form is in. No open task. |
 | [border-ask](plans/border-ask/plan.md) | The ask stage is met. No open task. Skip it. |
 | [step-timer](plans/step-timer/plan.md) | The clock and the page are in. No open task. Skip it. |
 | [ready-fixes](plans/ready-fixes/plan.md) | propose-span and ready-group name different files. The rest of the propose stage waits on them. It may run beside other plans. |

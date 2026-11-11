@@ -32,6 +32,8 @@ _LENGTH_LIMITS = {
     'collar': (0.0, 50.0),
     'distance': (0.0, 1000000.0),
     'join': (0.0, 1000000.0),
+    'inner': (0.0, 1000000.0),
+    'border': (0.0, 1000000.0),
 }
 
 
@@ -216,6 +218,17 @@ class _Form(object):
         live = not self._form_locked()
         self.distance_spin.setEnabled(live)
         self.join_spin.setEnabled(live)
+        self._arm_border_controls()
+
+    def _arm_border_controls(self):
+        if getattr(self, 'inner_spin', None) is None:
+            return
+        # A border ask is not a solver run. The spins stay editable.
+        busy = bool(self.state.get('busy')) and self.state.get('ask') != 'border'
+        self.inner_spin.setEnabled(not busy)
+        self.border_spin.setEnabled(not busy)
+        self.round_box.setEnabled(not busy)
+        self.radius_spin.setEnabled(not busy)
 
     def _on_swap(self):
         if self.state.get('opening') or self._solver_running():
@@ -282,11 +295,14 @@ class _Form(object):
         self._ask_surrounds()
 
     def _on_piece_length(self, key=None):
-        # No spin. A later options task calls this after it stores the length.
+        # Border width asks for the border only. Padding, the checkbox,
+        # and the radius also ask for a surround that is already showing.
         if not isinstance(key, str):
             key = None
-        if key not in (None, 'inner', 'border'):
+        if key not in (None, 'inner', 'border', 'corner_radius'):
             return
+        self._show_radius_spin()
+        self._sync_applied_radius()
         if (self.blocked or self.state.get('opening') or self._solver_running()
                 or self.state.get('drop')):
             return
@@ -300,8 +316,175 @@ class _Form(object):
         if self._surround_due() and self._surround_stale():
             self._ask_surrounds()
 
+    def _form_layout(self):
+        root = self.dialog.layout()
+        if root is None:
+            return None
+        for index in range(root.count()):
+            item = root.itemAt(index)
+            if item is None:
+                continue
+            layout = item.layout()
+            if isinstance(layout, self.QtWidgets.QFormLayout):
+                return layout
+        return None
+
+    def _ensure_border_controls(self):
+        if getattr(self, 'inner_spin', None) is not None:
+            return
+        scale = float(self.dialog.user_unit_scale) or 1.0
+        # Kept even while the box is off. corner_radius is the applied one.
+        self.state['lengths']['border_radius'] = _QUARTER_INCH / scale
+        self.state['history_round'] = False
+        label = self.QtWidgets.QLabel
+        spin = self.QtWidgets.QDoubleSpinBox
+        self.inner_label = label('Border Padding')
+        self.inner_label.setObjectName('border-padding-label')
+        self.inner_spin = spin()
+        self.inner_spin.setObjectName('border-padding')
+        self.inner_spin.setDecimals(4)
+        self.inner_spin.setSingleStep(0.1)
+        self.border_label = label('Border Width')
+        self.border_label.setObjectName('border-width-label')
+        self.border_spin = spin()
+        self.border_spin.setObjectName('border-width')
+        self.border_spin.setDecimals(4)
+        self.border_spin.setSingleStep(0.1)
+        self.round_label = label('Border Rounded Corners')
+        self.round_label.setObjectName('border-rounded-label')
+        self.round_box = self.QtWidgets.QCheckBox()
+        self.round_box.setObjectName('border-rounded')
+        self.radius_label = label('Border Corner Radius')
+        self.radius_label.setObjectName('border-corner-radius-label')
+        self.radius_spin = spin()
+        self.radius_spin.setObjectName('border-corner-radius')
+        self.radius_spin.setDecimals(4)
+        self.radius_spin.setSingleStep(0.1)
+        form = self._form_layout()
+        if form is not None:
+            found = form.getWidgetPosition(self.join_spin)
+            row = found[0] if found else -1
+            if row < 0:
+                form.addRow(self.inner_label, self.inner_spin)
+                form.addRow(self.border_label, self.border_spin)
+                form.addRow(self.round_label, self.round_box)
+                form.addRow(self.radius_label, self.radius_spin)
+            else:
+                form.insertRow(row + 1, self.radius_label, self.radius_spin)
+                form.insertRow(row + 1, self.round_label, self.round_box)
+                form.insertRow(row + 1, self.border_label, self.border_spin)
+                form.insertRow(row + 1, self.inner_label, self.inner_spin)
+        self._show_radius_row(False)
+        self._remember_length(
+            'inner', self.inner_spin, lambda: self._on_piece_length('inner'))
+        self._remember_length(
+            'border', self.border_spin, lambda: self._on_piece_length('border'))
+        self._remember_length(
+            'border_radius', self.radius_spin, self._on_kept_radius)
+        self.round_box.toggled.connect(self._on_round_toggled)
+
+    def _show_radius_row(self, show):
+        visible = bool(show)
+        self.radius_label.setVisible(visible)
+        self.radius_spin.setVisible(visible)
+
+    def _subject_rect(self):
+        regions = self.state.get('regions')
+        if regions is None or regions.subject is None or regions.subject.isEmpty():
+            return None
+        return regions.subject.boundingRect()
+
+    def _radius_cap(self):
+        """Half the shorter side of the inner rectangle, in user units."""
+        rect = self._subject_rect()
+        if rect is None:
+            return None
+        inner = float(self.state['lengths'].get('inner') or 0.0)
+        width = float(rect.width()) + 2.0 * inner
+        height = float(rect.height()) + 2.0 * inner
+        shorter = min(width, height)
+        if shorter <= 0.0:
+            return 0.0
+        return shorter * 0.5
+
+    def _clamp_kept_radius(self):
+        if getattr(self, 'radius_spin', None) is None:
+            return
+        if 'border_radius' not in self.state['lengths']:
+            return
+        kept = float(self.state['lengths']['border_radius'])
+        if kept < 0.0:
+            kept = 0.0
+        cap = self._radius_cap()
+        if cap is not None and kept > cap:
+            kept = cap
+        self.state['lengths']['border_radius'] = kept
+
+    def _sync_applied_radius(self):
+        # The ask forwards corner_radius whenever the key is set.
+        if getattr(self, 'round_box', None) is None:
+            return
+        if self.round_box.isChecked():
+            self.state['lengths']['corner_radius'] = float(
+                self.state['lengths']['border_radius'])
+        else:
+            self.state['lengths'].pop('corner_radius', None)
+
+    def _show_radius_spin(self):
+        if getattr(self, 'radius_spin', None) is None:
+            return
+        self._clamp_kept_radius()
+        scale = self.dialog.user_unit_scale
+        inches = self.state['unit_inches']
+        kept = float(self.state['lengths']['border_radius'])
+        cap = self._radius_cap()
+        hi_user = max(kept, 1000000.0) if cap is None else max(cap, kept)
+        shown = _to_display(kept, scale, inches)
+        shown_hi = _to_display(hi_user, scale, inches)
+        spin = self.radius_spin
+        spin.blockSignals(True)
+        spin.setSuffix(' ' + self.state['unit'])
+        spin.setRange(min(0.0, shown), max(shown_hi, shown))
+        if spin.maximum() < shown:
+            spin.setMaximum(shown)
+        if spin.minimum() > shown:
+            spin.setMinimum(shown)
+        spin.setValue(shown)
+        spin.blockSignals(False)
+
+    def _on_kept_radius(self, _value=None):
+        self._on_piece_length('corner_radius')
+
+    def _on_round_toggled(self, checked):
+        self._show_radius_row(bool(checked))
+        self._clamp_kept_radius()
+        self._sync_applied_radius()
+        if self.state.get('applying_history') or self.state.get('applying_unit'):
+            return
+        old = bool(self.state.get('history_round'))
+        new = bool(checked)
+        self.state['history_round'] = new
+        self._on_piece_length('corner_radius')
+        if new == old or self.state.get('opening'):
+            return
+        self._push_option(
+            lambda value=new: self._restore_round(value),
+            lambda value=old: self._restore_round(value))
+
+    def _restore_round(self, checked):
+        self.state['applying_history'] = True
+        try:
+            self.state['history_round'] = bool(checked)
+            self.round_box.setChecked(bool(checked))
+        finally:
+            self.state['applying_history'] = False
+        self._show_radius_row(bool(checked))
+        self._sync_applied_radius()
+        self._on_piece_length('corner_radius')
+
     def _show_lengths(self):
         """Show stored user-unit lengths in the current display unit."""
+        self._ensure_border_controls()
         scale = self.dialog.user_unit_scale
         inches = self.state['unit_inches']
         suffix = ' ' + self.state['unit']
@@ -311,6 +494,8 @@ class _Form(object):
             ('padding', self.pad_spin),
             ('spacing', self.space_spin),
             ('collar', self.collar_spin),
+            ('inner', self.inner_spin),
+            ('border', self.border_spin),
         )
         self.state['applying_unit'] = True
         try:
@@ -335,6 +520,8 @@ class _Form(object):
                 spin.blockSignals(False)
         finally:
             self.state['applying_unit'] = False
+        self._show_radius_spin()
+        self._sync_applied_radius()
         # A show from user units is not a committed edit.
         for key, value in self.state['lengths'].items():
             self.state['history_lengths'][key] = float(value)
@@ -380,6 +567,16 @@ class _Form(object):
             self.state['applying_history'] = False
         if key in ('distance', 'join'):
             self._on_surround_length(self.state['lengths'][key])
+        elif key == 'inner':
+            self._clamp_kept_radius()
+            self._sync_applied_radius()
+            self._on_piece_length('inner')
+        elif key == 'border':
+            self._on_piece_length('border')
+        elif key == 'border_radius':
+            self._clamp_kept_radius()
+            self._sync_applied_radius()
+            self._on_piece_length('corner_radius')
 
     def _push_length(self, key, old_user, new_user):
         self._push_option(
