@@ -2,7 +2,14 @@
 
 The order of active tasks for design-copy.
 
-1. [include-choice](tasks/active/include-choice/task.md)
+(none)
+
+[include-choice](tasks/inactive/include-choice/task.md)
+is done.
 
 [result-groups](tasks/inactive/result-groups/task.md)
-is done. The checkbox calls that writer.
+is done.
+
+[design-records](tasks/inactive/design-records/task.md)
+stays parked. The original design is not the
+default export.

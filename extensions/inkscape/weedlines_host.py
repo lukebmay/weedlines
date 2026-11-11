@@ -2,7 +2,7 @@
 """Detached Weedlines UI process (spawned by the Inkscape extension).
 
 Runs outside Inkscape's extension wait so the app stays interactive.
-On Apply, writes ``last_result.svg`` (design + cuts in document units) and
+On Apply, writes ``last_result.svg`` and
 ``last_result.json`` for ``Weedlines → 3 Reimport last weedlines``.
 """
 from __future__ import division
@@ -62,7 +62,7 @@ def main(argv=None):
     doc_attrs = dict(job.get('doc_attrs') or {})
     records = list(job.get('records') or [])
 
-    weed, layer_name, color = run_weedlines_dialog(
+    chosen = run_weedlines_dialog(
         records,
         defaults=defaults,
         quit_app=False,
@@ -72,6 +72,7 @@ def main(argv=None):
         display_unit=doc_attrs.get('display_unit'),
         user_unit_scale=doc_attrs.get('user_unit_scale'),
     )
+    weed, layer_name, color = chosen
     try:
         os.remove(job_path)
     except OSError:
@@ -99,6 +100,8 @@ def main(argv=None):
         keep_d=keep_d,
         doc_attrs=doc_attrs,
         weed_line_color=color,
+        border_d_list=getattr(chosen, 'border_d_list', None),
+        records=getattr(chosen, 'records', None),
     )
 
     svg_path = result_svg_file()

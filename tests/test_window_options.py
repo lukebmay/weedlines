@@ -640,3 +640,247 @@ def test_undo_does_not_remove_a_cut():
         dialog.reject()
 
     _run(_RECT, drive)
+
+
+_INK_LABEL = '{http://www.inkscape.org/namespaces/inkscape}label'
+_JOB = [
+    _RECT[0],
+    {
+        'id': 'weedlines-correction-arrow',
+        'd': 'M 7,7 L 8,9',
+        'closed': [False],
+        'fill': 'none',
+    },
+]
+_FRAME = {'mode': 'frame'}
+
+
+def _include_box(dialog):
+    widget = dialog.findChild(QtWidgets.QCheckBox, 'include-original')
+    assert widget is not None
+    return widget
+
+
+def _paths(group):
+    found = []
+    for el in list(group):
+        tag = el.tag
+        if isinstance(tag, str) and tag.rsplit('}', 1)[-1] == 'path':
+            found.append(el)
+    return found
+
+
+def _apply_choice(dialog, include):
+    _pump_until(lambda: dialog.worker_calls.count('piece_border') >= 1)
+    _wait_idle(dialog)
+    assert 'classify' in dialog.worker_calls
+    box = _include_box(dialog)
+    assert box.isChecked() is False
+    if include:
+        box.setChecked(True)
+    start = _button(dialog, 'start')
+    assert start.isEnabled() is True
+    start.click()
+    apply_btn = _button(dialog, 'apply')
+    _pump_until(lambda: apply_btn.isEnabled())
+    _wait_idle(dialog)
+    import importlib
+    import weedlib
+    piece_mod = importlib.import_module('weedlib.piece_border')
+    seen = {'n': 0}
+    real = piece_mod.piece_border
+
+    def boom(*args, **kwargs):
+        seen['n'] += 1
+        return real(*args, **kwargs)
+
+    piece_mod.piece_border = boom
+    weedlib.piece_border = boom
+    try:
+        apply_btn.click()
+    finally:
+        piece_mod.piece_border = real
+        weedlib.piece_border = real
+    return seen
+
+
+def _write_choice(tmp_path, monkeypatch, chosen):
+    import weedlines_job as JOB
+    from weedlib.svg_paths import weed_path_to_open_d_list
+    monkeypatch.setattr(JOB, 'cache_dir', lambda: str(tmp_path))
+    weed, layer_name, color = chosen
+    JOB.write_result(
+        layer_name,
+        weed_path_to_open_d_list(weed),
+        weed_line_color=color,
+        border_d_list=chosen.border_d_list,
+        records=chosen.records,
+    )
+    return os.path.join(str(tmp_path), 'last_result.svg')
+
+
+def _result_group(svg_path):
+    import weedlines_svg as SVG
+    group = SVG.load_result_svg_groups(svg_path)
+    assert group is not None
+    return group
+
+
+def test_include_original_design_joins_the_option_history():
+    def drive(dialog):
+        for mode in (_SURROUND, 'frame', 'grid', 'island-hop'):
+            _set_mode(dialog, mode)
+            box = _include_box(dialog)
+            label = _label(dialog, 'include-original-label')
+            assert label.text() == 'Include original design'
+            assert label.isVisible() is True
+            assert box.isVisible() is True
+            assert box.isChecked() is False
+        box = _include_box(dialog)
+        box.setChecked(True)
+        assert box.isChecked() is True
+        _undo_at(box)
+        assert box.isChecked() is False
+        _redo_at(box)
+        assert box.isChecked() is True
+        assert _mode_box(dialog).currentData() == 'island-hop'
+        dialog.reject()
+
+    _run(_JOB, drive)
+
+
+def test_default_apply_omits_original_design(tmp_path, monkeypatch):
+    seen = {}
+
+    def drive(dialog):
+        seen['rebuild'] = _apply_choice(dialog, False)
+
+    chosen = _run(_JOB, drive, defaults=dict(_FRAME))
+    assert seen['rebuild']['n'] == 0
+    assert chosen.records is None
+    assert chosen.border_d_list
+    svg_path = _write_choice(tmp_path, monkeypatch, chosen)
+    group = _result_group(svg_path)
+    assert [el.get(_INK_LABEL) for el in list(group)] == [
+        'Border', 'Weed lines',
+    ]
+    from weedlib.svg_paths import weed_path_to_open_d_list
+    cuts = _paths(list(group)[1])
+    assert [el.get('d') for el in cuts] == weed_path_to_open_d_list(chosen[0])
+    assert [el.get('d') for el in _paths(list(group)[0])] == [
+        d for d in chosen.border_d_list if d
+    ]
+    with open(svg_path, encoding='utf-8') as fh:
+        text = fh.read()
+    assert 'Original design' not in text
+    assert 'weedlines-correction' not in text
+    assert text.count('inkscape:groupmode="layer"') == 1
+
+
+def test_include_original_design_copies_the_records(tmp_path, monkeypatch):
+    def drive(dialog):
+        _apply_choice(dialog, True)
+
+    chosen = _run(_JOB, drive, defaults=dict(_FRAME))
+    assert chosen.records == _JOB
+    svg_path = _write_choice(tmp_path, monkeypatch, chosen)
+    group = _result_group(svg_path)
+    assert [el.get(_INK_LABEL) for el in list(group)] == [
+        'Border', 'Weed lines', 'Original design',
+    ]
+    paths = _paths(list(group)[-1])
+    assert [el.get('id') for el in paths] == ['panel']
+    assert [el.get('d') for el in paths] == [_RECT[0]['d']]
+    with open(svg_path, encoding='utf-8') as fh:
+        text = fh.read()
+    assert 'weedlines-correction' not in text
+    assert 'M 7,7 L 8,9' not in text
+    from weedlib.svg_paths import weed_path_to_open_d_list
+    cuts = _paths(list(group)[1])
+    assert [el.get('d') for el in cuts] == weed_path_to_open_d_list(chosen[0])
+
+
+def test_host_passes_the_included_groups(tmp_path, monkeypatch):
+    import json
+    import weedlines_host
+    import weedlines_dialog
+    import weedlines_job as JOB
+    from weedlib.qt import QPainterPath
+    monkeypatch.setattr(JOB, 'cache_dir', lambda: str(tmp_path))
+    path = QPainterPath()
+    path.moveTo(0, 0)
+    path.lineTo(12, 0)
+
+    class _Chosen(tuple):
+        def __new__(cls):
+            result = tuple.__new__(cls, (path, 'Weed lines', '#ABCDEF'))
+            result.border_d_list = ['M 1,1 L 4,1']
+            result.records = list(_JOB)
+            return result
+
+    monkeypatch.setattr(
+        weedlines_dialog, 'run_weedlines_dialog', lambda *_a, **_k: _Chosen())
+
+    def information(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(QtWidgets.QMessageBox, 'information', information)
+    job_path = os.path.join(str(tmp_path), 'job.json')
+    with open(job_path, 'w', encoding='utf-8') as fh:
+        json.dump({
+            'keep_d': 'M 0,0 L 8,0',
+            'records': list(_JOB),
+            'defaults': dict(_FRAME),
+            'doc_attrs': {'width': '20', 'height': '20', 'viewBox': '0 0 20 20'},
+        }, fh)
+    assert weedlines_host.main([job_path]) == 0
+    group = _result_group(os.path.join(str(tmp_path), 'last_result.svg'))
+    assert [el.get(_INK_LABEL) for el in list(group)] == [
+        'Border', 'Weed lines', 'Original design',
+    ]
+    assert [el.get('d') for el in _paths(list(group)[0])] == ['M 1,1 L 4,1']
+    assert [el.get('id') for el in _paths(list(group)[-1])] == ['panel']
+    assert [el.get('d') for el in _paths(list(group)[-1])] == [_RECT[0]['d']]
+
+
+def test_inline_path_writes_the_same_groups():
+    inkex_dir = '/usr/share/inkscape/extensions'
+    if (os.path.isdir(os.path.join(inkex_dir, 'inkex'))
+            and inkex_dir not in sys.path):
+        sys.path.insert(0, inkex_dir)
+    inkex = pytest.importorskip('inkex')
+    from inkex import PathElement
+    import weedlines
+    svg = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<svg xmlns="http://www.w3.org/2000/svg" '
+        'xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape">\n'
+        '  <g id="layer1" inkscape:groupmode="layer" '
+        'inkscape:label="Layer 1">\n'
+        '    <path id="person-path" d="M 2,3 L 4,5"/>\n'
+        '  </g>\n'
+        '</svg>\n'
+    )
+    root = inkex.load_svg(svg.encode('utf-8')).getroot()
+    weedlines._add_weed_layer_from_d(
+        root, inkex, PathElement, ['M 0,0 L 12,0'], 'Weed lines', '#123456',
+        border_d_list=['M 1,1 L 4,1'], records=list(_JOB))
+    assert root.getElementById('person-path').get('d') == 'M 2,3 L 4,5'
+    assert len(list(root.getElementById('person-path').getparent())) == 1
+    group = root.getElementById('weedlines')
+    assert [el.get(_INK_LABEL) for el in group] == [
+        'Border', 'Weed lines', 'Original design',
+    ]
+    assert root.getElementById('weedlines-border-0000').get('d') == (
+        'M 1,1 L 4,1')
+    cut = root.getElementById('weed-cut-0000')
+    assert cut.getparent().get('id') == 'weedlines-cuts'
+    assert cut.get('d') == 'M 0,0 L 12,0'
+    assert root.getElementById('panel').get('d') == _RECT[0]['d']
+    assert root.getElementById('weedlines-correction-arrow') is None
+    bare = inkex.load_svg(svg.encode('utf-8')).getroot()
+    weedlines._add_weed_layer_from_d(
+        bare, inkex, PathElement, ['M 0,0 L 12,0'], 'Weed lines')
+    assert [el.get(_INK_LABEL) for el in bare.getElementById('weedlines')] == [
+        'Border', 'Weed lines',
+    ]

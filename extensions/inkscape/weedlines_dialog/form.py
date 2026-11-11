@@ -336,6 +336,7 @@ class _Form(object):
         # Kept even while the box is off. corner_radius is the applied one.
         self.state['lengths']['border_radius'] = _QUARTER_INCH / scale
         self.state['history_round'] = False
+        self.state['history_include'] = False
         label = self.QtWidgets.QLabel
         spin = self.QtWidgets.QDoubleSpinBox
         self.inner_label = label('Border Padding')
@@ -360,6 +361,10 @@ class _Form(object):
         self.radius_spin.setObjectName('border-corner-radius')
         self.radius_spin.setDecimals(4)
         self.radius_spin.setSingleStep(0.1)
+        self.include_label = label('Include original design')
+        self.include_label.setObjectName('include-original-label')
+        self.include_box = self.QtWidgets.QCheckBox()
+        self.include_box.setObjectName('include-original')
         form = self._form_layout()
         if form is not None:
             found = form.getWidgetPosition(self.join_spin)
@@ -369,7 +374,9 @@ class _Form(object):
                 form.addRow(self.border_label, self.border_spin)
                 form.addRow(self.round_label, self.round_box)
                 form.addRow(self.radius_label, self.radius_spin)
+                form.addRow(self.include_label, self.include_box)
             else:
+                form.insertRow(row + 1, self.include_label, self.include_box)
                 form.insertRow(row + 1, self.radius_label, self.radius_spin)
                 form.insertRow(row + 1, self.round_label, self.round_box)
                 form.insertRow(row + 1, self.border_label, self.border_spin)
@@ -382,6 +389,7 @@ class _Form(object):
         self._remember_length(
             'border_radius', self.radius_spin, self._on_kept_radius)
         self.round_box.toggled.connect(self._on_round_toggled)
+        self.include_box.toggled.connect(self._on_include_toggled)
 
     def _show_radius_row(self, show):
         visible = bool(show)
@@ -481,6 +489,27 @@ class _Form(object):
         self._show_radius_row(bool(checked))
         self._sync_applied_radius()
         self._on_piece_length('corner_radius')
+
+    def _on_include_toggled(self, checked):
+        # The choice is the result. It does not ask for the border.
+        if self.state.get('applying_history'):
+            return
+        old = bool(self.state.get('history_include'))
+        new = bool(checked)
+        self.state['history_include'] = new
+        if new == old or self.state.get('opening'):
+            return
+        self._push_option(
+            lambda value=new: self._restore_include(value),
+            lambda value=old: self._restore_include(value))
+
+    def _restore_include(self, checked):
+        self.state['applying_history'] = True
+        try:
+            self.state['history_include'] = bool(checked)
+            self.include_box.setChecked(bool(checked))
+        finally:
+            self.state['applying_history'] = False
 
     def _show_lengths(self):
         """Show stored user-unit lengths in the current display unit."""

@@ -30,7 +30,9 @@ class _Window(_Form, _RunControls, _ReturnLine, _Preview, _Inbox, _Ask):
         """Show the weedlines UI. Returns ``(weed_path, layer_name, color)``.
 
         ``color`` is the weed-line color when Apply accepts, and None when
-        the window does not. *records* are the job's per-path records, not
+        the window does not. On Apply the tuple carries ``border_d_list``
+        and ``records``. ``records`` is present only while Include original
+        design is on. *records* are the job's per-path records, not
         a union. Start runs only when the figure check reports no defect.
         The solver keep path is the subject region. Swap exchanges that
         subject with the weed area. The preview paints the subject, the
@@ -444,7 +446,26 @@ class _Window(_Form, _RunControls, _ReturnLine, _Preview, _Inbox, _Ask):
             raise ready_error
         if weed is None:
             return None, None, None
-        return weed, layer_name, self.weed_edit.property('color')
+        return _ApplyChoice(
+            weed, layer_name, self.weed_edit.property('color'),
+            self._held_border_d_list(), self._chosen_records())
+
+    def _held_border_d_list(self):
+        """Path data for the border paths already on the window."""
+        from weedlib.svg_paths import qpainterpath_to_svg_d
+        found = []
+        for path in self.state.get('border_paths') or []:
+            if path is None:
+                found.append('')
+                continue
+            found.append(qpainterpath_to_svg_d(path, close_subpaths=False))
+        return found
+
+    def _chosen_records(self):
+        box = getattr(self, 'include_box', None)
+        if box is None or not box.isChecked():
+            return None
+        return list(self.records or [])
 
     def _shown(self):
         # exec_ has shown the dialog. The ask returns here; ready is later.
@@ -465,6 +486,16 @@ class _Window(_Form, _RunControls, _ReturnLine, _Preview, _Inbox, _Ask):
         self.state['drop'] = True
 
 
+class _ApplyChoice(tuple):
+    """Three Apply values, plus the border paths and the included records."""
+
+    def __new__(cls, weed, layer_name, color, border_d_list, records):
+        result = tuple.__new__(cls, (weed, layer_name, color))
+        result.border_d_list = list(border_d_list or [])
+        result.records = None if records is None else list(records)
+        return result
+
+
 def run_weedlines_dialog(records, defaults=None, platform_lines=None,
                          quit_app=True, width=None, height=None,
                          view_box=None, display_unit=None,
@@ -472,7 +503,9 @@ def run_weedlines_dialog(records, defaults=None, platform_lines=None,
     """Show the weedlines UI. Returns ``(weed_path, layer_name, color)``.
 
     ``color`` is the weed-line color when Apply accepts, and None when
-    the window does not. *records* are the job's per-path records, not
+    the window does not. On Apply the tuple carries ``border_d_list``
+    and ``records``. ``records`` is present only while Include original
+    design is on. *records* are the job's per-path records, not
     a union. Start runs only when the figure check reports no defect.
     The solver keep path is the subject region. Swap exchanges that
     subject with the weed area. The preview paints the subject, the

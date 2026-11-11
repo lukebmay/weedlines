@@ -626,38 +626,90 @@ def _path_records(nodes, inkex, QTransform):
     return records
 
 
+def _result_group(inkex, label, gid):
+    if hasattr(inkex, 'Group') and hasattr(inkex.Group, 'new'):
+        group = inkex.Group.new(label)
+    else:
+        group = inkex.etree.Element(inkex.addNS('g', 'svg'))
+        group.set(_INKSCAPE_LABEL, label)
+    group.set('id', gid)
+    return group
+
+
+def _append_result_groups(layer, inkex, PathElement, d_list, color,
+                          border_d_list, records):
+    """Border, weed lines, and original design when records were passed."""
+    from weedlines_svg import cut_style
+    style = cut_style(color)
+    weedlines = _result_group(inkex, 'Weedlines', 'weedlines')
+    border = _result_group(inkex, 'Border', 'weedlines-border')
+    for index, d in enumerate(border_d_list or ()):
+        if not d:
+            continue
+        el = PathElement()
+        el.set('id', 'weedlines-border-%04d' % index)
+        el.set('style', style)
+        el.set('d', d)
+        border.append(el)
+    cuts = _result_group(inkex, 'Weed lines', 'weedlines-cuts')
+    for index, d in enumerate(d_list or ()):
+        if not d:
+            continue
+        el = PathElement()
+        el.set('id', 'weed-cut-%04d' % index)
+        el.set('style', style)
+        el.set('d', d)
+        cuts.append(el)
+    weedlines.append(border)
+    weedlines.append(cuts)
+    if records is not None:
+        original = _result_group(
+            inkex, 'Original design', 'weedlines-original')
+        for index, record in enumerate(records):
+            if not isinstance(record, dict):
+                continue
+            ident = str(record.get('id') or '')
+            if ident.startswith('weedlines-correction'):
+                continue
+            if not ident:
+                ident = 'original-%04d' % index
+            d = record.get('d')
+            if d is None:
+                d = ''
+            el = PathElement()
+            el.set('id', ident)
+            el.set('d', str(d))
+            original.append(el)
+        weedlines.append(original)
+    layer.append(weedlines)
+
+
 def _add_weed_layer_from_d(svg, inkex, PathElement, d_list, layer_label,
-                           color=None):
-    """Write open SVG path `d` strings into a new Weedlines layer."""
+                           color=None, border_d_list=None, records=None):
+    """Write the Weedlines group onto one new layer."""
     if not d_list:
         raise inkex.AbortExtension('Weed solver produced no cuts.')
 
+    ns_ink = 'http://www.inkscape.org/namespaces/inkscape'
     layer = None
     if hasattr(inkex, 'Group') and hasattr(inkex.Group, 'new'):
         layer = svg.add(inkex.Group.new(layer_label, is_layer=True))
     if layer is None:
-        ns_ink = 'http://www.inkscape.org/namespaces/inkscape'
         layer = inkex.etree.SubElement(svg, inkex.addNS('g', 'svg'))
-        layer.set('{%s}groupmode' % ns_ink, 'layer')
         layer.set('{%s}label' % ns_ink, layer_label)
-
-    from weedlines_svg import cut_style
-    style = cut_style(color)
-    for i, d in enumerate(d_list):
-        el = PathElement()
-        el.set('d', d)
-        el.set('style', style)
-        el.set('id', 'weed-cut-{:04d}'.format(i))
-        layer.append(el)
+    layer.set('{%s}groupmode' % ns_ink, 'layer')
+    _append_result_groups(
+        layer, inkex, PathElement, d_list, color, border_d_list, records)
 
 
 def _add_weed_layer(svg, inkex, PathElement, weed_path, layer_label,
-                    color=None):
+                    color=None, border_d_list=None, records=None):
     from weedlib.svg_paths import weed_path_to_open_d_list
 
     d_list = weed_path_to_open_d_list(weed_path)
     _add_weed_layer_from_d(
-        svg, inkex, PathElement, d_list, layer_label, color)
+        svg, inkex, PathElement, d_list, layer_label, color,
+        border_d_list=border_d_list, records=records)
 
 
 _UNCHOSEN_MODE = 'Surround and Conquer'
@@ -768,12 +820,13 @@ class WeedLinesEffect(object):
         old_out, old_err = sys.stdout, sys.stderr
         null_out = open(os.devnull, 'w')
         null_err = open(os.devnull, 'w')
+        chosen = None
         weed, layer_name, color = None, None, None
         try:
             sys.stdout = null_out
             sys.stderr = null_err
             with NativeStdioCapture() as capture:
-                weed, layer_name, color = run_weedlines_dialog(
+                chosen = run_weedlines_dialog(
                     records,
                     defaults=defaults,
                     platform_lines=capture.lines,
@@ -784,6 +837,7 @@ class WeedLinesEffect(object):
                     display_unit=doc_attrs.get('display_unit'),
                     user_unit_scale=doc_attrs.get('user_unit_scale'),
                 )
+                weed, layer_name, color = chosen
         finally:
             sys.stdout, sys.stderr = old_out, old_err
             try:
@@ -799,7 +853,9 @@ class WeedLinesEffect(object):
             return
 
         _add_weed_layer(
-            self.svg, inkex, PathElement, weed, layer_name, color)
+            self.svg, inkex, PathElement, weed, layer_name, color,
+            border_d_list=getattr(chosen, 'border_d_list', None),
+            records=getattr(chosen, 'records', None))
 
 
 def main():
