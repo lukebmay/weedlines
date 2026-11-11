@@ -20,6 +20,7 @@
 - `test_surround_clip.py` Surround clip to the inner rectangle.
 - `test_surround_smooth.py` Fillets out to the surround distance.
 - `test_bays.py` Bay, peninsula, and pocket seals.
+- `test_cavern.py` Zig-zag candidate numbers, and none for a rectangle, a hole, or an open clip.
 - `test_corridors.py` Corridors, agglomerate, and gutters.
 - `test_emit.py` Clearance, alpha, hugs, slivers, and rank.
 - `test_frame.py` Frame and the mode switch.

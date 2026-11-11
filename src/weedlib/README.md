@@ -2,6 +2,7 @@
 
 - `__init__.py` re-exports keep fill, the weed solvers, the piece border, surrounds, and SVG path conversion.
 - `arrows.py` builds one shaft and one head for each defect target.
+- `cavern.py` returns candidate numbers for each cavern on one outline.
 - `debug.py` writes the opt-in auto-weed decision log and names the planner phase.
 - `keep.py` lists closed subpaths, collapses the one twin, nests them, and builds the keep fill.
 - `paths.py` splits and joins painter-path subpaths for the solvers.

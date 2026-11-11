@@ -1,6 +1,6 @@
 # Zig-zag probe
 
-**Status:** ready
+**Status:** done
 
 ## Goal
 
@@ -95,6 +95,61 @@ tests, `agents/architecture/`, `docs/`,
 
 ## Note
 
-The developer writes what changed, why, and how it was checked.
-The reviewer then writes the summary, the context worth keeping,
-and the result.
+Added `src/weedlib/cavern.py`. `probe` takes one
+outline and returns the coast length, the total
+turn, and the turn per unit length for each
+cavern. A caller's hole mark returns nothing. An
+open outline does not join its ends. One index
+sentence is in each README. The concavity note
+records the large tooth, the small tooth, and
+both times.
+
+The surround and bay helpers cut turns with
+those steps' own cutoffs, so this walk stays on
+the outline. These three numbers need no mouth.
+The depth-to-mouth ratio needs one, so it is
+skipped. Mouth and reach stay two readings.
+Reach squared over reach plus mouth is not
+computed. No number is crowned. No threshold is
+added. Nothing is sealed. Length and the turn
+per unit length change with size. The turn does
+not.
+
+`python3 -m pytest tests/test_cavern.py`: 6
+passed. No Inkscape. The large and the small
+tooth are not the same numbers. A rectangle, a
+marked concave hole, and the open stand-in
+return no cavern. A comb of 5 teeth is 5 groups.
+
+## Summary
+
+`probe` returns coast length, total turn, and turn per
+unit length for each cavern on one outline. The large
+tooth is length 30, turn pi, and turn per unit length
+pi/30. The same tooth at one hundredth is length 0.3,
+turn pi, and turn per unit length pi/0.3. Length and
+turn per unit length change with size. The turn stays
+pi. No number is chosen. The depth-to-mouth ratio is
+skipped because this walk does not define a mouth.
+Mouth and reach stay two readings. Nothing is sealed.
+
+## Context worth keeping
+
+The glossary names cavern. It does not give mouth or
+reach a row. The note keeps both as readings, and the
+walk computes neither. Reach squared over reach plus
+mouth is not computed. A negative turn groups a concave
+run. That sign is not a size threshold. A marked hole
+returns before the walk. The open stand-in is a point
+list in the test, and its ends are not joined. A comb
+of 5 teeth is 5 groups from one pass. The times are in
+the note, and the tests do not assert them. `cavern.py`
+is 130 lines and stays whole. It is not re-exported.
+The guide, the window, the surround package, `bay.py`,
+and `propose.py` are not in this diff. `name-measure`
+stays parked. The pass is `cr-01.md`.
+
+## Result
+
+No defect. `python3 -m pytest tests/test_cavern.py`:
+6 passed in 0.05s. No Inkscape.
