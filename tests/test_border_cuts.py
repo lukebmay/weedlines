@@ -2,6 +2,8 @@
 """Mode lines clip to the inner piece border. No Inkscape."""
 from __future__ import division
 
+import math
+
 import pytest
 
 try:
@@ -256,6 +258,289 @@ def test_island_hop_still_runs():
     _assert_published_pair(published, inner, outer)
     _assert_only_outer_outside(_segs(weed), inner, outer)
     _assert_only_outer_outside(published, inner, outer)
+
+
+def _line_samples(path, limit=None):
+    count = path.elementCount() if limit is None else limit
+    line = QPainterPath.LineToElement
+    move = QPainterPath.MoveToElement
+    current = None
+    samples = []
+    for index in range(count):
+        element = path.elementAt(index)
+        if element.type == move:
+            current = (element.x, element.y)
+            continue
+        if element.type != line or current is None:
+            current = (element.x, element.y)
+            continue
+        end = (element.x, element.y)
+        samples.append(current)
+        samples.append((
+            0.5 * (current[0] + end[0]),
+            0.5 * (current[1] + end[1]),
+        ))
+        samples.append(end)
+        current = end
+    return samples
+
+
+def _round_outside(x_coord, y_coord, rect, radius, eps=0.05):
+    if (
+        x_coord < rect.left() - eps or x_coord > rect.right() + eps
+        or y_coord < rect.top() - eps or y_coord > rect.bottom() + eps
+    ):
+        return True
+    boxes = (
+        (rect.left() + radius, rect.top() + radius,
+         rect.left(), rect.left() + radius,
+         rect.top(), rect.top() + radius),
+        (rect.right() - radius, rect.top() + radius,
+         rect.right() - radius, rect.right(),
+         rect.top(), rect.top() + radius),
+        (rect.right() - radius, rect.bottom() - radius,
+         rect.right() - radius, rect.right(),
+         rect.bottom() - radius, rect.bottom()),
+        (rect.left() + radius, rect.bottom() - radius,
+         rect.left(), rect.left() + radius,
+         rect.bottom() - radius, rect.bottom()),
+    )
+    for center_x, center_y, x0, x1, y0, y1 in boxes:
+        if (
+            x0 - eps <= x_coord <= x1 + eps
+            and y0 - eps <= y_coord <= y1 + eps
+            and math.hypot(
+                x_coord - center_x, y_coord - center_y) > radius + eps
+        ):
+            return True
+    return False
+
+
+def _outline_dist(x_coord, y_coord, path):
+    """Distance to lines and cubics, not to curve handles."""
+    best = None
+    move = QPainterPath.MoveToElement
+    line = QPainterPath.LineToElement
+    curve = QPainterPath.CurveToElement
+    current = None
+    index = 0
+    count = path.elementCount()
+    while index < count:
+        element = path.elementAt(index)
+        if element.type == move or element.type == line:
+            end = (element.x, element.y)
+            if element.type == line and current is not None:
+                dist = _point_seg_dist(x_coord, y_coord, current, end)
+                if best is None or dist < best:
+                    best = dist
+            current = end
+            index += 1
+            continue
+        if element.type != curve or current is None:
+            index += 1
+            continue
+        first = (element.x, element.y)
+        second = (
+            path.elementAt(index + 1).x, path.elementAt(index + 1).y)
+        end = (path.elementAt(index + 2).x, path.elementAt(index + 2).y)
+        previous = current
+        for step in range(1, 17):
+            t = step / 16.0
+            point = _cubic_at(current, first, second, end, t)
+            dist = _point_seg_dist(x_coord, y_coord, previous, point)
+            if best is None or dist < best:
+                best = dist
+            previous = point
+        current = end
+        index += 3
+    if best is None:
+        return 1e9
+    return best
+
+
+def _cubic_at(start, first, second, end, t):
+    u = 1.0 - t
+    return (
+        u * u * u * start[0] + 3 * u * u * t * first[0]
+        + 3 * u * t * t * second[0] + t * t * t * end[0],
+        u * u * u * start[1] + 3 * u * u * t * first[1]
+        + 3 * u * t * t * second[1] + t * t * t * end[1],
+    )
+
+
+def _point_seg_dist(px, py, start, end):
+    ax, ay = start
+    bx, by = end
+    dx = bx - ax
+    dy = by - ay
+    length_sq = dx * dx + dy * dy
+    if length_sq <= 1e-18:
+        return math.hypot(px - ax, py - ay)
+    t = ((px - ax) * dx + (py - ay) * dy) / length_sq
+    if t < 0.0:
+        t = 0.0
+    elif t > 1.0:
+        t = 1.0
+    return math.hypot(px - (ax + t * dx), py - (ay + t * dy))
+
+
+def _poly_dist(x_coord, y_coord, path):
+    best = None
+    for polygon in path.toSubpathPolygons():
+        points = [(point.x(), point.y()) for point in polygon]
+        for index in range(len(points) - 1):
+            ax, ay = points[index]
+            bx, by = points[index + 1]
+            dx = bx - ax
+            dy = by - ay
+            length_sq = dx * dx + dy * dy
+            if length_sq <= 1e-18:
+                dist = math.hypot(x_coord - ax, y_coord - ay)
+            else:
+                t = ((x_coord - ax) * dx + (y_coord - ay) * dy) / length_sq
+                if t < 0.0:
+                    t = 0.0
+                elif t > 1.0:
+                    t = 1.0
+                dist = math.hypot(
+                    x_coord - (ax + t * dx), y_coord - (ay + t * dy))
+            if best is None or dist < best:
+                best = dist
+    if best is None:
+        return 1e9
+    return best
+
+
+def _seg_dist(x_coord, y_coord, segments):
+    best = None
+    for seg in segments:
+        ax, ay, bx, by = seg
+        dx = bx - ax
+        dy = by - ay
+        length_sq = dx * dx + dy * dy
+        if length_sq <= 1e-18:
+            dist = math.hypot(x_coord - ax, y_coord - ay)
+        else:
+            t = ((x_coord - ax) * dx + (y_coord - ay) * dy) / length_sq
+            if t < 0.0:
+                t = 0.0
+            elif t > 1.0:
+                t = 1.0
+            dist = math.hypot(
+                x_coord - (ax + t * dx), y_coord - (ay + t * dy))
+        if best is None or dist < best:
+            best = dist
+    if best is None:
+        return 1e9
+    return best
+
+
+def _curve_mids(path):
+    curve = QPainterPath.CurveToElement
+    current = None
+    mids = []
+    index = 0
+    count = path.elementCount()
+    while index < count:
+        element = path.elementAt(index)
+        if element.isMoveTo() or element.type == QPainterPath.LineToElement:
+            current = (element.x, element.y)
+            index += 1
+            continue
+        if element.type != curve or current is None:
+            index += 1
+            continue
+        first = (element.x, element.y)
+        second = (
+            path.elementAt(index + 1).x, path.elementAt(index + 1).y)
+        end = (path.elementAt(index + 2).x, path.elementAt(index + 2).y)
+        u = 0.5
+        t = 0.5
+        mids.append((
+            u * u * u * current[0] + 3 * u * u * t * first[0]
+            + 3 * u * t * t * second[0] + t * t * t * end[0],
+            u * u * u * current[1] + 3 * u * u * t * first[1]
+            + 3 * u * t * t * second[1] + t * t * t * end[1],
+        ))
+        current = end
+        index += 3
+    return mids
+
+
+def _assert_round_cuts(weed, published, inner, outer, radius):
+    rect = inner.boundingRect()
+    _assert_path_pair(weed, inner, outer)
+    border_n = inner.elementCount() + outer.elementCount()
+    for x_coord, y_coord in _line_samples(
+            weed, weed.elementCount() - border_n):
+        assert not _round_outside(x_coord, y_coord, rect, radius), (
+            x_coord, y_coord)
+    for seg in published:
+        for t in (0.0, 0.5, 1.0):
+            x_coord = seg[0] + t * (seg[2] - seg[0])
+            y_coord = seg[1] + t * (seg[3] - seg[1])
+            on_border = (
+                _outline_dist(x_coord, y_coord, inner) <= 0.05
+                or _outline_dist(x_coord, y_coord, outer) <= 0.05
+            )
+            assert on_border or not _round_outside(
+                x_coord, y_coord, rect, radius), (x_coord, y_coord)
+    for x_coord, y_coord in _curve_mids(outer):
+        assert _seg_dist(x_coord, y_coord, published) <= 0.05
+
+
+def test_zero_corner_radius_leaves_the_square_clip():
+    keep = _rect(0, 0, 40, 40)
+    padding = [20, 20, 20, 20]
+    plain, plain_published = _run(
+        keep, mode='frame', padding=padding,
+        inner_distance=4, border_width=3)
+    zero, zero_published = _run(
+        keep, mode='frame', padding=padding,
+        inner_distance=4, border_width=3, corner_radius=0)
+    assert _elements(plain) == _elements(zero)
+    assert plain_published == zero_published
+
+
+def test_rounded_frame_clips_the_corner_not_the_box():
+    """The frame corner is inside the box and outside the arc."""
+    keep = _rect(0, 0, 40, 40)
+    padding = [2, 2, 2, 2]
+    radius = 16
+    plain, _plain_published = _run(
+        keep, mode='frame', padding=padding,
+        inner_distance=6, border_width=3)
+    weed, published = _run(
+        keep, mode='frame', padding=padding,
+        inner_distance=6, border_width=3, corner_radius=radius)
+    inner, outer = piece_border(keep, 6, 3, radius)
+    assert _poly_dist(-2, -2, plain) < 1e-6
+    assert _poly_dist(-2, -2, weed) > 0.5
+    assert _poly_dist(20, -2, weed) < 1e-6
+    _assert_round_cuts(weed, published, inner, outer, radius)
+
+
+def test_grid_stays_inside_the_rounded_border():
+    keep = _rect(0, 0, 40, 40)
+    radius = 16
+    inner, outer = piece_border(keep, 6, 3, radius)
+    weed, published = _run(
+        keep, mode='grid', padding=[2, 2, 2, 2], spacing=10,
+        inner_distance=6, border_width=3, corner_radius=radius)
+    assert weed.elementCount() > inner.elementCount() + outer.elementCount()
+    _assert_round_cuts(weed, published, inner, outer, radius)
+
+
+def test_island_hop_stays_inside_the_rounded_border():
+    pytest.importorskip('pyclipper')
+    keep = _rect(0, 0, 50, 50)
+    radius = 8
+    inner, outer = piece_border(keep, 3, 2, radius)
+    weed, published = _run(
+        keep, mode='island-hop', padding=[12, 12, 12, 12], spacing=20,
+        inner_distance=3, border_width=2, corner_radius=radius)
+    assert weed.elementCount() > inner.elementCount() + outer.elementCount()
+    _assert_round_cuts(weed, published, inner, outer, radius)
 
 
 def test_border_clip_does_not_stick():

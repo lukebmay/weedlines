@@ -34,28 +34,39 @@ _A_SLIVER = 8.0
 _H_SLIVER = 2.5
 _A_GAIN_MIN = 12.0
 
-# Piece-border inner rectangle. None leaves a published segment unchanged.
-_border_clip_rect = None
+# Piece-border inner path. None leaves a published segment unchanged.
+_border_clip_shape = None
 
 
-def _set_border_clip(rect):
-    """Clip published segments to *rect*. None stops the clip."""
-    global _border_clip_rect
-    _border_clip_rect = rect
+def _set_border_clip(shape):
+    """Clip published segments to *shape*. None stops the clip."""
+    global _border_clip_shape
+    _border_clip_shape = shape
 
 
-def _clip_published_seg(seg):
-    """Segment the host sees. None drops it. No rect returns *seg*."""
-    rect = _border_clip_rect
-    if rect is None or seg is None:
-        return seg
-    clipped = _sol_clip._clip_seg_to_rect(
-        seg[0], seg[1], seg[2], seg[3], rect)
-    if clipped is None:
-        return None
-    if math.hypot(clipped[2] - clipped[0], clipped[3] - clipped[1]) < 1e-9:
-        return None
-    return clipped
+def _clip_published_pieces(seg):
+    """Segments the host sees. Empty drops *seg*. No clip returns it.
+
+    A rounded inner border is the path, not its bounding box.
+    """
+    shape = _border_clip_shape
+    if seg is None:
+        return ()
+    if shape is None:
+        return (seg,)
+    if _sol_clip._path_has_curve(shape):
+        parts = _sol_clip._clip_line_to_region(
+            seg[0], seg[1], seg[2], seg[3], shape, False,
+            samples=64, min_len=1e-9)
+    else:
+        clipped = _sol_clip._clip_seg_to_rect(
+            seg[0], seg[1], seg[2], seg[3], shape.boundingRect())
+        parts = () if clipped is None else (clipped,)
+    kept = []
+    for part in parts:
+        if math.hypot(part[2] - part[0], part[3] - part[1]) >= 1e-9:
+            kept.append(part)
+    return kept
 
 
 def _publish_path_segments(path):
@@ -63,11 +74,14 @@ def _publish_path_segments(path):
     if path is None or path.isEmpty():
         return
     from .. import progress as _progress
-    for seg in _sol_geom._iter_line_segs(path):
-        seg = _clip_published_seg(seg)
-        if seg is None:
-            continue
-        _progress.report_segment(seg)
+    if _sol_clip._path_has_curve(path):
+        # Curve handles sit outside a rounded corner.
+        segments = _sol_clip._outline_segs(path)
+    else:
+        segments = _sol_geom._iter_line_segs(path)
+    for seg in segments:
+        for piece in _clip_published_pieces(seg):
+            _progress.report_segment(piece)
 
 
 # Candidate must lie along an existing weed (not merely both ends near it).
@@ -522,8 +536,7 @@ def _add_seg(out, seg, min_cut, keep_path=None, rules=None, report=True):
     # The seen copy is the same seal, not a second cut.
     # Piece-border clip, when one is set. The stored seal stays whole.
     if report:
-        published = _clip_published_seg(seg)
-        if published is not None:
+        for published in _clip_published_pieces(seg):
             _progress.report_segment(published)
 
 

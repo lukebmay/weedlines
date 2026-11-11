@@ -37,7 +37,8 @@ def generate_weeds(keep_path,
                    alpha_min=None,
                    frame_clearance=None,
                    inner_distance=None,
-                   border_width=None):
+                   border_width=None,
+                   corner_radius=None):
     """Build a weed QPainterPath for keep geometry.
 
     Parameters
@@ -59,7 +60,10 @@ def generate_weeds(keep_path,
     inner_distance, border_width
         Piece-border lengths in user units. Omit either and today's
         path is unchanged. When both are set, mode lines stay inside
-        the inner rectangle, then that pair is emitted, inner then outer.
+        the inner border, then that pair is emitted, inner then outer.
+    corner_radius
+        Rounds that border when both lengths are set. Omitted stays
+        square. The radius is user units the caller already converted.
     """
     if keep_path is None or keep_path.isEmpty():
         return QPainterPath()
@@ -73,14 +77,18 @@ def generate_weeds(keep_path,
     spacing = max(float(spacing or DEFAULT_GRID_SPACING), 1e-6)
     rules = _sol_rules._cut_rules(body_clearance, alpha_min, frame_clearance)
     borders = None
-    inner_rect = None
+    inner_shape = None
     if inner_distance is not None and border_width is not None:
-        pair = piece_border(keep_path, inner_distance, border_width)
+        if corner_radius is None:
+            pair = piece_border(keep_path, inner_distance, border_width)
+        else:
+            pair = piece_border(
+                keep_path, inner_distance, border_width, corner_radius)
         if len(pair) == 2:
             borders = pair
-            inner_rect = pair[0].boundingRect()
+            inner_shape = pair[0]
     # None leaves a published segment unchanged.
-    _sol_emit._set_border_clip(inner_rect)
+    _sol_emit._set_border_clip(inner_shape)
     try:
         if mode == 'frame':
             weed = frame_weeds(keep_path, padding)
@@ -112,7 +120,7 @@ def generate_weeds(keep_path,
     if borders is None:
         return weed
     inner, outer = borders
-    weed = _sol_clip._clip_path_to_rect(weed, inner_rect)
+    weed = _sol_clip._clip_path_to_border(weed, inner_shape)
     # The pair is not clipped. Nothing sits between the two rectangles.
     weed.addPath(inner)
     weed.addPath(outer)

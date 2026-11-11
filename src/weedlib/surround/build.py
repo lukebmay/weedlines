@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Dilate, cluster, bridge, and smooth, then clip to the inner rectangle."""
+"""Dilate, cluster, bridge, and smooth, then clip to the inner border."""
 from __future__ import division
+
+import math
 
 from .. import progress
 from ..paths import split_painter_path
@@ -22,7 +24,8 @@ from .bridge import _bridge_inner_outers
 from .smooth import _finish_outline
 
 
-def build_surrounds(subject, distance, join_gap=0.0, inner_distance=None):
+def build_surrounds(subject, distance, join_gap=0.0, inner_distance=None,
+                    corner_radius=None):
     """One smoothed outline for each cluster.
 
     ``subject`` is the subject region in document user units, holes
@@ -35,9 +38,11 @@ def build_surrounds(subject, distance, join_gap=0.0, inner_distance=None):
 
     When ``inner_distance`` is omitted, those outlines stay as they
     are. When it is passed, each outline is clipped to the inner
-    piece-border rectangle. A run that meets the rectangle is left
-    open, without the rectangle side between its ends. A run that
-    stays inside stays closed. A run the clip removes is absent.
+    piece border. A run that meets the border is left open, without
+    the border between its ends. A run that stays inside stays
+    closed. A run the clip removes is absent. ``corner_radius``
+    rounds that border. Omitted, it stays square. The radius is
+    user units and is capped on the inner rectangle.
     """
     if not isinstance(subject, QPainterPath):
         raise TypeError(
@@ -104,22 +109,30 @@ def build_surrounds(subject, distance, join_gap=0.0, inner_distance=None):
                 outline, distance, dilated, len(kept) == 1))
     if inner_distance is None:
         return surrounds
-    return _clip_to_inner_rectangle(subject, surrounds, inner_distance)
+    return _clip_to_inner_border(
+        subject, surrounds, inner_distance, corner_radius)
 
 
 # A point this close to a side lies on the inner rectangle.
 _CLIP_EDGE = 1e-4
 # Bounds at least this far inside are not clipped.
 _INSIDE_MARGIN = 1e-6
+# A border chord from the boolean is not this close to the surround.
+_SOURCE_TOL = 1e-2
 
 
-def _clip_to_inner_rectangle(subject, surrounds, inner_distance):
-    """Clip each surround to the inner piece-border rectangle.
+def _clip_to_inner_border(subject, surrounds, inner_distance, corner_radius):
+    """Clip each surround to the inner piece border.
 
     The border width is not this clip. ``piece_border`` still
-    builds the rectangle, and only the inner one is used.
+    builds the border, and only the inner path is used. A rounded
+    corner is that path, not the bounding box.
     """
-    border = piece_border(subject, inner_distance, 0.0)
+    if corner_radius is None:
+        border = piece_border(subject, inner_distance, 0.0)
+    else:
+        border = piece_border(
+            subject, inner_distance, 0.0, corner_radius)
     if not border:
         return []
     inner = border[0]
@@ -133,18 +146,35 @@ def _clip_to_inner_rectangle(subject, surrounds, inner_distance):
 
 
 def _clip_surround(path, inner, rect):
-    if _bounds_inside(path, rect):
+    if _fully_inside(path, inner, rect):
         return [path]
     inter = path.intersected(inner)
     if inter.isEmpty():
         return []
     # A flattened curve's chords fall inside the subject. Keep the
     # lines and curves from the intersection, and drop only a side
-    # of the inner rectangle.
-    runs, dropped = _kept_runs(inter, rect)
+    # of the inner border. The boolean also closes a rounded corner
+    # with chords of that corner. Those chords are not the surround.
+    runs, dropped = _kept_runs(inter, inner, rect, path)
     if not dropped:
         return [path]
     return [run for run in runs if run.elementCount() > 1]
+
+
+def _fully_inside(path, inner, rect):
+    if not _bounds_inside(path, rect):
+        return False
+    if not _path_has_curve(inner):
+        return True
+    return inner.contains(path)
+
+
+def _path_has_curve(path):
+    curve = QPainterPath.CurveToElement
+    for index in range(path.elementCount()):
+        if path.elementAt(index).type == curve:
+            return True
+    return False
 
 
 def _bounds_inside(path, rect):
@@ -158,19 +188,25 @@ def _bounds_inside(path, rect):
     )
 
 
-def _kept_runs(path, rect):
-    """Open runs of lines and curves that are not a rectangle side.
+def _kept_runs(path, inner, rect, source):
+    """Open runs of lines and curves that are not the inner border.
 
-    Nothing dropped means the surround never lay on the rectangle,
+    Nothing dropped means the surround never lay on the border,
     so the caller returns the original outline.
     """
+    border_segs = None
+    source_segs = None
+    if _path_has_curve(inner):
+        border_segs = list(_segments(inner))
+        source_segs = list(_segments(source))
     runs = []
     dropped = False
     for subpath in split_painter_path(path):
         segments = list(_segments(subpath))
         if not segments:
             continue
-        chains, sub_dropped = _chain_segments(segments, rect)
+        chains, sub_dropped = _chain_segments(
+            segments, rect, border_segs, source_segs)
         dropped = dropped or sub_dropped
         for chain in chains:
             run = _path_from_segments(chain)
@@ -179,12 +215,13 @@ def _kept_runs(path, rect):
     return runs, dropped
 
 
-def _chain_segments(segments, rect):
+def _chain_segments(segments, rect, border_segs, source_segs):
     dropped = False
     runs = []
     current = []
     for kind, points in segments:
-        if _lies_on_rectangle(points, rect):
+        if _drop_border_segment(
+                kind, points, rect, border_segs, source_segs):
             dropped = True
             if current:
                 runs.append(current)
@@ -200,6 +237,129 @@ def _chain_segments(segments, rect):
         runs[0] = runs[-1] + runs[0]
         del runs[-1]
     return runs, dropped
+
+
+def _drop_border_segment(kind, points, rect, border_segs, source_segs):
+    """True when *points* is the inner border, not the surround."""
+    if border_segs is None:
+        return _lies_on_rectangle(points, rect)
+    if _samples_on_segments(kind, points, border_segs, _CLIP_EDGE):
+        return True
+    # The boolean closes the cut with the border. A chord of a
+    # rounded corner is not on the surround.
+    return not _samples_on_segments(kind, points, source_segs, _SOURCE_TOL)
+
+
+def _samples_on_segments(kind, points, segments, tol):
+    for x_coord, y_coord in _segment_samples(kind, points):
+        if _dist_to_segments(x_coord, y_coord, segments) > tol:
+            return False
+    return True
+
+
+def _segment_samples(kind, points):
+    if kind == 'line':
+        start, end = points[0], points[-1]
+        return (
+            start,
+            (0.5 * (start[0] + end[0]), 0.5 * (start[1] + end[1])),
+            end,
+        )
+    if kind == 'cubic':
+        return tuple(_bezier(points, step / 4.0) for step in range(5))
+    if kind == 'quad':
+        return tuple(_quad_at(points, step / 4.0) for step in range(5))
+    return points
+
+
+def _bezier(points, t):
+    u = 1.0 - t
+    p0, p1, p2, p3 = points
+    return (
+        u * u * u * p0[0] + 3 * u * u * t * p1[0]
+        + 3 * u * t * t * p2[0] + t * t * t * p3[0],
+        u * u * u * p0[1] + 3 * u * u * t * p1[1]
+        + 3 * u * t * t * p2[1] + t * t * t * p3[1],
+    )
+
+
+def _quad_at(points, t):
+    u = 1.0 - t
+    p0, p1, p2 = points
+    return (
+        u * u * p0[0] + 2 * u * t * p1[0] + t * t * p2[0],
+        u * u * p0[1] + 2 * u * t * p1[1] + t * t * p2[1],
+    )
+
+
+def _dist_to_segments(x_coord, y_coord, segments):
+    best = None
+    for kind, points in segments:
+        if kind == 'line':
+            dist = _point_seg_dist(
+                x_coord, y_coord, points[0], points[-1])
+        elif kind == 'cubic':
+            dist = _dist_to_curve(x_coord, y_coord, points, _bezier)
+        elif kind == 'quad':
+            dist = _dist_to_curve(x_coord, y_coord, points, _quad_at)
+        else:
+            continue
+        if best is None or dist < best:
+            best = dist
+            if best <= _CLIP_EDGE:
+                return best
+    if best is None:
+        return 1e9
+    return best
+
+
+def _dist_to_curve(x_coord, y_coord, points, at):
+    steps = 32
+    best_t = 0.0
+    best = None
+    for step in range(steps + 1):
+        t = step / float(steps)
+        sx, sy = at(points, t)
+        dist = (sx - x_coord) * (sx - x_coord) + (sy - y_coord) * (sy - y_coord)
+        if best is None or dist < best:
+            best = dist
+            best_t = t
+    span = 1.0 / steps
+    lo = best_t - span
+    if lo < 0.0:
+        lo = 0.0
+    hi = best_t + span
+    if hi > 1.0:
+        hi = 1.0
+    for _step in range(40):
+        left = (2.0 * lo + hi) / 3.0
+        right = (lo + 2.0 * hi) / 3.0
+        lx, ly = at(points, left)
+        rx, ry = at(points, right)
+        left_dist = (lx - x_coord) ** 2 + (ly - y_coord) ** 2
+        right_dist = (rx - x_coord) ** 2 + (ry - y_coord) ** 2
+        if left_dist <= right_dist:
+            hi = right
+        else:
+            lo = left
+    sx, sy = at(points, 0.5 * (lo + hi))
+    return math.hypot(sx - x_coord, sy - y_coord)
+
+
+def _point_seg_dist(px, py, start, end):
+    ax, ay = start
+    bx, by = end
+    dx = bx - ax
+    dy = by - ay
+    length_sq = dx * dx + dy * dy
+    if length_sq <= 1e-18:
+        return math.hypot(px - ax, py - ay)
+    t = ((px - ax) * dx + (py - ay) * dy) / length_sq
+    if t < 0.0:
+        t = 0.0
+    elif t > 1.0:
+        t = 1.0
+    return math.hypot(px - (ax + t * dx), py - (ay + t * dy))
 
 
 def _lies_on_rectangle(points, rect):

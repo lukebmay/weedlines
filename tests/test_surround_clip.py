@@ -472,3 +472,180 @@ def test_curve_clip_does_not_cut_the_subject():
         nearest = min(
             _distance_to_path(x_coord, y_coord, path) for path in paths)
         assert nearest > 0.5
+
+
+def _line_samples(path):
+    line = QPainterPath.LineToElement
+    move = QPainterPath.MoveToElement
+    current = None
+    samples = []
+    for index in range(path.elementCount()):
+        element = path.elementAt(index)
+        if element.type == move:
+            current = (element.x, element.y)
+            continue
+        if element.type != line or current is None:
+            current = (element.x, element.y)
+            continue
+        end = (element.x, element.y)
+        samples.append(current)
+        samples.append((
+            0.5 * (current[0] + end[0]),
+            0.5 * (current[1] + end[1]),
+        ))
+        samples.append(end)
+        current = end
+    return samples
+
+
+def _outside_round(x_coord, y_coord, rect, radius, eps=0.05):
+    if (
+        x_coord < rect.left() - eps or x_coord > rect.right() + eps
+        or y_coord < rect.top() - eps or y_coord > rect.bottom() + eps
+    ):
+        return True
+    boxes = (
+        (rect.left() + radius, rect.top() + radius,
+         rect.left(), rect.left() + radius,
+         rect.top(), rect.top() + radius),
+        (rect.right() - radius, rect.top() + radius,
+         rect.right() - radius, rect.right(),
+         rect.top(), rect.top() + radius),
+        (rect.right() - radius, rect.bottom() - radius,
+         rect.right() - radius, rect.right(),
+         rect.bottom() - radius, rect.bottom()),
+        (rect.left() + radius, rect.bottom() - radius,
+         rect.left(), rect.left() + radius,
+         rect.bottom() - radius, rect.bottom()),
+    )
+    for center_x, center_y, x0, x1, y0, y1 in boxes:
+        if x0 - eps <= x_coord <= x1 + eps and y0 - eps <= y_coord <= y1 + eps:
+            if math.hypot(
+                    x_coord - center_x, y_coord - center_y) > radius + eps:
+                return True
+    return False
+
+
+def _arc_between(start, end, center, radius):
+    start_angle = math.atan2(start[1] - center[1], start[0] - center[0])
+    end_angle = math.atan2(end[1] - center[1], end[0] - center[0])
+    sweep = (end_angle - start_angle + math.pi) % (2.0 * math.pi) - math.pi
+    mid = start_angle + 0.5 * sweep
+    return (
+        center[0] + radius * math.cos(mid),
+        center[1] + radius * math.sin(mid),
+    )
+
+
+def _paths_differ(left, right):
+    if left.elementCount() != right.elementCount():
+        return True
+    for index in range(left.elementCount()):
+        got = left.elementAt(index)
+        expected = right.elementAt(index)
+        if got.type != expected.type:
+            return True
+        if abs(got.x - expected.x) > 1e-6 or abs(got.y - expected.y) > 1e-6:
+            return True
+    return False
+
+
+def test_radius_without_the_inner_length_does_not_clip(monkeypatch):
+    def boom(*_args, **_kwargs):
+        raise AssertionError('piece_border was called')
+
+    monkeypatch.setattr('weedlib.surround.build.piece_border', boom)
+    paths = build_surrounds(_square(), _DISTANCE, 0, corner_radius=4)
+    assert len(paths) == 1
+    assert _is_closed(paths[0])
+
+
+def test_zero_corner_radius_matches_the_square_clip():
+    subject = _four_squares()
+    square = build_surrounds(subject, _DISTANCE, 0, _INNER)
+    zero = build_surrounds(
+        subject, _DISTANCE, 0, _INNER, corner_radius=0)
+    negative = build_surrounds(
+        subject, _DISTANCE, 0, _INNER, corner_radius=-3)
+    assert len(zero) == len(square)
+    assert len(negative) == len(square)
+    for left, right in zip(square, zero):
+        _same_path(left, right)
+    for left, right in zip(square, negative):
+        _same_path(left, right)
+
+
+def test_rounded_clip_follows_the_arc_not_the_box():
+    """The corner cutout of the box is outside the rounded border."""
+    subject = _four_squares()
+    radius = 20.0
+    square = build_surrounds(subject, _DISTANCE, 0, _INNER)
+    rounded = build_surrounds(
+        subject, _DISTANCE, 0, _INNER, corner_radius=radius)
+    assert len(rounded) == 4
+    rect = _inner_rect(subject, _INNER)
+    center = (rect.left() + radius, rect.top() + radius)
+    corner = None
+    for path in rounded:
+        bounds = path.boundingRect()
+        if bounds.left() < 0.0 and bounds.top() < 0.0:
+            corner = path
+    assert corner is not None
+    assert not _is_closed(corner)
+    start, end = _ends(corner)
+    for x_coord, y_coord in (start, end):
+        assert math.hypot(
+            x_coord - center[0], y_coord - center[1]
+        ) == pytest.approx(radius, abs=0.05)
+        assert min(
+            abs(x_coord - rect.left()),
+            abs(y_coord - rect.top()),
+            abs(x_coord - rect.right()),
+            abs(y_coord - rect.bottom()),
+        ) > 0.2
+    cutout = (13.9, -0.9)
+    assert math.hypot(
+        cutout[0] - center[0], cutout[1] - center[1]) > radius + 0.3
+    assert min(
+        _distance_to_path(cutout[0], cutout[1], path) for path in square
+    ) < 0.05
+    assert min(
+        _distance_to_path(cutout[0], cutout[1], path) for path in rounded
+    ) > 0.4
+    mid = _arc_between(start, end, center, radius)
+    assert _distance_to_path(mid[0], mid[1], corner) > 1.0
+    for path in rounded:
+        assert not _is_closed(path)
+        for x_coord, y_coord in _line_samples(path):
+            assert not _outside_round(x_coord, y_coord, rect, radius)
+
+
+def test_over_radius_matches_the_capped_border():
+    """Half of the 42 side is 21. A larger radius is that border."""
+    subject = _four_squares()
+    square = build_surrounds(subject, _DISTANCE, 0, _INNER)
+    capped = build_surrounds(
+        subject, _DISTANCE, 0, _INNER, corner_radius=21)
+    over = build_surrounds(
+        subject, _DISTANCE, 0, _INNER, corner_radius=100)
+    assert len(over) == len(capped)
+    for left, right in zip(over, capped):
+        _same_path(left, right)
+    assert _paths_differ(square[0], capped[0])
+
+
+def test_inside_rounded_border_stays_closed():
+    subject = QPainterPath()
+    subject.addRect(10, 10, 20, 20)
+    raw = build_surrounds(subject, 3, 0)
+    clipped = build_surrounds(subject, 3, 0, 8, corner_radius=10)
+    assert len(clipped) == 1
+    assert _is_closed(clipped[0])
+    _same_path(clipped[0], raw[0])
+
+
+def test_surround_on_the_rounded_border_is_absent():
+    """The border cut is the inner path. The surround does not repeat it."""
+    rounded = QPainterPath()
+    rounded.addRoundedRect(0, 0, 40, 20, 6, 6)
+    assert build_surrounds(rounded, 0, 0, 0.0, corner_radius=6) == []

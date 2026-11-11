@@ -45,6 +45,159 @@ def _clip_seg_to_rect(x0, y0, x1, y1, rect):
     return (x0 + t0 * dx, y0 + t0 * dy, x0 + t1 * dx, y0 + t1 * dy)
 
 
+def _path_has_curve(path):
+    if path is None or path.isEmpty():
+        return False
+    curve = QPainterPath.CurveToElement
+    for index in range(path.elementCount()):
+        if path.elementAt(index).type == curve:
+            return True
+    return False
+
+
+# A corner cubic's handles sit outside the arc. Chords stay this close.
+_CURVE_FLAT = 0.02
+
+
+def _clip_path_to_border(path, shape):
+    """Clip *path* to the inner piece border.
+
+    A square border uses its rectangle. A rounded border does not
+    use that rectangle's bounding box.
+    """
+    if path is None or path.isEmpty() or shape is None or shape.isEmpty():
+        return QPainterPath()
+    if not _path_has_curve(shape):
+        return _clip_path_to_rect(path, shape.boundingRect())
+    out = QPainterPath()
+    for seg in _sol_geom._iter_line_segs(path):
+        parts = _clip_line_to_region(
+            seg[0], seg[1], seg[2], seg[3], shape, False,
+            samples=64, min_len=1e-9)
+        for part in parts:
+            if math.hypot(part[2] - part[0], part[3] - part[1]) < 1e-9:
+                continue
+            out.moveTo(part[0], part[1])
+            out.lineTo(part[2], part[3])
+    return out
+
+
+def _outline_segs(path, flat=_CURVE_FLAT):
+    """Line segments along the path. Curve handles are not vertices."""
+    move = QPainterPath.MoveToElement
+    line = QPainterPath.LineToElement
+    curve = QPainterPath.CurveToElement
+    data = QPainterPath.CurveToDataElement
+    current = None
+    index = 0
+    count = path.elementCount()
+    while index < count:
+        element = path.elementAt(index)
+        if element.type == move:
+            current = (element.x, element.y)
+            index += 1
+            continue
+        if element.type == line:
+            end = (element.x, element.y)
+            if current is not None:
+                yield (current[0], current[1], end[0], end[1])
+            current = end
+            index += 1
+            continue
+        if element.type != curve or current is None:
+            index += 1
+            continue
+        controls = [(element.x, element.y)]
+        index += 1
+        while index < count and path.elementAt(index).type == data:
+            follow = path.elementAt(index)
+            controls.append((follow.x, follow.y))
+            index += 1
+        if len(controls) == 3:
+            for seg in _flatten_cubic(
+                    current, controls[0], controls[1], controls[2], flat, 0):
+                yield seg
+            current = controls[2]
+            continue
+        if len(controls) == 2:
+            for seg in _flatten_quad(
+                    current, controls[0], controls[1], flat, 0):
+                yield seg
+            current = controls[1]
+            continue
+        current = controls[-1]
+
+
+def _flatten_cubic(p0, p1, p2, p3, flat, depth):
+    if depth >= 8 or _controls_near_chord(p0, p1, p2, p3, flat):
+        if math.hypot(p3[0] - p0[0], p3[1] - p0[1]) >= 1e-9:
+            yield (p0[0], p0[1], p3[0], p3[1])
+        return
+    left, right = _split_cubic(p0, p1, p2, p3)
+    for seg in _flatten_cubic(left[0], left[1], left[2], left[3], flat, depth + 1):
+        yield seg
+    for seg in _flatten_cubic(
+            right[0], right[1], right[2], right[3], flat, depth + 1):
+        yield seg
+
+
+def _flatten_quad(p0, p1, p2, flat, depth):
+    if depth >= 8 or _point_seg_dist(p1[0], p1[1], p0, p2) <= flat:
+        if math.hypot(p2[0] - p0[0], p2[1] - p0[1]) >= 1e-9:
+            yield (p0[0], p0[1], p2[0], p2[1])
+        return
+    # Same split a cubic uses, with the quadratic lifted to a cubic.
+    c1 = (
+        p0[0] + 2.0 / 3.0 * (p1[0] - p0[0]),
+        p0[1] + 2.0 / 3.0 * (p1[1] - p0[1]),
+    )
+    c2 = (
+        p2[0] + 2.0 / 3.0 * (p1[0] - p2[0]),
+        p2[1] + 2.0 / 3.0 * (p1[1] - p2[1]),
+    )
+    for seg in _flatten_cubic(p0, c1, c2, p2, flat, depth):
+        yield seg
+
+
+def _controls_near_chord(p0, p1, p2, p3, flat):
+    return (
+        _point_seg_dist(p1[0], p1[1], p0, p3) <= flat
+        and _point_seg_dist(p2[0], p2[1], p0, p3) <= flat
+    )
+
+
+def _point_seg_dist(px, py, start, end):
+    ax, ay = start
+    bx, by = end
+    dx = bx - ax
+    dy = by - ay
+    length_sq = dx * dx + dy * dy
+    if length_sq <= 1e-18:
+        return math.hypot(px - ax, py - ay)
+    t = ((px - ax) * dx + (py - ay) * dy) / length_sq
+    if t < 0.0:
+        t = 0.0
+    elif t > 1.0:
+        t = 1.0
+    return math.hypot(px - (ax + t * dx), py - (ay + t * dy))
+
+
+def _split_cubic(p0, p1, p2, p3):
+    def mid(left, right):
+        return (
+            0.5 * (left[0] + right[0]),
+            0.5 * (left[1] + right[1]),
+        )
+
+    p01 = mid(p0, p1)
+    p12 = mid(p1, p2)
+    p23 = mid(p2, p3)
+    p012 = mid(p01, p12)
+    p123 = mid(p12, p23)
+    p0123 = mid(p012, p123)
+    return (p0, p01, p012, p0123), (p0123, p123, p23, p3)
+
+
 def _clip_path_to_rect(path, rect):
     """Clip every line segment of *path* to *rect* (curves become end lines)."""
     out = QPainterPath()
