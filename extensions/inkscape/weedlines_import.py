@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 """Inkscape extension: import the last Weedlines result.
 
-Prefers ``last_result.svg`` so a weed-line result keeps the design and
-cuts in the job's user units. A correction result has no design copy;
-its arrow groups go on one new layer above the open document.
+Prefers ``last_result.svg``. A weed-line result places its Weedlines
+group on one new layer. A ready file stays on the corrections layer.
 """
 from __future__ import division
 
@@ -123,34 +122,21 @@ class WeedLinesImportEffect(object):
 
         if os.path.isfile(svg_file):
             groups = load_correction_svg_groups(svg_file)
-            design, cuts = load_result_svg_groups(svg_file)
-            # A ready file is correction groups and no design copy.
-            if groups and design is None:
+            weedlines = load_result_svg_groups(svg_file)
+            # A ready file is correction groups and no Weedlines group.
+            if groups and weedlines is None:
                 raise inkex.AbortExtension(
                     'That file is a ready result.\n'
                     'Run Extensions → Weedlines → 4 Reimport last ready cut.'
                 )
 
-            if design is None and cuts is None:
+            if weedlines is None:
                 raise inkex.AbortExtension(
                     'Weedlines result SVG was empty:\n%s' % svg_file
                 )
 
-            # Parent layer holding design + cuts (same user units as source).
-            ns_ink = 'http://www.inkscape.org/namespaces/inkscape'
-            if hasattr(inkex, 'Group') and hasattr(inkex.Group, 'new'):
-                layer = self.svg.add(
-                    inkex.Group.new(layer_name, is_layer=True))
-            else:
-                layer = inkex.etree.SubElement(
-                    self.svg, inkex.addNS('g', 'svg'))
-                layer.set('{%s}groupmode' % ns_ink, 'layer')
-                layer.set('{%s}label' % ns_ink, layer_name)
-
-            if design is not None:
-                _append_etree_element(layer, design, inkex)
-            if cuts is not None:
-                _append_etree_element(layer, cuts, inkex)
+            layer = _append_layer(self.svg, inkex, layer_name)
+            _append_etree_element(layer, weedlines, inkex)
             return
 
         # Legacy JSON-only fallback (cuts only).

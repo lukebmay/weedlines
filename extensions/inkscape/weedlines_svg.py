@@ -212,21 +212,66 @@ def cut_style(color=None):
     ) % color
 
 
-def write_result_svg(keep_d, weed_d_list, doc_attrs=None, layer_name=None,
-                     path=None, weed_line_color=None):
-    """Write a standalone SVG: design keep + weed cuts in document user units.
+def _group(indent, gid, label, inner, layer=False):
+    pad = ' ' * indent
+    mode = ' inkscape:groupmode="layer"' if layer else ''
+    return (
+        '%s<g%s id="%s" inkscape:label="%s">\n%s%s</g>\n'
+        % (pad, mode, gid, _xml_escape_attr(label), inner, pad)
+    )
 
-    *doc_attrs* should be the source document's width/height/viewBox so opening
-    or importing the file preserves physical size. Path coordinates are already
-    in that user-unit space (composed transforms baked in). An omitted
-    *weed_line_color* strokes each cut with ``#FF0000``.
+
+def _stroke_paths(d_list, style, prefix):
+    """Caller path data, in order. An empty entry keeps its index."""
+    lines = []
+    escaped = _xml_escape_attr(style)
+    for index, d in enumerate(d_list or ()):
+        if not d:
+            continue
+        lines.append(
+            '        <path id="%s-%04d" style="%s" d="%s"/>\n'
+            % (prefix, index, escaped, _xml_escape_attr(d))
+        )
+    return ''.join(lines)
+
+
+def _original_paths(records):
+    """One path per record. ``d`` is copied. A correction id is omitted."""
+    lines = []
+    for index, record in enumerate(records or ()):
+        if not isinstance(record, dict):
+            continue
+        ident = str(record.get('id') or '')
+        if ident.startswith('weedlines-correction'):
+            continue
+        if not ident:
+            ident = 'original-%04d' % index
+        d = record.get('d')
+        if d is None:
+            d = ''
+        lines.append(
+            '        <path id="%s" d="%s"/>\n'
+            % (_xml_escape_attr(ident), _xml_escape_attr(d))
+        )
+    return ''.join(lines)
+
+
+def write_result_svg(keep_d, weed_d_list, doc_attrs=None, layer_name=None,
+                     path=None, weed_line_color=None, border_d_list=None,
+                     records=None):
+    """Write one Weedlines group on one layer, in document user units.
+
+    *keep_d* is accepted and not written. Border and cut path data are
+    the lists the caller passes. Both use the cut stroke. *records*,
+    when passed, are the Original design group: one path each, ``d``
+    copied as stored. An omitted *records* leaves that group out.
+    An omitted *weed_line_color* strokes with ``#FF0000``.
     """
     path = path or result_svg_path()
     doc_attrs = dict(doc_attrs or {})
     layer_name = layer_name or 'Weed lines'
+    del keep_d
 
-    # Build as a plain string to control namespaces cleanly (ElementTree
-    # register_namespace + explicit xmlns duplicates attributes).
     width = doc_attrs.get('width') or ''
     height = doc_attrs.get('height') or ''
     view_box = doc_attrs.get('viewBox') or doc_attrs.get('viewbox') or ''
@@ -234,6 +279,8 @@ def write_result_svg(keep_d, weed_d_list, doc_attrs=None, layer_name=None,
         width = width or '100%'
         height = height or '100%'
 
+    # Build as a plain string to control namespaces cleanly (ElementTree
+    # register_namespace + explicit xmlns duplicates attributes).
     parts = [
         "<?xml version='1.0' encoding='utf-8'?>\n",
         '<svg xmlns="%s" xmlns:inkscape="%s"' % (SVG_NS, INK_NS),
@@ -246,32 +293,20 @@ def write_result_svg(keep_d, weed_d_list, doc_attrs=None, layer_name=None,
         parts.append(' viewBox="%s"' % _xml_escape_attr(view_box))
     parts.append('>\n')
 
-    parts.append(
-        '  <g inkscape:label="Weedlines design" id="weedlines-design">\n'
-    )
-    if keep_d:
-        parts.append(
-            '    <path id="weedlines-keep" fill-rule="evenodd" '
-            'style="fill:#9a9a9a;fill-opacity:1;fill-rule:evenodd;'
-            'stroke:#666666;stroke-width:0.25;stroke-opacity:1" d="%s"/>\n'
-            % _xml_escape_attr(keep_d)
-        )
-    parts.append('  </g>\n')
-
-    parts.append(
-        '  <g inkscape:groupmode="layer" inkscape:label="%s" '
-        'id="weedlines-cuts">\n'
-        % _xml_escape_attr(layer_name)
-    )
     style = cut_style(weed_line_color)
-    for i, d in enumerate(weed_d_list or ()):
-        if not d:
-            continue
-        parts.append(
-            '    <path id="weed-cut-%04d" style="%s" d="%s"/>\n'
-            % (i, _xml_escape_attr(style), _xml_escape_attr(d))
-        )
-    parts.append('  </g>\n</svg>\n')
+    inner = [
+        _group(6, 'weedlines-border', 'Border',
+               _stroke_paths(border_d_list, style, 'weedlines-border')),
+        _group(6, 'weedlines-cuts', 'Weed lines',
+               _stroke_paths(weed_d_list, style, 'weed-cut')),
+    ]
+    if records is not None:
+        inner.append(_group(
+            6, 'weedlines-original', 'Original design',
+            _original_paths(records)))
+    body = _group(4, 'weedlines', 'Weedlines', ''.join(inner))
+    parts.append(_group(2, 'weedlines-layer', layer_name, body, layer=True))
+    parts.append('</svg>\n')
 
     tmp = path + '.tmp'
     with open(tmp, 'w', encoding='utf-8') as fh:
@@ -291,24 +326,22 @@ def _xml_escape_attr(value):
 
 
 def load_result_svg_groups(path=None):
-    """Return (design_element_or_None, cuts_element_or_None) from result SVG."""
+    """Return the Weedlines group, or None when this file has none."""
     path = path or result_svg_path()
     if not os.path.isfile(path):
-        return None, None
-    tree = ET.parse(path)
-    root = tree.getroot()
-    design = cuts = None
-    for child in list(root):
-        tag = child.tag
-        if not isinstance(tag, str):
+        return None
+    root = ET.parse(path).getroot()
+    for child in root.iter():
+        if _local_tag(child.tag) != 'g':
             continue
         cid = child.get('id') or ''
+        # A layer labeled Weedlines is not this group.
+        if cid == 'weedlines-layer':
+            continue
         label = child.get(_qn(INK_NS, 'label')) or ''
-        if cid == 'weedlines-design' or label == 'Weedlines design':
-            design = child
-        elif cid == 'weedlines-cuts' or child.get(_qn(INK_NS, 'groupmode')) == 'layer':
-            cuts = child
-    return design, cuts
+        if cid == 'weedlines' or label == 'Weedlines':
+            return child
+    return None
 
 
 def _local_tag(tag):

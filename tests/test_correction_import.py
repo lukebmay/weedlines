@@ -126,31 +126,36 @@ def test_correction_file_becomes_one_layer_of_groups(tmp_path, monkeypatch):
     assert all(el.get(_LABEL) != 'Weedlines design' for el in _descendants(root))
 
 
-def test_weed_line_file_still_contributes_design_and_cuts(tmp_path, monkeypatch):
+def test_weed_line_import_places_the_weedlines_group(tmp_path, monkeypatch):
     monkeypatch.setattr(JOB, 'cache_dir', lambda: str(tmp_path))
     JOB.write_result(
         'Weed lines',
         ['M 0,0 L 12,0'],
         keep_d='M 0,0 L 8,0 L 8,8 Z',
         doc_attrs={'width': '20', 'height': '20', 'viewBox': '0 0 20 20'},
+        border_d_list=['M 1,1 L 3,1'],
     )
     root = _import(_open_document())
     person = root.getElementById('person-path')
     assert person.get('d') == _PERSON_D
     assert person.getparent().get('id') == 'layer1'
+    assert len(list(person.getparent())) == 1
 
-    design = root.getElementById('weedlines-design')
-    cuts = root.getElementById('weedlines-cuts')
-    assert design is not None
-    assert design.get(_LABEL) == 'Weedlines design'
-    assert root.getElementById('weedlines-keep') is not None
-    assert cuts is not None
-    assert cuts.getparent() is design.getparent()
-    assert design.getparent().get(_LABEL) == 'Weed lines'
+    layers = [el for el in root if el.get(_MODE) == 'layer']
+    assert [el.get(_LABEL) for el in layers] == ['Layer 1', 'Weed lines']
+    weedlines = root.getElementById('weedlines')
+    assert weedlines is not None
+    assert weedlines.getparent() is layers[-1]
+    assert [el.get(_LABEL) for el in weedlines] == ['Border', 'Weed lines']
+    assert root.getElementById('weedlines-design') is None
+    assert root.getElementById('weedlines-keep') is None
+    border = root.getElementById('weedlines-border-0000')
+    assert border is not None and border.get('d') == 'M 1,1 L 3,1'
     cut = root.getElementById('weed-cut-0000')
-    assert cut is not None and cut.getparent() is cuts
+    assert cut is not None and cut.getparent().get('id') == 'weedlines-cuts'
     assert cut.get('d') == 'M 0,0 L 12,0'
     assert root.getElementByName('Weedlines corrections') is None
+    assert root.getElementByName('Original design') is None
 
 
 def _is_path(el):

@@ -89,6 +89,10 @@ def test_empty_kind_is_omitted_and_file_has_no_design(tmp_path, monkeypatch):
     assert 'Weedlines design' not in text
     assert 'weedlines-design' not in text
     assert 'weedlines-keep' not in text
+    assert 'inkscape:label="Border"' not in text
+    assert 'inkscape:label="Weed lines"' not in text
+    assert 'inkscape:label="Original design"' not in text
+    assert 'weed-cut-' not in text
     groups = SVG.load_correction_svg_groups(svg_path)
     assert [group.get(_INK_LABEL) for group in groups] == [
         'Dangling ends', 'Self-overlaps',
@@ -189,25 +193,90 @@ def test_present_kind_has_one_text_at_the_mark_origin(tmp_path, monkeypatch):
     assert shapes == []
 
 
-def test_write_result_still_writes_design_and_cuts(tmp_path, monkeypatch):
+def test_default_result_is_border_and_weed_lines(tmp_path, monkeypatch):
     monkeypatch.setattr(JOB, 'cache_dir', lambda: str(tmp_path))
     JOB.write_result(
         'Weed lines',
         ['M 0,0 L 12,0'],
-        keep_d='M 0,0 L 8,0 L 8,8 Z',
+        keep_d='M 9,9 L 8,8',
         doc_attrs={'width': '20', 'height': '20', 'viewBox': '0 0 20 20'},
+        border_d_list=['M 1,1 L 4,1 L 4,3'],
     )
     svg_path = os.path.join(str(tmp_path), 'last_result.svg')
-    design, cuts = SVG.load_result_svg_groups(svg_path)
-    assert design is not None
-    assert design.get('id') == 'weedlines-design'
-    assert cuts is not None
+    group = SVG.load_result_svg_groups(svg_path)
+    assert group is not None
+    assert group.get('id') == 'weedlines'
+    assert [el.get(_INK_LABEL) for el in list(group)] == [
+        'Border', 'Weed lines',
+    ]
     cut_ds = [
-        el.get('d') for el in list(cuts)
+        el.get('d') for el in group.iter()
         if (el.get('id') or '').startswith('weed-cut-')
     ]
     assert cut_ds == ['M 0,0 L 12,0']
+    with open(svg_path, encoding='utf-8') as fh:
+        text = fh.read()
+    assert 'M 9,9 L 8,8' not in text
+    assert 'Weedlines design' not in text
+    assert 'Original design' not in text
+    assert 'Weedlines corrections' not in text
+    assert text.count('inkscape:groupmode="layer"') == 1
     assert SVG.load_correction_svg_groups(svg_path) == []
+
+
+def test_original_design_copies_records_when_included(tmp_path, monkeypatch):
+    monkeypatch.setattr(JOB, 'cache_dir', lambda: str(tmp_path))
+    records = [
+        {
+            'id': 'gap',
+            'd': 'M 5,6 L 15,6 L 15,20',
+            'closed': [True],
+            'fill': 'none',
+        },
+        {
+            'id': 'weedlines-correction-arrow',
+            'd': 'M 7,7 L 8,9',
+            'closed': [False],
+            'fill': 'none',
+        },
+        {
+            'id': 'panel',
+            'd': 'M 1,1 L 2,1',
+            'closed': [False],
+            'fill': '#112233',
+        },
+    ]
+    job_path = JOB.write_job('', {'mode': 'frame'}, records=records)
+    JOB.write_result(
+        'Weed lines',
+        ['M 0,0 L 12,0'],
+        doc_attrs=_DOC,
+        border_d_list=['M 0,0 L 3,0'],
+        records=records,
+    )
+    svg_path = os.path.join(str(tmp_path), 'last_result.svg')
+    group = SVG.load_result_svg_groups(svg_path)
+    assert [el.get(_INK_LABEL) for el in list(group)] == [
+        'Border', 'Weed lines', 'Original design',
+    ]
+    original = list(group)[-1]
+    paths = _paths(original)
+    assert [el.get('id') for el in paths] == ['gap', 'panel']
+    assert [el.get('d') for el in paths] == [
+        'M 5,6 L 15,6 L 15,20',
+        'M 1,1 L 2,1',
+    ]
+    assert all(not _CLOSEPATH.search(el.get('d') or '') for el in paths)
+    with open(svg_path, encoding='utf-8') as fh:
+        text = fh.read()
+    assert 'weedlines-correction' not in text
+    assert 'Weedlines corrections' not in text
+    assert 'M 7,7 L 8,9' not in text
+    job = JOB.read_job(job_path)
+    assert job['records'] == records
+    from weedlib.figures.check import classify_figures
+    figures = classify_figures(job['records']).figures
+    assert [figure.id for figure in figures] == ['gap', 'panel']
 
 
 def _arrow_ds(svg_path):

@@ -257,8 +257,42 @@ def test_result_svg_import_keeps_the_file_style(tmp_path, monkeypatch):
         fh.write(text)
     root = _import(_open_root(inkex))
     _assert_layer_cuts(root, '#222222')
-    assert root.getElementById('weedlines-design') is not None
-    assert root.getElementById('weedlines-keep') is not None
+    weedlines = root.getElementById('weedlines')
+    assert weedlines is not None
+    assert weedlines.get(_LABEL) == 'Weedlines'
+    assert weedlines.getparent().get(_LABEL) == 'Weed lines'
+    assert [el.get(_LABEL) for el in weedlines] == ['Border', 'Weed lines']
+    assert root.getElementById('weedlines-design') is None
+    assert root.getElementById('weedlines-keep') is None
+
+
+def test_border_uses_the_cut_stroke_and_the_caller_data(tmp_path, monkeypatch):
+    _cache(tmp_path, monkeypatch)
+    border = 'M 1,1 L 4,1 L 4,3'
+    JOB.write_result(
+        'Weed lines',
+        list(_DS),
+        keep_d='M 9,9 L 8,8',
+        doc_attrs=dict(_DOC),
+        weed_line_color='#123456',
+        border_d_list=[border],
+    )
+    root = ET.parse(SVG.result_svg_path()).getroot()
+    cuts = [
+        el for el in root.iter('{%s}path' % _SVG)
+        if (el.get('id') or '').startswith('weed-cut-')
+    ]
+    borders = [
+        el for el in root.iter('{%s}path' % _SVG)
+        if (el.get('id') or '').startswith('weedlines-border-')
+    ]
+    _assert_file_cuts(cuts, '#123456')
+    assert [el.get('d') for el in borders] == [border]
+    assert [el.get('style') for el in borders] == [_stroke('#123456')]
+    text = ET.tostring(root, encoding='unicode')
+    assert 'M 9,9 L 8,8' not in text
+    assert 'Weedlines design' not in text
+    assert 'Original design' not in text
 
 
 def test_correction_file_imports_as_arrow_groups_only(tmp_path, monkeypatch):

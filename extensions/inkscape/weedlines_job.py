@@ -85,10 +85,13 @@ def read_job(path):
 
 
 def write_result(layer_name, path_d_list, meta=None, keep_d=None,
-                 doc_attrs=None, weed_line_color=None):
-    """Save Apply output: JSON metadata + SVG (design + cuts).
+                 doc_attrs=None, weed_line_color=None, border_d_list=None,
+                 records=None):
+    """Save Apply output. The SVG holds the groups the caller included.
 
-    *weed_line_color* is stored when the caller passes one.
+    *keep_d* stays on the JSON. It is not a result group. *border_d_list*
+    is the Border group. *records*, when passed, is the Original design
+    group. *weed_line_color* is stored when the caller passes one.
     """
     payload = {
         'version': 2,
@@ -100,6 +103,10 @@ def write_result(layer_name, path_d_list, meta=None, keep_d=None,
         'meta': dict(meta or {}),
         'svg': _RESULT_SVG_NAME,
     }
+    if border_d_list is not None:
+        payload['border'] = list(border_d_list)
+    if records is not None:
+        payload['records'] = list(records)
     if weed_line_color is not None:
         payload['weed_line_color'] = weed_line_color
     path = result_path()
@@ -117,6 +124,8 @@ def write_result(layer_name, path_d_list, meta=None, keep_d=None,
             layer_name=layer_name,
             path=result_svg_file(),
             weed_line_color=weed_line_color,
+            border_d_list=border_d_list,
+            records=records,
         )
     except Exception:
         # JSON alone still allows cut-only import.
