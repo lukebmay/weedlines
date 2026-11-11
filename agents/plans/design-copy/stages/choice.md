@@ -2,15 +2,11 @@
 
 ## This stage
 
-The host part is the result. The window checkbox is
-**Include original design**. It is off until the
-person turns it on. Apply writes the groups that
-choice includes. Import places them as that part says.
-
-The border paths are the piece border the library
-already builds. This stage does not change that
-geometry.
+The choice stage is met. The default result is the
+Border group and the Weed lines group. Include
+original design is off until the person turns it on.
 
 ## Not yet
 
-Nothing further in this plan.
+Nothing further in this plan. `design-records`
+stays parked.

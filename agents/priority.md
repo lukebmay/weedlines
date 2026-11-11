@@ -46,7 +46,7 @@ A waiting plan stays under its rank. The notes say why. Skip it.
 | --- | --- |
 | [weedlib-index](plans/weedlib-index/plan.md) | The index is in. No open task. Skip it. |
 | [run-log-label](plans/run-log-label/plan.md) | The stages stage is met. No open task. Skip it. log-label stays parked. |
-| [design-copy](plans/design-copy/plan.md) | The checkbox is in. No open task. Include original design stays off by default. |
+| [design-copy](plans/design-copy/plan.md) | The choice stage is met. No open task. Skip it. design-records stays parked. |
 | [extension-doc-drift](plans/extension-doc-drift/plan.md) | The page follows the host menu and the install part. No open task. Skip it. |
 
 ## 2 low
