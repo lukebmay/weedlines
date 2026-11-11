@@ -2,9 +2,9 @@
 
 The order of active tasks for design-copy.
 
-(none yet — the architect files tasks from the
-choice stage.)
+1. [result-groups](tasks/active/result-groups/task.md)
+1. [include-choice](tasks/active/include-choice/task.md)
 
-[design-records](tasks/inactive/design-records/task.md)
-is parked. The original design is optional, not the
-default export.
+include-choice calls the result writer. It waits
+until result-groups is done. Do not run them
+together.

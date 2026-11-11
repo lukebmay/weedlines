@@ -45,8 +45,8 @@ A waiting plan stays under its rank. The notes say why. Skip it.
 | Plan | Notes |
 | --- | --- |
 | [weedlib-index](plans/weedlib-index/plan.md) | The index is in. No open task. Skip it. |
-| [run-log-label](plans/run-log-label/plan.md) | The stage lines are in. No open task. log-label stays parked. |
-| [design-copy](plans/design-copy/plan.md) | Default export is the border and the weed lines. Include original design is optional. No tasks yet. File them before coding. |
+| [run-log-label](plans/run-log-label/plan.md) | The stages stage is met. No open task. Skip it. log-label stays parked. |
+| [design-copy](plans/design-copy/plan.md) | result-groups is first. include-choice calls that writer. Include original design is the checkbox, off by default. |
 | [extension-doc-drift](plans/extension-doc-drift/plan.md) | The page follows the host menu and the install part. No open task. Skip it. |
 
 ## 2 low
