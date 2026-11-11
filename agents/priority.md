@@ -24,10 +24,10 @@ A waiting plan stays under its rank. The notes say why. Skip it.
 | [source-split](plans/source-split/plan.md) | The split stage is met. No open task. Skip it. |
 | [make-ready](plans/make-ready/plan.md) | The stub tasks are done. Fixes are [ready-fixes](plans/ready-fixes/plan.md). |
 | [surround-doc](plans/surround-doc/plan.md) | The label stage is met. No open task. Skip it. |
-| [piece-border](plans/piece-border/plan.md) | The form is in. No open task. |
+| [piece-border](plans/piece-border/plan.md) | The border stage is met. No open task. Skip it. |
 | [border-ask](plans/border-ask/plan.md) | The ask stage is met. No open task. Skip it. |
 | [step-timer](plans/step-timer/plan.md) | The clock and the page are in. No open task. Skip it. |
-| [ready-fixes](plans/ready-fixes/plan.md) | propose-span and ready-group name different files. The rest of the propose stage waits on them. It may run beside other plans. |
+| [ready-fixes](plans/ready-fixes/plan.md) | propose-span and ready-group are in progress. They name different files. The rest of the propose stage waits on them. |
 | [concavity](plans/concavity/plan.md) | Exploration is open. A probe is not a named measure. It may run beside other plans. Do not crown one number. |
 | [surround-cavern](plans/surround-cavern/plan.md) | Waiting until the algorithms part names a measure and a threshold. A probe is not that name. |
 | [preview-color-picker](plans/preview-color-picker/plan.md) | The picker is in. No open task. Skip it. |
