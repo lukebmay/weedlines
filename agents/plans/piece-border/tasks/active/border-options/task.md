@@ -1,10 +1,6 @@
 # Border options
 
-**Status:** waiting
-
-**Blocker:** [border-corners](../../active/border-corners/task.md)
-is not done. The labels are named. Do not build the
-rounded geometry in this task.
+**Status:** ready
 
 ## Goal
 
@@ -14,21 +10,27 @@ Corner Radius while that box is on.
 
 ## Do
 
-Edit `extensions/inkscape/weedlines_dialog/form.py`
-only. The labels are **Border Padding**, **Border
+Edit only
+`extensions/inkscape/weedlines_dialog/form.py` and
+`tests/test_window_border.py`. Do not edit the
+library, the ask, or the run controls. Do not
+forward `corner_radius` through the window ask.
+That work is
+[border-ask](../../../../border-ask/plan.md).
+
+The labels are **Border Padding**, **Border
 Width**, **Border Rounded Corners**, and **Border
 Corner Radius**. Hide the radius while the box is
 off. The radius starts at one quarter of an inch.
 The window does not allow it below zero or above
 half the shorter side of the inner rectangle.
 
-The stored lengths and the change entry come from the
-border-paint task. Border padding, the checkbox, and
-the radius use that entry. Each asks off the GUI
-thread and repaints the border. When a surround is
-showing, those three also ask for the surround. The
-border width asks for the border only. Do not build
-or clip the rectangles here.
+The stored lengths and `change_piece_length` come
+from the border-paint task. Border padding, the
+checkbox, and the radius call that entry. The
+border width calls it so the ask is for the border
+only. Do not build or clip the rectangles here.
+Do not put the radius on the ask.
 
 Keep the values while the window is open, including
 the radius while the box is off. A committed change
@@ -37,7 +39,7 @@ use. These controls do not bring back frame padding,
 grid spacing, the collar, or the layer name. Do not
 remove island-hop.
 
-Do not edit the library, `docs/`, or `README.md`.
+Do not edit `docs/` or `README.md`.
 
 ## Checks
 
