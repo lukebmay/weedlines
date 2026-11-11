@@ -243,7 +243,7 @@ class _Window(_Form, _RunControls, _ReturnLine, _Preview, _Inbox, _Ask):
         status_row.addWidget(self.status_label, stretch=1)
         self.root.addLayout(status_row)
 
-        log_label = self.QtWidgets.QLabel('Algorithm output (stdout / stderr)')
+        log_label = self.QtWidgets.QLabel('Algorithm output')
         self.root.addWidget(log_label)
         self.log_view = self.QtWidgets.QPlainTextEdit()
         self.log_view.setReadOnly(True)

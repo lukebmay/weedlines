@@ -303,9 +303,10 @@ def _ask_solver(request, conn, pausing, cancelled):
         call = call + (inner_distance, border_width)
     conn.send(call)
 
-    def on_phase(name):
+    def on_phase(name, kind):
         conn.send(('phase', str(name)))
-        conn.send(('log', '[phase] %s\n' % name))
+        if kind == 'stage' or kind == 'substage':
+            conn.send(('log', '[%s] %s\n' % (kind, name)))
 
     def on_seg(seg):
         if cancelled.is_set():

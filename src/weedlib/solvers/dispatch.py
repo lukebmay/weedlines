@@ -68,7 +68,50 @@ def generate_weeds(keep_path,
     if keep_path is None or keep_path.isEmpty():
         return QPainterPath()
     from .. import progress as _progress
-    _progress.report(mode)
+    try:
+        _progress.report(mode, stage=True)
+        return _generate_body(
+            keep_path,
+            mode,
+            padding,
+            spacing,
+            max_chunk,
+            bridge_width,
+            clearance,
+            min_cut,
+            delicate_angle_deg,
+            collar,
+            max_spokes,
+            peninsula_ratio,
+            body_clearance,
+            alpha_min,
+            frame_clearance,
+            inner_distance,
+            border_width,
+            corner_radius,
+        )
+    finally:
+        _progress.close_stage()
+
+
+def _generate_body(keep_path,
+                   mode,
+                   padding,
+                   spacing,
+                   max_chunk,
+                   bridge_width,
+                   clearance,
+                   min_cut,
+                   delicate_angle_deg,
+                   collar,
+                   max_spokes,
+                   peninsula_ratio,
+                   body_clearance,
+                   alpha_min,
+                   frame_clearance,
+                   inner_distance,
+                   border_width,
+                   corner_radius):
     mode = (mode or DEFAULT_WEED_MODE).strip().lower()
     if mode == 'auto':
         mode = 'island-hop'

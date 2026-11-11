@@ -20,6 +20,7 @@ _cancel_cb = None
 _pause_cb = None
 _geometry_cb = None
 _focus_cb = None
+_stage_open = False
 
 
 class WeedCancelled(Exception):
@@ -32,8 +33,9 @@ def install(progress=None, cancel=None, geometry=None, pause=None,
 
     Parameters
     ----------
-    progress : callable(str), optional
-        Phase label callback.
+    progress : callable(str, str), optional
+        Label callback. The second argument is ``stage``,
+        ``substage``, or empty when the name is neither.
     cancel : callable() -> bool, optional
         Return True to abort with ``WeedCancelled``.
     geometry : callable(seg), optional
@@ -48,26 +50,47 @@ def install(progress=None, cancel=None, geometry=None, pause=None,
         absent. A line is exactly two points. This is not a cut.
     """
     global _progress_cb, _cancel_cb, _pause_cb, _geometry_cb, _focus_cb
+    global _stage_open
     _progress_cb = progress
     _cancel_cb = cancel
     _geometry_cb = geometry
     _pause_cb = pause
     _focus_cb = focus
+    _stage_open = False
 
 
 def clear():
     install(None, None, None, None, None)
 
 
-def report(phase):
-    """Publish a short phase label to the host, then check pause/cancel."""
+def report(name, stage=False, substage=False):
+    """Publish a stage or substage label, then check pause/cancel.
+
+    The mode ``generate_weeds`` reports is a stage. A phase
+    entered while that stage is open is a substage. The kind
+    is set with the log quiet.
+    """
+    global _stage_open
+    if stage:
+        kind = 'stage'
+        _stage_open = True
+    elif substage and _stage_open:
+        kind = 'substage'
+    else:
+        kind = ''
     cb = _progress_cb
     if cb is not None:
         try:
-            cb(str(phase))
+            cb(str(name), kind)
         except Exception:
             pass
     check_cancel()
+
+
+def close_stage():
+    """The stage stays open until the run that reported it returns."""
+    global _stage_open
+    _stage_open = False
 
 
 def report_segment(seg):

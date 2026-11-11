@@ -2,6 +2,7 @@
 """Progress / cancel / pause hooks for long-running solvers."""
 from __future__ import division
 
+import logging
 import threading
 import time
 
@@ -139,7 +140,7 @@ def test_cancel_raises_during_grid():
     keep.addRect(QRectF(0, 0, 40, 40))
     raise_cancel = [False]
 
-    def on_phase(name):
+    def on_phase(name, kind):
         raise_cancel[0] = True
 
     progress.install(
@@ -151,6 +152,91 @@ def test_cancel_raises_during_grid():
             raise_cancel[0] = True
             generate_weeds(keep, mode='frame', padding=[2, 2, 2, 2])
     finally:
+        progress.clear()
+
+
+def test_stage_and_substage_when_the_log_is_quiet(monkeypatch):
+    """A quiet log still reports the stage and a phase inside it."""
+    monkeypatch.setenv('WEEDLINES_LOG', '0')
+    monkeypatch.delenv('INKCUT_WEED_DEBUG', raising=False)
+    QPainterPath, QRectF, generate_weeds = _need_solver()
+    from weedlib.debug import phase
+
+    seen = []
+    segs = []
+    messages = []
+
+    class _Grab(logging.Handler):
+        def emit(self, record):
+            messages.append(record.getMessage())
+
+    grab = _Grab()
+    weed_log = logging.getLogger('weedlib')
+    weed_log.addHandler(grab)
+    progress.install(
+        progress=lambda name, kind: seen.append((name, kind)),
+        geometry=lambda seg: segs.append(tuple(seg)),
+    )
+    try:
+        with phase('body_pockets'):
+            pass
+        assert seen == [('body_pockets', '')]
+        seen[:] = []
+        keep = QPainterPath()
+        keep.addRect(QRectF(0, 0, 40, 30))
+        weed = generate_weeds(keep, mode='frame', padding=[2, 2, 2, 2])
+        assert not weed.isEmpty()
+        assert seen == [('frame', 'stage')]
+        assert len(segs) > 1
+        before = len(segs)
+        progress.report('grid', stage=True)
+        with phase('body_pockets'):
+            progress.report_segment((0, 0, 1, 0))
+        assert seen[-2:] == [('grid', 'stage'), ('body_pockets', 'substage')]
+        assert segs[-1] == (0, 0, 1, 0)
+        assert len(segs) == before + 1
+        assert not any('phase.enter' in message for message in messages)
+        assert not any('emit.accept' in message for message in messages)
+    finally:
+        weed_log.removeHandler(grab)
+        progress.clear()
+
+
+def test_reject_stays_a_log_line(monkeypatch):
+    """A reject is not a stage report. A set level still records it."""
+    monkeypatch.delenv('INKCUT_WEED_DEBUG', raising=False)
+    from weedlib import debug
+
+    seen = []
+    messages = []
+
+    class _Grab(logging.Handler):
+        def emit(self, record):
+            messages.append(record.getMessage())
+
+    grab = _Grab()
+    weed_log = logging.getLogger('weedlib')
+    weed_log.addHandler(grab)
+    progress.install(progress=lambda name, kind: seen.append((name, kind)))
+    try:
+        monkeypatch.setenv('WEEDLINES_LOG', '0')
+        debug.log('emit.reject', reason='short')
+        debug.log('emit.accept', seg=(0, 0, 1, 0))
+        assert messages == []
+        assert seen == []
+        monkeypatch.setenv('WEEDLINES_LOG', '1')
+        debug.log('emit.reject', reason='short')
+        debug.log('emit.accept', seg=(0, 0, 1, 0))
+        assert seen == []
+        assert any(message.startswith('emit.reject') for message in messages)
+        assert not any(message.startswith('emit.accept') for message in messages)
+        messages[:] = []
+        monkeypatch.setenv('WEEDLINES_LOG', '2')
+        debug.log('emit.accept', seg=(0, 0, 1, 0))
+        assert seen == []
+        assert any(message.startswith('emit.accept') for message in messages)
+    finally:
+        weed_log.removeHandler(grab)
         progress.clear()
 
 
@@ -180,7 +266,7 @@ def test_pause_blocks_then_resume_completes():
 
     def work():
         progress.install(
-            progress=lambda _n: started.set(),
+            progress=lambda _name, _kind: started.set(),
             pause=lambda: paused.is_set(),
             cancel=lambda: False,
         )
@@ -217,7 +303,7 @@ def test_cancel_while_paused():
 
     def work():
         progress.install(
-            progress=lambda _n: started.set(),
+            progress=lambda _name, _kind: started.set(),
             pause=lambda: paused.is_set(),
             cancel=lambda: cancel.is_set(),
         )

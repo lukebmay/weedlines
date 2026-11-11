@@ -63,11 +63,12 @@ def phase_name():
 def phase(name, **fields):
     """Push a named planner phase for nested emit / rank logs.
 
-    Always reports *name* to ``weedlib.progress`` (Apply UI / cancel),
-    even when ``WEEDLINES_LOG`` is off.
+    Always reports *name* to ``weedlib.progress``, even when
+    ``WEEDLINES_LOG`` is off. While a stage is open, that
+    report is a substage.
     """
     from . import progress as _progress
-    _progress.report(name)
+    _progress.report(name, substage=True)
     if not enabled():
         try:
             yield

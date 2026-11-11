@@ -502,6 +502,19 @@ def _log_text(dialog):
     return log.toPlainText()
 
 
+def _preview_lines(dialog):
+    count = 0
+    for item in _preview_scene(dialog).items():
+        pen = getattr(item, 'pen', None)
+        line = getattr(item, 'line', None)
+        if not callable(pen) or not callable(line):
+            continue
+        if pen().color().alpha() == 0:
+            continue
+        count += 1
+    return count
+
+
 def _release_solver(dialog):
     if not dialog.isVisible() or not _run_busy(dialog):
         return
@@ -521,6 +534,18 @@ def _release_solver(dialog):
         pass
     if dialog.isVisible():
         dialog.reject()
+
+
+def test_log_label_is_algorithm_output():
+    def drive(dialog):
+        texts = [
+            label.text() for label in dialog.findChildren(QtWidgets.QLabel)
+        ]
+        assert texts.count('Algorithm output') == 1
+        assert 'Algorithm output (stdout / stderr)' not in texts
+        dialog.reject()
+
+    _run(_RECT_RECORDS, drive)
 
 
 def test_solver_hold_lets_a_timer_fire_and_logs_the_run(monkeypatch):
@@ -569,8 +594,16 @@ def test_solver_hold_lets_a_timer_fire_and_logs_the_run(monkeypatch):
             _pump_until(lambda: _button(dialog, 'apply').isEnabled())
             text = _log_text(dialog)
             assert text.count('solver-stdio-marker') >= 2
-            assert '[phase]' in text
+            assert text.count('[stage] frame') == 1
+            assert '[substage] ' not in text
+            assert '[phase]' not in text
             assert 'hold' in text.splitlines()
+            assert _preview_lines(dialog) > 1
+            clock = dialog.findChild(QtWidgets.QLabel, 'step-cut-time')
+            assert clock is not None
+            assert clock.text().replace('.', '', 1).isdigit()
+            status = dialog.findChild(QtWidgets.QLabel, 'status')
+            assert status is not None and status.text() == 'done'
             dialog.reject()
         finally:
             _release_solver(dialog)
@@ -823,20 +856,34 @@ def test_deliberate_log_level_survives(monkeypatch):
                     or not _run_busy(dialog),
                     timeout=30)
                 holder['text'] = _log_text(dialog)
+                holder['items'] = _preview_lines(dialog)
                 dialog.reject()
             finally:
                 _release_solver(dialog)
 
         _run(_RECT_RECORDS, drive)
-        return holder['text']
+        return holder['text'], holder['items']
 
-    quiet = once('0')
-    assert '[phase]' in quiet
+    def _reports(text):
+        return [
+            line for line in text.splitlines()
+            if line.startswith('[stage] ') or line.startswith('[substage] ')
+        ]
+
+    quiet, quiet_items = once('0')
+    loud, loud_items = once('2')
+    quiet_reports = _reports(quiet)
+    assert quiet_reports == _reports(loud)
+    assert quiet_reports.count('[stage] island-hop') == 1
+    assert any(line.startswith('[substage] ') for line in quiet_reports)
+    assert '[phase]' not in quiet and '[phase]' not in loud
     assert 'phase.enter' not in quiet
+    assert 'emit.accept' not in quiet
+    assert 'emit.reject' not in quiet
     assert 'DEBUG weedlib:' not in quiet
-    loud = once('2')
-    assert '[phase]' in loud
+    assert quiet_items > 0 and loud_items > 0
     assert 'phase.enter' in loud
+    assert 'emit.accept' in loud
     assert 'DEBUG weedlib:' in loud
 
 
