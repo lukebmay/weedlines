@@ -23,6 +23,7 @@ except ImportError:
 
 import weedlines_import as IMP  # noqa: E402
 import weedlines_job as JOB  # noqa: E402
+import weedlines_svg as SVG  # noqa: E402
 
 _INK = 'http://www.inkscape.org/namespaces/inkscape'
 _LABEL = '{%s}label' % _INK
@@ -150,3 +151,53 @@ def test_weed_line_file_still_contributes_design_and_cuts(tmp_path, monkeypatch)
     assert cut is not None and cut.getparent() is cuts
     assert cut.get('d') == 'M 0,0 L 12,0'
     assert root.getElementByName('Weedlines corrections') is None
+
+
+def _is_path(el):
+    tag = el.tag
+    return isinstance(tag, str) and tag.rsplit('}', 1)[-1] == 'path'
+
+
+def _write_ready(tmp_path, paths):
+    svg_path = os.path.join(str(tmp_path), 'last_ready.svg')
+    with open(svg_path, 'w', encoding='utf-8') as fh:
+        fh.write(_CORRECTION)
+    SVG.write_ready_fixes(paths, path=svg_path)
+    return svg_path
+
+
+def test_reimport_places_ready_fixes_and_keeps_the_paths(tmp_path, monkeypatch):
+    monkeypatch.setattr(JOB, 'cache_dir', lambda: str(tmp_path))
+    approved = ['M 0,0 L 8,0 L 8,3', 'M 1,1 L 2,2']
+    _write_ready(tmp_path, approved)
+    root = _import(_open_document(), 'ready')
+    person = root.getElementById('person-path')
+    assert person.get('d') == _PERSON_D
+    assert person.getparent().get('id') == 'layer1'
+    assert len(list(person.getparent())) == 1
+
+    layers = [
+        el for el in root
+        if el.get(_LABEL) == 'Weedlines corrections'
+    ]
+    assert len(layers) == 1
+    layer = layers[0]
+    assert list(root)[-1] is layer
+    assert [el.get(_LABEL) for el in layer] == [
+        'Dangling ends', 'Self-overlaps', 'Ready fixes',
+    ]
+    ready = layer[-1]
+    assert ready.get('id') == 'weedlines-correction-ready'
+    assert [el.get('d') for el in ready if _is_path(el)] == approved
+    assert root.getElementById('weedlines-correction-dangling') is not None
+    assert root.getElementById('person-path').get('d') == _PERSON_D
+
+
+def test_weed_line_reimport_still_refuses_a_ready_file(tmp_path, monkeypatch):
+    monkeypatch.setattr(JOB, 'cache_dir', lambda: str(tmp_path))
+    _write_ready(tmp_path, ['M 0,0 L 8,0'])
+    refused = _open_document()
+    with pytest.raises(inkex.AbortExtension):
+        _import(refused, 'weedlines')
+    assert refused.getElementById('person-path').get('d') == _PERSON_D
+    assert [el.get(_LABEL) for el in refused] == ['Layer 1']

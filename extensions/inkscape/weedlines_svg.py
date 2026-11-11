@@ -20,6 +20,13 @@ _CORRECTION_KINDS = (
     ('overlap', 'Figure overlaps'),
     ('self-overlap', 'Self-overlaps'),
 )
+_READY_LABEL = 'Ready fixes'
+_READY_BLOCK = re.compile(
+    r'  <g id="weedlines-correction-ready" inkscape:label="Ready fixes">\n'
+    r'.*?'
+    r'  </g>\n',
+    re.DOTALL,
+)
 
 
 def _qn(ns, tag):
@@ -476,16 +483,78 @@ def write_correction_svg(arrows, doc_attrs=None, path=None, labels=None):
     return path
 
 
-def load_correction_svg_groups(path=None):
-    """Return correction arrow groups, in document order.
+def write_ready_fixes(paths, path=None):
+    """Add one Ready fixes group of approved replacement paths.
 
-    Each item is the group for one kind that had an arrow. A missing
-    file, or a design-plus-cuts file, returns an empty list.
+    Arrow groups already in the ready file stay. An empty *paths*
+    does not add the group and does not create a file. A later call
+    replaces the previous Ready fixes group.
+    """
+    if path is None:
+        from weedlines_job import ready_svg_file
+        path = ready_svg_file()
+    data = _ready_ds(paths)
+    if not data or not os.path.isfile(path):
+        return path
+    with open(path, encoding='utf-8') as fh:
+        text = fh.read()
+    text = _READY_BLOCK.sub('', text)
+    index = text.rfind('</svg>')
+    if index < 0:
+        return path
+    text = text[:index] + _ready_group(data) + text[index:]
+    tmp = path + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as fh:
+        fh.write(text)
+    os.replace(tmp, path)
+    return path
+
+
+def _ready_ds(paths):
+    convert = None
+    found = []
+    for item in paths or ():
+        if item is None:
+            continue
+        if isinstance(item, str):
+            text = item.strip()
+        else:
+            if convert is None:
+                from weedlib.svg_paths import qpainterpath_to_svg_d
+                convert = qpainterpath_to_svg_d
+            text = convert(item, close_subpaths=False)
+        if text:
+            found.append(text)
+    return found
+
+
+def _ready_group(data):
+    style = _xml_escape_attr('fill:none;stroke:#000000;stroke-width:0.25')
+    lines = [
+        '  <g id="weedlines-correction-ready" '
+        'inkscape:label="Ready fixes">\n',
+    ]
+    for index, d in enumerate(data):
+        lines.append(
+            '    <path id="weedlines-ready-%04d" style="%s" d="%s"/>\n'
+            % (index, style, _xml_escape_attr(d))
+        )
+    lines.append('  </g>\n')
+    return ''.join(lines)
+
+
+def load_correction_svg_groups(path=None):
+    """Return ready-file groups, in document order.
+
+    Arrow groups for each kind that had an arrow, and the Ready
+    fixes group when the file has one. A missing file, or a
+    design-plus-cuts file, returns an empty list.
     """
     path = path or result_svg_path()
     if not os.path.isfile(path):
         return []
     labels = {label for _kind, label in _CORRECTION_KINDS}
+    labels.add(_READY_LABEL)
     groups = []
     root = ET.parse(path).getroot()
     for child in list(root):

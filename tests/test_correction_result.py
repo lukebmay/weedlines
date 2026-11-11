@@ -208,3 +208,72 @@ def test_write_result_still_writes_design_and_cuts(tmp_path, monkeypatch):
     ]
     assert cut_ds == ['M 0,0 L 12,0']
     assert SVG.load_correction_svg_groups(svg_path) == []
+
+
+def _arrow_ds(svg_path):
+    return [
+        el.get('d')
+        for group in SVG.load_correction_svg_groups(svg_path)
+        if group.get(_INK_LABEL) != 'Ready fixes'
+        for el in _paths(group)
+    ]
+
+
+def test_approved_paths_are_one_ready_fixes_group(tmp_path, monkeypatch):
+    arrows = _arrow_sets({
+        'dangling': [(30, 40)],
+        'overlap': [],
+        'self-overlap': [(20, 70)],
+    })
+    _json_path, svg_path = _write(tmp_path, monkeypatch, arrows)
+    before = _arrow_ds(svg_path)
+    assert before
+    SVG.write_ready_fixes(
+        ['M 0,0 L 3,0', 'M 1,1 L 1,4'], path=svg_path)
+    groups = SVG.load_correction_svg_groups(svg_path)
+    assert [group.get(_INK_LABEL) for group in groups] == [
+        'Dangling ends', 'Self-overlaps', 'Ready fixes',
+    ]
+    assert _arrow_ds(svg_path) == before
+    ready = groups[-1]
+    assert ready.get('id') == 'weedlines-correction-ready'
+    assert [el.get('d') for el in _paths(ready)] == [
+        'M 0,0 L 3,0', 'M 1,1 L 1,4',
+    ]
+    assert all(_fill(el) == 'none' for el in _paths(ready))
+
+    from weedlib.qt import QPainterPath
+    from weedlib.svg_paths import qpainterpath_to_svg_d
+    path = QPainterPath()
+    path.moveTo(0, 0)
+    path.lineTo(6, 0)
+    SVG.write_ready_fixes([path], path=svg_path)
+    groups = SVG.load_correction_svg_groups(svg_path)
+    assert [group.get(_INK_LABEL) for group in groups] == [
+        'Dangling ends', 'Self-overlaps', 'Ready fixes',
+    ]
+    assert _arrow_ds(svg_path) == before
+    ready_paths = _paths(groups[-1])
+    assert len(ready_paths) == 1
+    assert ready_paths[0].get('d') == qpainterpath_to_svg_d(
+        path, close_subpaths=False)
+    assert ready_paths[0].get('id') == 'weedlines-ready-0000'
+
+
+def test_no_approved_paths_leaves_the_arrow_file(tmp_path, monkeypatch):
+    arrows = _arrow_sets({
+        'dangling': [(30, 40)],
+        'overlap': [],
+        'self-overlap': [],
+    })
+    _json_path, svg_path = _write(tmp_path, monkeypatch, arrows)
+    with open(svg_path, encoding='utf-8') as fh:
+        before = fh.read()
+    assert 'Ready fixes' not in before
+    SVG.write_ready_fixes([], path=svg_path)
+    SVG.write_ready_fixes(['', '  '], path=svg_path)
+    with open(svg_path, encoding='utf-8') as fh:
+        assert fh.read() == before
+    missing = os.path.join(str(tmp_path), 'absent.svg')
+    SVG.write_ready_fixes(['M 0,0 L 1,0'], path=missing)
+    assert not os.path.isfile(missing)
