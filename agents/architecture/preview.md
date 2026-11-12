@@ -60,17 +60,18 @@ cuts, and that region is checkerboard too.
 
 ## Surround preview
 
-When the mode is Surround and Conquer and the figure check
-reports no defect, the window waits. It does not ask for a
-surround, and it paints none, until the person starts that
-step. The Start control starts it. The window then asks
+When the mode is Surround and Conquer and the preflight gate
+allows a start, the window waits. [`preflight.md`](./preflight.md)
+is that gate. It does not ask for a surround, and it paints
+none, until the person starts that step. The Start control
+starts it. The window then asks
 the library and paints each surround in the weed-line color, on
 top of the checkerboard. That start does not run a solver and
 does not write a result. It asks again when the surround
 distance changes, when the join gap changes, when the person
 swaps, or when the mode becomes Surround and Conquer after
-the step has been started. It paints no surround while a
-defect exists.
+the step has been started. It paints no surround while the
+preflight gate blocks that start.
 
 The form shows the surround distance and the join gap only in
 this mode. The labels are "Surround distance" and "Join gap".
@@ -109,7 +110,7 @@ The window does not keep these in a preferences file.
 ## Piece border
 
 The window paints the two piece-border rectangles when the
-figure check reports no defect. The library builds them.
+preflight gate allows a start. The library builds them.
 The window paints the paths it is given, in the weed-line
 color. It does not build the rectangles. It paints them
 without waiting for Start.
@@ -192,16 +193,34 @@ The line and the actions are in the layout. They are not a
 popover, a message box, or any other surface that covers the
 preview.
 
-The line reads: "Correct the marked problems in Inkscape before
-weed lines will run." It names each kind that is present, using
-the words dangling ends, figure overlaps, and self-overlaps.
-Each of those names is preceded by a swatch of that arrow's
-color. The words stay in the label color.
+The line names each kind that is present, using the words
+dangling ends, figure overlaps, and self-overlaps. Each of
+those names is preceded by a swatch of that arrow's color.
+The words stay in the label color. While the preflight gate
+blocks, the line reads: "Correct the marked problems in
+Inkscape before weed lines will run." When that gate allows
+a start and a self-overlap remains, the line still names the
+self-overlaps, and it does not say that weed lines will not
+run.
+
+The window shows a checkbox labeled **Accept
+self-overlaps**. It is not a plugin setting. Checked, the person accepts every reported self-overlap
+the preflight gate allows. [`preflight.md`](./preflight.md)
+is that gate. Unchecked, the window shows one
+self-overlapping figure at a time. The person accepts
+that figure as is, or asks the library to fix it. A
+retrace is not accepted from this checkbox. One figure
+may have several crossings. That is one decision, not
+one decision per crossing. The fix is the proposal in
+[`host.md`](./host.md). Accept as is does not change the
+path. The checkbox does not hide a dangling end or a
+separate-figure overlap, and it does not start past the
+preflight gate.
 
 The actions are labeled "Return to Inkscape" and "Return to
 Inkscape with correction arrows". The second action is present
-only when at least one defect exists. Start stays disabled for
-every mode while a defect exists.
+only when at least one defect exists. Start stays disabled
+while the preflight gate blocks.
 
 "Return to Inkscape" writes no result and closes the window.
 "Return to Inkscape with correction arrows" writes the

@@ -78,6 +78,23 @@ Inkscape uses when it unions and combines. A dangling
 end is closed by joining the two open ends of that
 figure.
 
+When the person fixes a self-overlap from the window, the
+library replaces that enclosed figure with one closed
+figure for each region the even-odd rule paints.
+[`paths.md`](./paths.md) is that rule. Each crossing is
+split at its parameters. Each new figure has its own
+anchor at that place. Those anchors share the place and
+are not one vertex a walk can turn through. A face the
+fill leaves empty is omitted. A counter that does not
+cross the outer outline stays a counter of the figure
+that contains it. An open subpath is not fixed this way,
+because the painted join is not a segment. Regions that
+were painted stay painted, and the fix paints no new
+region. This is not the stacked-node repair and not the
+weld. Make-ready does not propose this split. The window
+asks for it. The open document is still not edited until
+reimport.
+
 `1 Auto generate weedlines` still opens the detached
 window and returns at once. No path geometry aborts and
 tells the person to convert objects to paths. Apply writes

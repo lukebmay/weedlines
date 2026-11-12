@@ -58,40 +58,61 @@ A dangling end is a defect. The target is that endpoint.
 
 A separate-figure overlap is a defect. It is two figures whose
 interiors share area, where each interior also has a point the
-other does not. Each connected region of that shared area is one
-overlap. The arrow target is a point inside that region.
+other does not. It is also two figures, not nesting, that share
+a coincident piece of boundary of positive length, whether or
+not the interiors share area. A proper subsegment counts. A
+point does not. The painted join is not a piece of boundary.
+Each connected region of shared area is one overlap, and its
+arrow target is a point inside that region. Each connected
+coincident piece is one overlap, and its arrow target is a
+point of that piece.
 
 Nesting is not a separate-figure overlap. Nesting means every
 point of one interior lies inside the other and the outlines do
-not cross. A letter sitting inside a border is nesting. Nesting
-is how a border surrounds other figures. Swap chooses which of
+not cross. A coincident piece of boundary does not make
+nesting an overlap. A letter sitting inside a border is
+nesting. Nesting is how a border surrounds other figures. Swap chooses which of
 those interiors is the subject. The figure check does not ask
 the person to remove the border.
 
-Shared boundary with no shared area is not an overlap. A point
-touch is not an overlap.
+A point touch is not an overlap. A tangent contact that stays on one
+side is not a crossing. A tangent contact that changes sides
+is a crossing. A shared endpoint is a point touch.
 
 A self-overlap is a defect. It is one figure whose outline
-crosses itself. Each crossing point is a target. Two subpaths of
-the same element that cross are a self-overlap of that one
-figure. A closed hole whose outline does not cross the outer
-outline is not a self-overlap. That hole is the counter of the
-figure.
+crosses itself. It is also one figure that retraces a
+coincident piece of its own boundary of positive length.
+Each crossing point is a target. The target of a retrace is
+a point of that piece. Two subpaths of the same element that
+cross are a self-overlap of that one figure. Two subpaths of
+the same element that coincide for a positive length are a
+self-overlap of that one figure. A retrace is not a
+separate-figure overlap. A closed hole whose outline does not
+cross the outer outline is not a self-overlap. That hole is
+the counter of the figure.
 
 Overlap does not depend on which region is the subject. Swap
 does not add or remove these defects.
 
 ## Gate
 
-The window may start an algorithm only when the latest figure
-check reports no defect. The window has no control that starts
-anyway. This gate is in front of frame, grid, island-hop, and
-any later algorithm, including Surround and Conquer.
+The window may start an algorithm when the latest figure
+check reports no defect. It may also start when every
+remaining defect is a self-overlap that is a crossing and
+the person has accepted it. The person may accept a
+self-overlap that is a crossing. A retrace is a
+self-overlap the person may not accept. Accepting does not
+change the path, does not remove a dangling end, and does
+not make the crossing one peel. A self-overlap stays
+reported. The window has no control that starts past a
+dangling end, a separate-figure overlap, or a retrace.
+This gate is in front of frame, grid, island-hop, and any
+later algorithm, including Surround and Conquer.
 
 Make ready may propose a fix for a defect the check reports.
 [`host.md`](./host.md) is the approval and what each fix does.
 The check itself does not change the path.
 
 The check does not change how a solver cuts a keep path it is
-given. A design that fails the check never reaches the solver
+given. A design the gate blocks never reaches the solver
 from the window.
