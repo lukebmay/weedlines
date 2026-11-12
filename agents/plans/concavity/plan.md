@@ -20,11 +20,13 @@ cut uses them.
 - [`../../architecture/algorithms.md`](../../architecture/algorithms.md)
 - [`../../architecture/glossary.md`](../../architecture/glossary.md)
 - [`../../architecture/boundary.md`](../../architecture/boundary.md)
+- [`../../architecture/paths.md`](../../architecture/paths.md)
 
 ## Checks
 
-- A candidate is local to the outline. It does not
-  search over sets of caverns.
+- The candidate calculation follows the algorithms
+  part.
+  [`../../architecture/algorithms.md`](../../architecture/algorithms.md)
 - One cavern may produce more than one number.
 - A rectangle has no cavern to score. A hole loop is
   not a cavern. The open piece-border clip is not a
@@ -35,3 +37,23 @@ cut uses them.
 - This plan does not bridge a mouth, does not cut a
   cavern up, and does not start conquer or the
   surround coastline.
+- The size pictures, the smoothness pictures, the
+  segment atomics, and the corridor pictures stay in
+  [`notes.md`](notes.md). They are not measures.
+
+## Panel
+
+The next pass uses these roles. This is not a diary
+and not a transcript.
+
+- Vector-graphics expert. Path topology and the
+  overlap rules.
+- Graphic designer who peels vinyl. Whether the peel
+  is one a person can do.
+- Graph-theory mathematician. Algorithm structure and
+  efficiency.
+- Senior developer. File homes and speed.
+- Architect. Writes. Does not implement.
+
+Open [`notes.md`](notes.md). This attempt matters.
+The handoff is there.

@@ -27,12 +27,18 @@ clear of the subject, and start a second peel inside the
 cavern until the two meet. A cavern longer than it is wide
 makes that second peel likely to fall onto the subject and
 stick. A comb is many of those caverns. A shallow wave is a
-mild cavern and often peels in one motion.
+mild cavern and often peels in one motion. A bay is this
+same concavity. It is not a second coastline object.
 
 The same coastline at a small size can peel cleanly and at a
 large size can fall onto the subject. Vinyl has thickness.
 A short flap drops less readily than a long one. Absolute
 size is part of the difficulty, with the shape.
+
+A scale-free reading of the coast does not carry that
+size. Size is its own later threshold, beside the shape
+reading. The length it uses is not the length of a
+closing segment. This part does not name the threshold.
 
 The aim of every algorithm is that a cavern which would
 make the peel fail is sealed by a weed line, and a cavern
@@ -41,17 +47,28 @@ thickness, so the same zig-zag can need a seal on each
 tooth when the teeth are large and need none when the
 teeth are small.
 
+A convex corner is not a cavern. The weed side of the coast
+is the side that can hold one. A bend the other way is the
+piece, and a closing cut there takes the piece apart. One
+cubic is not one cavern. A coast a measure may score is a
+contiguous run of the same reflex sign on one subpath.
+Smoothness of a coast is not the editor node type.
+[`paths.md`](./paths.md) is that type. This part does not
+name that measure.
+
 A measure is a number the library can compute for one
 cavern. One cavern may need more than one number. Each
 measure this part names has a threshold the person sets.
-This part does not name the measures yet. No cutting
-algorithm seals a cavern, and the window offers no cavern
-threshold, until this part names the measure and the
-threshold. The library may compute candidate numbers. A
+This part does not name the cavern measures yet. A seal
+of one cavern waits on that name. The window offers no
+separate cavern threshold until then. The classification
+cuts are not that seal. The library may compute candidate
+numbers. A
 candidate is not a measure this part has named. The
-calculation is local to the outline. It does not search
-over sets of caverns. It stays fast enough to run while
-the person is looking.
+calculation is local to the outline. It may look at
+more than one cavern. It does not have to try every
+subset, and it does not have to be optimal. It stays
+fast enough to run while the person is looking.
 
 A threshold is not the surround distance, the join gap,
 or a piece-border length. Those already mean clearance,
@@ -61,10 +78,10 @@ another.
 ## Modes that cut today
 
 Frame, grid, and island-hop are the modes that cut. The window
-starts one of them only when the latest figure check reports no
-defect. The keep path for that run is the subject region. The
-solvers still call that region keep, and they still call the
-weed area waste.
+starts one of them when the preflight gate allows that start.
+[`preflight.md`](./preflight.md) is that gate. The keep path for
+that run is the subject region. The solvers still call that
+region keep, and they still call the weed area waste.
 
 A clear design runs the selected mode the way it does today.
 This part does not change cut geometry, clearance, or ranking.
@@ -105,7 +122,9 @@ piece size is not the design bounds when a figure lies
 outside the subject. [`preview.md`](./preview.md) names those
 bounds.
 
-The piece border is two rectangles around the piece size.
+The usual piece border is two rectangles around the piece
+size. When there is no outer rectangle, that one rectangle
+is the border rectangle.
 The inner rectangle starts one eighth of an inch outside
 the piece size. That gap is border padding. The outer
 rectangle starts one eighth of an inch outside the inner
@@ -134,22 +153,150 @@ The library emits the two rectangles together, either before
 the other weed lines or after them. It does not split the
 pair around those lines. Island-hop remains a mode.
 
+## Classification
+
+Classification uses the path atomics in
+[`paths.md`](./paths.md). Those atomics are a line, a
+cubic, an inflection as a parameter split, and an
+anchor turn. Classification does not insert an anchor
+into the path.
+
+The border rectangle is the inner rectangle of the
+piece border. When the piece border is one rectangle,
+that rectangle is the border rectangle. The padding
+rectangle is the piece size. It lies inside the border
+rectangle. The gap between them is the border padding
+already named. It is not a new length.
+
+A positive figure is a figure whose interior is
+subject. A negative figure is a figure whose interior
+is weed. Figure keeps the meaning in
+[`preflight.md`](./preflight.md). Padding is weed area
+for both. On a negative figure the library cuts the
+padding rectangle, so the piece is not left attached
+to the padding. On a positive figure the library does
+not cut the padding rectangle. That padding is already
+beside other weed. The combined weed is still broken
+into weedable chunks.
+
+Ring, loop, and radial corridor are the weed around
+one figure. They are one thing. A corridor that only
+joins two figures is not a ring. One opening turns
+the ring into a corridor. The library may cut that
+opening. The opening is not a second class.
+
+The width of waste at a place is the diameter of the
+largest circle that fits in the waste there. A sheet
+is waste where that circle is wider than the sheet
+threshold. The threshold is adjustable and starts at
+8 inches. It is that diameter. It is not a radius.
+That inch is the kind of length
+[`boundary.md`](./boundary.md) already describes. A
+long thin corridor is not a sheet. A square and a
+short rectangle are corridors of the same kind. They
+are sheets only when that circle is over the
+threshold. Area along a corridor does not make a
+sheet. A rotated thin corridor stays a corridor.
+
+The sheet reduction strokes every border of the sheet
+at a width equal to the sheet threshold and converts
+that stroke to a path. The stroke is centered on the
+border, so half the threshold lies inside the sheet.
+That half is the radius of the circle whose diameter
+is the threshold. The part of the stroke inside the
+sheet is the band beside the border. The sheet remote
+is the sheet with that band removed. Intersecting the
+band with the sheet again leaves the band. If no
+remote remains, the waste is not a sheet. The remote
+begins half the sheet threshold in from the border.
+A point lies in the remote only when it is farther
+than that half from every border.
+
+The library then surrounds the remote. That surround
+is an internal surround at the surround distance
+already named. The corridor to solve is the weed
+between the sheet border and that surround. Its inner
+coast is the surround. The next test is the interior
+of the surround, not the raw remote. The outer coast
+of that interior is the surround. The reduction
+repeats while that interior is a sheet. When the
+remote is several pieces, pieces whose gap is less
+than twice the surround distance share one surround,
+the cluster rule already named.
+
+The smoothness threshold is a person-set option on a
+coast. This part does not name its formula. It is not
+an editor node type and not a turn at one anchor.
+[`paths.md`](./paths.md) is that type. A coast may be
+a corridor coast inside that threshold. It need not
+be one arc. A small 90-degree zigzag can sit inside
+it.
+
+Two figures join by one cut when the coast of the
+composite stays within the smoothness threshold, and
+by a corridor of two cuts otherwise. The corridor is
+an extra weed area. Either join is enough. The join
+makes one composite. A composite is the figures or
+composites being joined, together with the join
+medium. The medium is that one cut or that two-cut
+corridor. The cut adds no area. The corridor adds its
+area. A composite is not a figure, not a path
+element, and not an editor union. Figure keeps the
+meaning in [`preflight.md`](./preflight.md). During
+the reduction the composite is the unit that can be
+joined again. The library links the closest open gap
+first and repeats. The gap is measured through open
+weed. A link does not cross a figure or an earlier
+link. On a tie, one link is enough. A link corridor
+may be wider than the sheet threshold. After that
+corridor exists, it is reduced as a sheet.
+
+The weed outside one smooth figure is a corridor when
+its coast meets the smoothness threshold. A
+right-angle corner on that ring may lie inside the
+threshold. This part does not name that limit. The
+library may smooth a rough corridor. A smoothness cut
+joins convex point to convex point, stays in the
+weed, and may be a curve or more than one segment.
+
+A spur is trimmed only when the fitting circle along
+it is wider than the sheet threshold. The trim cuts off
+the part past that circle. A piece that fits inside a
+circle of the sheet tolerance, including a trimmed tip,
+is left or joined to the neighboring weed. It counts as solved. Joining it may
+leave that weed slightly over the sheet threshold. The
+sheet tolerance is adjustable and starts at 1 inch. That
+inch is the kind of length
+[`boundary.md`](./boundary.md) already describes. It
+is not the sheet threshold.
+
+The piece border is the outermost surround, whether
+or not an outer rectangle gives the border thickness.
+An internal surround may recurse around a cluster
+inside that border. It does not wrap the border. This
+part does not name a new surround distance. It does
+not use an average gap. Conquer is the joins, the
+opening of a ring, the sheet reduction, and the
+smoothing. An internal surround is not required
+first.
+
+A funnel is weed open at both ends. Waste that closes
+to width zero is a bucket. A cave is that bucket. A
+bucket is not a funnel.
+
 ## Surround and Conquer
 
 Surround and Conquer is the mode the window opens on. It uses
 the same figure check, the same subject and weed area, and the
 same preview colors as the other modes. It does not own those.
-Conquer is the next step. It closes each cavern that is
-over a named threshold with a weed line, and it cuts
-every closed loop of weed material so that waste peels
-in one pull. It does not run, and the library emits no
-conquer cuts, until this part names the cavern measures
-and their thresholds. The window leaves Conquer's Start
-disabled until then. Conquer does not change the
-surround step.
+It is one run. The classification above is the mapping.
+A cut is not written back as the next segment of the
+outline. When a seal exists, the outer peel follows the
+seal, and the weed inside it is a different coast.
 
-The first step is the surround. The library builds it from the
-subject. The window does not.
+The library builds the internal surround from the
+subject. The window does not. That internal surround
+uses the surround distance below.
 
 The surround distance is a length in document user units. The
 window starts it at five percent of the smaller side of the
@@ -164,17 +311,16 @@ The border width does not.
 
 The library keeps the surround at least the surround distance
 from the subject, except at an end the piece-border clip
-leaves on the inner border. Once this part names a
-cavern measure and its threshold, a cavern within every
-named threshold is traced at that distance. A straight
-edge of a traced cavern is a straight line at that
-distance. A cavern over a named threshold is not traced.
-The surround crosses that cavern's mouth. It may sit
-farther from the subject than the surround distance
-there, and it does not come closer. Until a measure and
-its threshold are named, the surround does not apply
-this test and does not bridge a cavern from a candidate
-number.
+leaves on the inner border. Once this part names the
+smoothness formula, a cavern within that threshold is
+traced at that distance. A straight edge of a traced
+cavern is a straight line at that distance. A cavern
+over that threshold is not traced. The surround crosses
+that cavern's mouth. It may sit farther from the
+subject than the surround distance there, and it does
+not come closer. This part does not name that formula,
+so the internal surround does not apply this test and
+does not bridge a cavern from a candidate number.
 
 That bridge has no sharp corner. The weed area inside the
 bridged cavern is not part of the outer peel. This step
@@ -202,15 +348,14 @@ do not meet, but whose separation is at most the join gap, are
 unioned and smoothed as if they overlapped. Close cut lines
 waste a pass and can lift the vinyl or mark the backing.
 
-There is no smoothing control. The surround distance is the
-clearance. The join gap joins surrounds. The two
-piece-border lengths and the corner radius are the
-border. A cavern threshold is separate from all of
-those. None of them stands in for another. The join
-gap does not decide which cavern is traced.
+The surround distance is the clearance. The join gap
+joins surrounds. The two piece-border lengths and the
+corner radius are the border. A cavern threshold is
+separate from all of those. None of them stands in for
+another. The join gap does not decide which cavern is
+traced.
 
-The step does not run again inside a cluster. It does not draw
-weed lines from the surround to the subject edges.
+The internal surround does not run again inside a cluster.
 
 The library clips a surround that meets the inner border
 to the inside of that border and leaves the surround

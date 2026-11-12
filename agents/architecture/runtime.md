@@ -46,12 +46,9 @@ returns nothing.
 
 A mode this guide gives no steps the person starts is one
 step. Frame, grid, and island-hop are each one step.
-Surround and Conquer has two steps: the surround, then
-conquer. [`algorithms.md`](./algorithms.md) is what
-conquer cuts. Conquer's Start stays disabled, and the
-library emits no conquer cuts, until that part names
-the cavern measures and their thresholds. The window
-shows conquer as the step that is left. The window shows one
+Surround and Conquer is one run. An internal surround
+is not its own step. [`algorithms.md`](./algorithms.md) is
+what the run cuts. The window shows one
 status for the run: ready, working, paused, or done. A
 spinner shows only while the run is working and is not
 paused. A phase name from the library can appear in that
@@ -65,10 +62,10 @@ that step and every later step, then runs the earlier step
 again. The window shows those steps, which one is current,
 and which are left.
 
-The window times each step the person has started. Conquer
-has no time while its Start stays disabled. While the step
-is working, the time advances and is shown with that step's
-status. A phase name may appear in the status and is not
+The window times each step the person has started.
+Surround and Conquer is timed like the other runs. While
+the step is working, the time advances and is shown with
+that step's status. A phase name may appear in the status and is not
 its own time. While the step is paused, the time holds, so
 a pause is not counted as the algorithm running. When the
 step finishes, the window keeps showing that working time

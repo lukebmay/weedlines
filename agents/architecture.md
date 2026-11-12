@@ -68,10 +68,9 @@ classifies the design and emits weed lines. One layer does not do
 another layer's job.
 
 Every algorithm waits on the same figure check. Surround and
-Conquer is the mode the window opens on. Its first step is the
-surround. Conquer is the next step.
+Conquer is the mode the window opens on. It is one run.
 [`architecture/algorithms.md`](./architecture/algorithms.md)
-says when it runs.
+is the mapping.
 The check, the preview,
 and the way correction arrows go back to Inkscape are specified,
 and they apply to every algorithm.
@@ -89,12 +88,14 @@ A run moves in this order.
    check, the subject, and the weed area.
 3. The window paints the preview. When the check finds a defect,
    the window offers the two return actions under the preview.
-4. When the check is clear, the person can run frame, grid, or
-   island-hop, or start the surround. The library emits the
+4. The person can run frame, grid, or island-hop, or start
+   the surround, when the preflight gate allows that start.
+   [`architecture/preflight.md`](./architecture/preflight.md)
+   is that gate. The library emits the
    weed lines for the mode that cuts. It emits the surround
    only after the person starts that step. The window paints
-   them in the weed-line color. Conquer does not run until
-   the algorithms part names the cavern measures and thresholds.
+   them in the weed-line color. What that run cuts is
+   [`architecture/algorithms.md`](./architecture/algorithms.md).
 5. Import reads the result file. A weed-line result brings in
    the border and the weed lines, and the original design only
    when the person included it. A correction-arrow result
@@ -105,7 +106,7 @@ A run moves in this order.
 | Host | The selection, the job, the result files, and import into the document | Figure classification, weed-line geometry |
 | Window | The preview, the plugin settings, swap, and the start and return actions | Path topology, solver cuts |
 | Library | Figures, subject and weed area, the figure check, arrow paths, and the algorithms | The Inkscape document, widgets |
-| Surround and Conquer | The surround | The figure check, conquer, and the other modes |
+| Surround and Conquer | The surround and conquer | The figure check and the other modes |
 
 ## Which file
 
@@ -122,3 +123,4 @@ inner workings there too. This index only points.
 | Pause, cancel, logging, how long a step took, the cache | [`architecture/runtime.md`](./architecture/runtime.md) |
 | Install and update | [`architecture/install.md`](./architecture/install.md) |
 | SVG conversion, the Qt binding, or units | [`architecture/boundary.md`](./architecture/boundary.md) |
+| Anchors, segments, handles, or how fill decides an interior | [`architecture/paths.md`](./architecture/paths.md) |

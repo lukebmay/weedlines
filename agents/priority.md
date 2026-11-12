@@ -28,12 +28,13 @@ A waiting plan stays under its rank. The notes say why. Skip it.
 | [border-ask](plans/border-ask/plan.md) | The ask stage is met. No open task. Skip it. |
 | [step-timer](plans/step-timer/plan.md) | The clock and the page are in. No open task. Skip it. |
 | [ready-fixes](plans/ready-fixes/plan.md) | The weld is in. No open task. propose-span, propose-corner, and the window wait on a split the guide does not name. Do not invent that number. |
-| [concavity](plans/concavity/plan.md) | The explore stage is met. No open task. Skip it. A probe is not a named measure. Do not crown one number. |
-| [surround-cavern](plans/surround-cavern/plan.md) | Waiting until the algorithms part names a measure and a threshold. A probe is not that name. |
+| [concavity](plans/concavity/plan.md) | The decided mapping is in [`architecture/algorithms.md`](architecture/algorithms.md). Probes are not the smoothness formula. No open task. |
+| [accept-self-overlap](plans/accept-self-overlap/plan.md) | The control is named in the guide. No open task. The window is not built until the human asks. Skip it. |
+| [surround-cavern](plans/surround-cavern/plan.md) | The coastline still waits on the smoothness formula, which is not named. A probe is not that formula. |
 | [preview-color-picker](plans/preview-color-picker/plan.md) | The picker is in. No open task. Skip it. |
 | [start-disabled-reason](plans/start-disabled-reason/plan.md) | The tooltip is in. No open task. Skip it. |
 | [control-names](plans/control-names/plan.md) | The pages name the run controls. No open task. Skip it. |
-| [surround-and-conquer](plans/surround-and-conquer/plan.md) | The surround step except the cavern coastline. Conquer is specified and waits on a named measure and threshold. Do not emit conquer cuts. |
+| [surround-and-conquer](plans/surround-and-conquer/plan.md) | The surround outline remains. The sheet reduction is in [`architecture/algorithms.md`](architecture/algorithms.md). Do not invent the smoothness formula or an internal-surround distance. Neither is a new number. |
 | [_bugs](plans/_bugs/plan.md) | No open task. The directory stays open. |
 | [responsive-run](plans/responsive-run/plan.md) | The responsive stage is met. No open task. Skip it. |
 | [segment-publish](plans/segment-publish/plan.md) | The publish stage is met. No open task. Skip it. |
