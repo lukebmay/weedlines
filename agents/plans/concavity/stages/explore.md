@@ -13,4 +13,5 @@ does not define a mouth. No number is named.
 Naming a measure and a threshold in the algorithms
 part, and wiring either into the surround coastline
 or into conquer. `name-measure` stays parked. Do
-not file another probe to invent a mouth.
+not file another probe to invent a mouth. The
+handoff in the notes is the next questions.
