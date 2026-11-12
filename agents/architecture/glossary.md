@@ -39,7 +39,7 @@ in [`../glossary.md`](../glossary.md).
 | **sheet** | Waste wider than the sheet threshold. [`algorithms.md`](./algorithms.md) |
 | **sheet threshold** | The diameter that marks a sheet. [`algorithms.md`](./algorithms.md) |
 | **sheet tolerance** | The circle a leftover piece must fit inside. [`algorithms.md`](./algorithms.md) |
-| **sheet remote** | The sheet with the border band removed. [`algorithms.md`](./algorithms.md) |
+| **sheet remote** | The abstract interior that sizes the sheet surround. Not a cut. [`algorithms.md`](./algorithms.md) |
 | **funnel** | Weed open at both ends. [`algorithms.md`](./algorithms.md) |
 | **bucket** | Waste that closes to width zero. A cave is that bucket. [`algorithms.md`](./algorithms.md) |
 | **ring** | The weed around one figure. [`algorithms.md`](./algorithms.md) |

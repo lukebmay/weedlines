@@ -212,17 +212,19 @@ begins half the sheet threshold in from the border.
 A point lies in the remote only when it is farther
 than that half from every border.
 
-The library then surrounds the remote. That surround
-is an internal surround at the surround distance
-already named. The corridor to solve is the weed
-between the sheet border and that surround. Its inner
-coast is the surround. The next test is the interior
-of the surround, not the raw remote. The outer coast
-of that interior is the surround. The reduction
-repeats while that interior is a sheet. When the
-remote is several pieces, pieces whose gap is less
-than twice the surround distance share one surround,
-the cluster rule already named.
+The sheet remote is not a cut and not a figure. It
+only sizes the surround cut. The library cuts one
+smooth closed outline that encloses the whole
+remote. An oval, an ellipse, a polygon, a rounded
+polygon, or an hourglass is enough when that
+outline is smooth. The outline does not keep a
+clearance from the remote. The surround distance
+does not apply to it. The corridor to solve is the
+weed between the sheet border and that outline. Its
+inner coast is the outline. The next test is the
+interior of the outline. The outer coast of that
+interior is the outline. The reduction repeats while
+that interior is a sheet.
 
 The smoothness threshold is a person-set option on a
 coast. This part does not name its formula. It is not
