@@ -1,8 +1,8 @@
 schema = 1
 tool_version = "0.7.1"
-catalog_version = "0.9.3"
+catalog_version = "0.9.5"
 installed_at = "2026-10-27T21:08:00+00:00"
-updated_at = "2026-11-09T18:38:51+00:00"
+updated_at = "2026-11-13T15:14:43+00:00"
 
 [[files]]
 id = "ansi-colors"
@@ -71,8 +71,8 @@ read_when = "Writing or editing markdown docs, plans, tasks, or README prose."
 [[files]]
 id = "scripting"
 path = "scripting.md"
-version = "2.4.3"
-sha256 = "c91606c64a118e7c48bded16ac0c78211f6e73b42289c7b32d49d41f8f8b754b"
+version = "2.5.0"
+sha256 = "7582cedf6e9a656d3cda742005457cbc49424b3c45d52ce59c36ae80b86fb746"
 title = "Scripting"
 read_when = "Writing or changing shell/Python scripts, installers, CLI tools, bin entries, or launching user-visible apps from a Grok agent."
 

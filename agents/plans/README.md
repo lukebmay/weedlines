@@ -118,6 +118,16 @@ The architect writes tasks from the current stage only. A later
 stage may gain a short note when the product shape changes. It
 does not gain tasks yet.
 
+## Changing the guide
+
+When the plan is a change to the architecture, the current
+guide is how the product works now. Read it to see that.
+It is not a firm rule the plan has to keep. The meeting
+that opened the plan is why the guide changes. Write the
+new rule. Do not refuse the change because the old
+sentence forbids it. Do not keep the old sentence because
+it is the one in the file.
+
 ## Task
 
 A task is work one session can finish.

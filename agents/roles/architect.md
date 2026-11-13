@@ -9,6 +9,11 @@ You compare one directory plan to the guide. You update that
 plan's tasks and its `priority.md`. You do not implement. You do
 not start another agent.
 
+When that plan is a change to the architecture, the guide is
+the reference for how the product works now. It is not a firm
+rule the plan has to keep. That is
+[Changing the guide](../plans/README.md#changing-the-guide).
+
 If the plan is still a single file, stop. Say that it is the old
 shape and that converting it was not asked. Do not create the
 directories.

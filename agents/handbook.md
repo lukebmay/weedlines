@@ -45,12 +45,14 @@ agent opens the parts the task needs. That rule is
 ## Source files
 
 A source file owns one responsibility. 500 lines is the
-usual ceiling. Past 1000 lines the file is too big. Split
-it before adding more.
+usual ceiling. When a file past 1000 lines is noticed,
+a separate plan is created to break that file apart on
+a named responsibility. The task already in progress continues.
+The split is not started inside it.
 
 A file under 500 lines stays whole. Do not split it to
 hit a count. From 500 to 1000, split only when the new
-code is a separate responsibility. Over 1000, split first.
+code is a separate responsibility.
 
 Write code an average developer can read and change. Prefer the
 direct structure. Keep the common path cheap to run. A highly
