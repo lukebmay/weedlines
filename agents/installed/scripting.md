@@ -85,6 +85,28 @@ state, cache, or runtime. State is `/var/lib/<app>`, cache is
 Root still does not own files under `$HOME`. The full rule is
 User dests and root, above.
 
+## Copy install (FIRM)
+
+The running install is a copy in the XDG homes. It is not a
+link into the git worktree. Editing the worktree does not
+change the running copy until the next install.
+
+An install with no flag copies the latest default branch.
+
+`--dev` is the developer install. It copies the project
+directory recorded at the first install, and it installs the
+tools the project needs in order to be worked on. Those two
+go together. For now they are one flag. A project that needs
+an extra tool names that tool in its own guide, not in this
+file.
+
+The recorded project path is installer state, not a settings
+key.
+
+A project with at least one user config file uses the
+`<APP>_CONFIG_DIR` variable already in this file. Unset means
+the XDG default. `XDG_CONFIG_HOME` wins over `~/.config`.
+
 ## Elevate only the privileged step (FIRM)
 
 The user runs the command in their normal shell. They do not prefix it with `sudo`, and they do not keep a separate root shell for it.

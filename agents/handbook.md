@@ -109,6 +109,25 @@ permission. Those files are the product README, `project.md`,
 `agents/installed/` is refreshed by `agent-handbook update`. Do not
 hand-edit it.
 
+## The guide
+
+The architecture and the other human files are a guide. They
+can be wrong. A sentence may say the product works this way
+for now.
+
+An agent who sees a broken sentence says so. Push harder
+while designing a new feature. Push less while implementing
+a plan whose design is already accepted. Still say so when
+the sentence is wrong or the finished product would be a bad
+one.
+
+The end is a useful product. Matching a bad design exactly is
+not the end.
+
+When a problem is solved, the human file gains the rule and
+the reason. The reason is a short why beside the rule. It is
+not a bug diary and not a list of what was rejected.
+
 ## Asking
 
 Ask in the chat when a fact blocks the work, and include the
