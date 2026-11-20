@@ -28,8 +28,8 @@ to.
 1. When `plan.md` holds a diary of attempts, say that those
    belong in `notes.md`. Do not move them unless the brief says
    to.
-1. Tell the human which tasks or plans look ready to archive.
-   Do not move them.
+1. Report a done plan that is still on the queue. Do not
+   move it unless the brief says to.
 
-Return the mismatches, the list edits, and the archive
-suggestions.
+Return the mismatches, the list edits, and any done
+plan still on the queue.

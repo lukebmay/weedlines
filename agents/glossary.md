@@ -68,7 +68,7 @@ the law for the target words.
 
 | Word | Meaning |
 | --- | --- |
-| **architecture** | `agents/architecture.md` is the index and how the parts fit. Each part lives under `agents/architecture/` when that directory exists. Until then, `architecture.md` is the whole guide. The guide of what has worked and what has failed. Not a snapshot, not a history, and not a ban on a better design. Human-owned. When it looks wrong, stop and meet. |
+| **architecture** | `agents/architecture.md` is the index and how the parts fit. Each part lives under `agents/architecture/` when that directory exists. Until then, `architecture.md` is the whole guide. The guide of what has worked and what has failed. Not a snapshot, not a history, and not a bug diary. It is not a ban on a better design. Agents write the sentence when a filed plan decides it, and take the plan link off when that plan is done. |
 | **acceptance** | `agents/acceptance.md`: when work is complete. Human-owned. |
 | **conflicts** | `agents/conflicts.md`: leftover names and contradictions. Agent-owned. Not a second architecture. |
 | **project** | `agents/project.md`: what the product is. Human-owned. |

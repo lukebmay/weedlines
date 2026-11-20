@@ -104,14 +104,15 @@ extension and override rows in [`glossary.md`](glossary.md).
 
 Human-owned files change only when the current message gives
 permission. Those files are the product README, `project.md`,
-`architecture.md`, the files under `architecture/`, and
-`acceptance.md`.
+and `acceptance.md`.
+`architecture.md` and the files under `architecture/` follow
+[The guide](#the-guide).
 `agents/installed/` is refreshed by `agent-handbook update`. Do not
 hand-edit it.
 
 ## The guide
 
-The architecture and the other human files are a guide. They
+The architecture and the human-owned files are a guide. They
 can be wrong. A sentence may say the product works this way
 for now.
 
@@ -124,9 +125,14 @@ one.
 The end is a useful product. Matching a bad design exactly is
 not the end.
 
-When a problem is solved, the human file gains the rule and
-the reason. The reason is a short why beside the rule. It is
-not a bug diary and not a list of what was rejected.
+Filing a plan writes the rule, the reason, and the plan link.
+Finishing the plan takes the link off. The reason is a short
+why beside the rule. It is not a bug diary and not a list of
+what was rejected. A decision with no plan says so. Do not
+write a tape, a session note, or a wish.
+
+A part file that still says the human owns it follows this
+section.
 
 ## Asking
 

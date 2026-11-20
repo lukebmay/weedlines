@@ -85,27 +85,93 @@ state, cache, or runtime. State is `/var/lib/<app>`, cache is
 Root still does not own files under `$HOME`. The full rule is
 User dests and root, above.
 
-## Copy install (FIRM)
+## XDG install (FIRM)
 
-The running install is a copy in the XDG homes. It is not a
-link into the git worktree. Editing the worktree does not
-change the running copy until the next install.
+This is how a user-facing application is installed into the
+XDG homes. It is not how every repository is installed.
 
-An install with no flag copies the latest default branch.
+A repository whose files are one person's machine stays a
+checkout. Shell startup, private aliases, and a private
+config tree are that kind of repository. An extension
+installs by the host's own mechanism. A later split may
+publish a shared program and keep a private user directory.
+That split is a different plan. This section does not do it.
 
-`--dev` is the developer install. It copies the project
-directory recorded at the first install, and it installs the
-tools the project needs in order to be worked on. Those two
-go together. For now they are one flag. A project that needs
-an extra tool names that tool in its own guide, not in this
-file.
+The release install is the default. `./install` with no
+flag, `curl -fsSL <public-url>/install | sh`, and
+`<app> update` all do this. `<app> update <ref>` does this
+from `<ref>`. `<ref>` is a commit or a branch. It prints
+a warning that `<ref>` is not the release.
 
-The recorded project path is installer state, not a settings
-key.
+The release ref is the one the project's guide names. When
+the guide names none, use a branch named `release` when
+that ref exists on the public remote. Otherwise use
+`master` when it exists, otherwise `main`. When none of
+those exist, fail and name the refs that were tried.
 
-A project with at least one user config file uses the
-`<APP>_CONFIG_DIR` variable already in this file. Unset means
-the XDG default. `XDG_CONFIG_HOME` wins over `~/.config`.
+The public URL is `https`, recorded when the command is
+installed. Download that ref into `$XDG_CACHE_HOME/<app>/src`,
+or `~/.cache/<app>/src` when `XDG_CACHE_HOME` is unset.
+Copy the snapshot into `$XDG_DATA_HOME/<app>`, or
+`~/.local/share/<app>`. The copy contains no `.git`.
+`~/.local/bin/<app>` points at the copy's executable. The
+cache directory is only the download. No installed command
+runs from it. Deleting the cache, or deleting any checkout,
+leaves the installed command working.
+
+A release install does not record a developer checkout. It
+does not fetch, pull, or write one. `./install` from inside
+a checkout ignores that checkout and prints that local edits
+were not installed. The download does not require git. Git
+is required only for a dev install. The script refuses to
+run as root and writes only the user prefix. `--dev` fails
+when the script is piped, because a pipe has no checkout.
+
+`<app> update` with no ref installs the release ref again.
+`<app> update <ref>` installs that commit or branch, prints
+the warning, and does not record `<ref>`. The next
+`<app> update` with no ref returns to the release ref.
+Either result is a release install.
+
+`./install --dev` makes `<app> install` a command.
+`<app> install --dev` keeps that command. `<app> install`
+with no flag is a release install, and so is `./install`
+with no flag. After either, the installed command does
+not accept `<app> install` until a later `./install --dev`.
+
+A dev install is `./install --dev` from a git checkout, and
+later `<app> install --dev`. `./install --dev` records that
+checkout. The path is installer state, under
+`$<APP>_STATE_DIR/hosts/<hostname>/`. Copy that directory
+as it sits, including uncommitted files, into the data home.
+Do not fetch. Then install the tools the project names in
+its guide. An empty tool list still leaves a dev install.
+Editing the checkout does not change the running command
+until the next dev install. The last checkout recorded
+wins.
+
+A missing recorded path fails and names the path.
+Do not search the disk. Do not fall back to a release.
+`--dev` from a directory that is not a checkout fails.
+
+The installed command records the config, data, and state
+roots from the install. A process that did not set the
+variable uses those recorded roots. A variable already set
+in the environment wins. The record is installer state.
+It is not a settings key the person edits. A shell rc is
+not required for the command to find those roots.
+
+Uninstall removes `~/.local/bin/<app>` and the data-home
+copy. It leaves the developer checkout, the config home,
+and the state home.
+
+Runtime commands do not call git. The version is a file in
+the snapshot. The running install is a copy in the XDG
+homes. It is not a link into a git worktree.
+
+Each project names its public install URL and, when it
+wants one, its release ref. Those facts live in that
+project's guide, not in this file.
 
 ## Elevate only the privileged step (FIRM)
 

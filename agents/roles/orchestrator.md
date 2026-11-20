@@ -41,13 +41,24 @@ it back. Do not read the `cr-` files. The reviewer has already
 written the summary on `task.md`.
 
 Accept the unit of work only when the reviewer reports no
-defect and the named checks passed. Then set the task to
-`done`, move it to `tasks/inactive/`, remove it from the
-plan's `priority.md`, and commit that slice on `master` as
-[`../git.md`](../git.md) describes. Sending it back does
-not commit.
+defect and the named checks passed. A pass in a disposable
+environment does not close a miss the person still sees.
+When the named checks passed and an open issues row is
+still what the human sees on the machine they are using,
+the task stays open. The note says the disposable pass
+succeeded and the row is still open. Otherwise set the
+task to `done`, move it to `tasks/inactive/`, remove it
+from the plan's `priority.md`, and commit that slice on
+`master` as [`../git.md`](../git.md) describes. Sending it
+back does not commit.
+When the task is done, the plan link comes off the guide
+sentence. The sentence stays. When the plan has no active
+task left, follow Archive in
+[`../plans/README.md`](../plans/README.md). A perpetual
+plan stays on the queue.
 
-When a directory plan's task list is empty, delegate an architect.
+When a directory plan that is not done has an empty task
+list, delegate an architect.
 When the list and the directories disagree, delegate a maid
 first. Do not do that survey yourself.
 

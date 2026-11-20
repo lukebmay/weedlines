@@ -94,10 +94,12 @@ or `_inbox`.
 
 ## Archive
 
-A plan that would confuse a later agent moves to
-`plans/.archived/<name>/`. A normal listing hides that directory.
-Do not open it unless the user says to. A perpetual plan does not
-move there. The maid suggests the move. She does not make it.
+When a plan is done, the orchestrator removes it from the
+project queue and moves the directory to
+`plans/.archived/<name>/` in that same turn. A done plan
+that is still listed is the same move. A perpetual plan,
+a name that starts with `_`, stays. A normal listing
+hides that directory. Do not open it to choose work.
 
 ## Templates
 
@@ -127,6 +129,29 @@ that opened the plan is why the guide changes. Write the
 new rule. Do not refuse the change because the old
 sentence forbids it. Do not keep the old sentence because
 it is the one in the file.
+
+## The product
+
+A plan completes the product named in the guide. A later
+plan does not narrow a goal so that aim is dropped. A
+check that passes while the person-visible result fails
+is not done.
+
+## Logs
+
+A plan that cites a log names the tape id. The lines the
+task needs are copied into the plan or the task. A later
+deletion of the log does not remove that copy. The copy
+is the evidence. It is not the whole tape.
+
+## A disposable pass
+
+A pass in a disposable environment does not close a miss
+the person still sees. When the named checks passed and
+an open issues row is still what the human sees on the
+machine they are using, the task stays open. The note
+says the disposable pass succeeded and the row is still
+open.
 
 ## Task
 
@@ -182,7 +207,8 @@ result. The orchestrator does not read the `cr-` files. The
 developer does not write them.
 
 When the reviewer reports no defect and the named checks passed,
-the orchestrator sets `done`, moves the directory to
+except the case in [A disposable pass](#a-disposable-pass), the
+orchestrator sets `done`, moves the directory to
 `tasks/inactive/`, and removes it from the plan's `priority.md`.
 
 The orchestrator lists `tasks/active/` only. Two tasks run at
@@ -191,8 +217,9 @@ name the same file are serial.
 
 ## Empty or contradictory queue
 
-When a directory plan has no task left in its `priority.md`, the
-orchestrator delegates an architect. The architect is a delegate.
+When a directory plan that is not done has no task left in its
+`priority.md`, the orchestrator delegates an architect. The
+architect is a delegate.
 The orchestrator does not do that survey in this conversation,
 and does not start a second orchestrator.
 
