@@ -52,35 +52,79 @@ When an installer runs as root or via `sudo`:
 
 ## XDG directory variables (FIRM)
 
-A user install uses one variable per home the program stores.
-A missing variable means the default. A set variable wins.
+An installable app that follows XDG knows the spec
+defaults. An unset XDG variable means that default.
+A set XDG variable wins over the default.
 
-- `<APP>_CONFIG_DIR` defaults to `$XDG_CONFIG_HOME/<app>`, or
-  `~/.config/<app>` when `XDG_CONFIG_HOME` is unset.
-- `<APP>_DATA_DIR` defaults to `$XDG_DATA_HOME/<app>`, or
-  `~/.local/share/<app>` when `XDG_DATA_HOME` is unset.
-- `<APP>_STATE_DIR` defaults to `$XDG_STATE_HOME/<app>`, or
-  `~/.local/state/<app>` when `XDG_STATE_HOME` is unset.
-  Logs on a user install stay in the state directory.
-  There is no separate log variable. XDG has no log home.
-- `<APP>_CACHE_DIR` defaults to `$XDG_CACHE_HOME/<app>`, or
-  `~/.cache/<app>` when `XDG_CACHE_HOME` is unset.
-- `<APP>_RUNTIME_DIR` defaults to `$XDG_RUNTIME_DIR/<app>`.
-  No home fallback. If both `<APP>_RUNTIME_DIR` and
-  `XDG_RUNTIME_DIR` are unset, fail. Do not use `/tmp`.
+The app has its own variable for each of those homes.
+Code uses the app variable. The XDG variables are read
+only by the resolver that fills an unset app variable.
 
-Records that differ per machine go in `$<APP>_*_DIR/hosts/<hostname>/`.
-`<hostname>` is the kernel hostname. Records reused on every host
-go directly in `$<APP>_*_DIR`. Pick one. Do not read both.
-Runtime has no `hosts/` directory, because `XDG_RUNTIME_DIR` is
-already local to the machine.
+- `<APP>_CONFIG_HOME`
+- `<APP>_DATA_HOME`
+- `<APP>_STATE_HOME`
+- `<APP>_CACHE_HOME`
+- `<APP>_RUNTIME_DIR`
+
+`<APP>` is the uppercase form. `<app>` is the directory
+name. Runtime stays `_DIR` because the XDG variable is
+`XDG_RUNTIME_DIR`.
+
+The resolver is the only read of an XDG variable.
+
+- If the app variable is set, use that value as the
+  home. Do not append `/<app>`. Do not replace it.
+- If it is unset and the XDG variable is set, use
+  `$XDG_.../<app>`.
+- If both are unset, use the spec default plus `/<app>`:
+  config `$HOME/.config/<app>`, data
+  `$HOME/.local/share/<app>`, state
+  `$HOME/.local/state/<app>`, cache `$HOME/.cache/<app>`.
+- Runtime has no default. If both `<APP>_RUNTIME_DIR`
+  and `XDG_RUNTIME_DIR` are unset, fail. Do not use
+  `/tmp`.
+
+Live homes are resolved at the start of every process.
+Pinned homes are resolved only at install.
+
+Config, cache, and runtime are live. A later change of
+`<APP>_CONFIG_HOME` is honored. A config file path is
+always `$<APP>_CONFIG_HOME/<file>`, for example
+`FOO_CONFIG="$<APP>_CONFIG_HOME/foo.json"`.
+
+- Neither app variable nor `XDG_CONFIG_HOME` set:
+  `~/.config/my-app/foo.json`.
+- `XDG_CONFIG_HOME=$HOME/my-configs` and the app
+  variable unset: `~/my-configs/my-app/foo.json`.
+- `MY_APP_CONFIG_HOME=$HOME/a/b/c/my-app`:
+  `~/a/b/c/my-app/foo.json`. That wins over both of
+  the others.
+
+Data and state are pinned. Install resolves them once
+and records the absolute paths. If the app variable is
+already set at install, record that value and do not
+overwrite the variable. After install the running
+command uses the record. A later set or unset of
+`<APP>_DATA_HOME`, `<APP>_STATE_HOME`, or the XDG data
+and state variables does not move those homes. Moving
+them is a reinstall. Do not write a shell rc entry for
+these variables.
+
+Records that differ per machine go in
+`$<APP>_*_HOME/hosts/<hostname>/` for the homes that
+have them. `<hostname>` is the kernel hostname. Records
+reused on every host go directly in `$<APP>_*_HOME`.
+Pick one. Do not read both. Runtime has no `hosts/`
+directory, because `XDG_RUNTIME_DIR` is already local
+to the machine. Logs stay in the state home. There is
+no separate log variable. XDG has no log home.
 
 A system install does not write `$HOME`. Config uses
 `XDG_CONFIG_DIRS` (default `/etc/xdg`). Data uses `XDG_DATA_DIRS`
 (default `/usr/local/share:/usr/share`). XDG does not name system
 state, cache, or runtime. State is `/var/lib/<app>`, cache is
 `/var/cache/<app>`, logs are `/var/log/<app>`, and runtime is
-`/run/<app>`. The same variables override those paths.
+`/run/<app>`. The app variables override those paths.
 
 Root still does not own files under `$HOME`. The full rule is
 User dests and root, above.
@@ -110,14 +154,15 @@ that ref exists on the public remote. Otherwise use
 those exist, fail and name the refs that were tried.
 
 The public URL is `https`, recorded when the command is
-installed. Download that ref into `$XDG_CACHE_HOME/<app>/src`,
-or `~/.cache/<app>/src` when `XDG_CACHE_HOME` is unset.
-Copy the snapshot into `$XDG_DATA_HOME/<app>`, or
-`~/.local/share/<app>`. The copy contains no `.git`.
-`~/.local/bin/<app>` points at the copy's executable. The
-cache directory is only the download. No installed command
-runs from it. Deleting the cache, or deleting any checkout,
-leaves the installed command working.
+installed. The download uses `$<APP>_CACHE_HOME/src` after
+the live resolver runs for that process. The snapshot is
+copied into the data home resolved at install. The copy
+contains no `.git`. The command is found at
+`~/.local/bin/<app>`, which points at the executable in
+the data copy. The cache home is only the download. No
+installed command runs from it. Deleting the cache, or
+deleting any checkout, leaves the installed command
+working.
 
 A release install does not record a developer checkout. It
 does not fetch, pull, or write one. `./install` from inside
@@ -141,9 +186,10 @@ not accept `<app> install` until a later `./install --dev`.
 
 A dev install is `./install --dev` from a git checkout, and
 later `<app> install --dev`. `./install --dev` records that
-checkout. The path is installer state, under
-`$<APP>_STATE_DIR/hosts/<hostname>/`. Copy that directory
-as it sits, including uncommitted files, into the data home.
+checkout. The dev checkout path stays under
+`$<APP>_STATE_HOME/hosts/<hostname>/`, using the state
+home from the record. Copy that directory as it sits,
+including uncommitted files, into the data home.
 Do not fetch. Then install the tools the project names in
 its guide. An empty tool list still leaves a dev install.
 Editing the checkout does not change the running command
@@ -154,12 +200,11 @@ A missing recorded path fails and names the path.
 Do not search the disk. Do not fall back to a release.
 `--dev` from a directory that is not a checkout fails.
 
-The installed command records the config, data, and state
-roots from the install. A process that did not set the
-variable uses those recorded roots. A variable already set
-in the environment wins. The record is installer state.
-It is not a settings key the person edits. A shell rc is
-not required for the command to find those roots.
+The record lives in the data copy, beside the version
+file, so the command can find the pinned data and state
+homes with no shell rc and no environment variable. The
+record is installer state. It is not a settings key.
+It holds data and state. It does not hold config.
 
 Uninstall removes `~/.local/bin/<app>` and the data-home
 copy. It leaves the developer checkout, the config home,
