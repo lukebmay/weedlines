@@ -15,8 +15,10 @@ still needs a test ([`testing.md`](./testing.md)). Closing a row
 does not replace that test.
 
 A new miss gets a row under **Open** in the same turn it is found.
-When a row would change the target design, stop and meet. Do not
-paper the architecture with the story.
+A bug row does not change the design. If the miss shows an
+architectural rule is wrong, that is
+[Changing the guide](plans/README.md#changing-the-guide), not a
+story pasted into architecture.
 
 ## Open
 

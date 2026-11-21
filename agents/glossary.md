@@ -22,14 +22,14 @@ the law for the target words.
 | Word | Meaning |
 | --- | --- |
 | **handbook** | The `agents/` directory: policies and procedures for agents operating on this codebase. In prose, say handbook, not “the agents folder.” |
-| **stone** | The current guide. Architecture records what has worked and warns about what has failed. Acceptance records the product checks. Written when the human says so. An old sentence is not kept because it is old. Not a history, and not a ban on a better design. Chat, plan notes, `priority.md` quotes, and rows in `conflicts-resolved.md` are not stone. |
+| **stone** | The current guide. Architecture records what has worked and warns about what has failed. Acceptance records the product checks. When it is written is [Changing the guide](plans/README.md#changing-the-guide). An old sentence is not kept because it is old. Not a history, and not a ban on a better design. Chat, plan notes, `priority.md` quotes, and rows in `conflicts-resolved.md` are not stone. |
 | **leftover** | Code or an old name that lags a settled handbook rule. Track it under **Leftovers** in `conflicts.md`. Do not mint more of it. |
 | **active conflict** | Two living rules disagree. Track it under **Active** in `conflicts.md`. Do not implement either side until the human picks. |
 | **one home per fact** | A rule lives in exactly one file. Other files link; they do not restate. |
 | **catalog** | Portable guideline fragments under `agents/installed/`, refreshed by `agent-handbook`. Who owns a handbook file is [`handbook.md`](handbook.md). |
 | **extension** | Project file at `agents/<same-path-as-installed>` (or `*.extend.md`) that amends a catalog file. |
 | **override** | Project file `agents/<stem>.override.md` that replaces an installed catalog file for that id. Rare. |
-| **human-owned** | A file the agent-handbook has delegated to a human. The rule is [`handbook.md`](handbook.md). |
+| **human-owned** | A file the agent-handbook has delegated to a human. The files and when they may change are [Changing the guide](plans/README.md#changing-the-guide). |
 | **agent-owned** | File agents update as ordinary work (`glossary.md`, `priority.md`, `conflicts.md`, `conflicts-resolved.md` append-only, the note on the task). |
 | **explicit** | Permission word in the **current** user message for `ssh`, `scp`, `sftp`, a remote login, root, or using another program as a back door onto a machine. Not required for `git push`, `git fetch`, or `git pull` the user asked for. See catalog `security.md`. |
 
@@ -68,7 +68,7 @@ the law for the target words.
 
 | Word | Meaning |
 | --- | --- |
-| **architecture** | `agents/architecture.md` is the index and how the parts fit. Each part lives under `agents/architecture/` when that directory exists. Until then, `architecture.md` is the whole guide. The guide of what has worked and what has failed. Not a snapshot, not a history, and not a bug diary. It is not a ban on a better design. Agents write the sentence when a filed plan decides it, and take the plan link off when that plan is done. |
+| **architecture** | `agents/architecture.md` is the index and how the parts fit. Each part lives under `agents/architecture/` when that directory exists. Until then, `architecture.md` is the whole guide. The guide of what has worked and what has failed. Not a snapshot, not a history, and not a bug diary. It is not a ban on a better design. When an agent may write a sentence here is [Changing the guide](plans/README.md#changing-the-guide). Opening a plan does not write it. |
 | **acceptance** | `agents/acceptance.md`: when work is complete. Human-owned. |
 | **conflicts** | `agents/conflicts.md`: leftover names and contradictions. Agent-owned. Not a second architecture. |
 | **project** | `agents/project.md`: what the product is. Human-owned. |
@@ -94,7 +94,7 @@ the law for the target words.
 | `PRIORITY.md` (ALL-CAPS) as the queue | **priority.md** |
 | A separate `blockers/` item as the unit of work | A **waiting** task that names the blocker |
 | A flat file as the plan | `plans/<name>/plan.md` |
-| Chat “don’t do X” as architecture | A guide sentence **with why** in architecture, or a slice fence on the plan |
+| Chat “don’t do X” as architecture | [Changing the guide](plans/README.md#changing-the-guide). A decision with no plan stays in the chat. A slice fence stays on the plan. |
 | A/B taskforce, taskforce, verifier, review pair, or implementer | **delegate** with a **role** (`developer`, `code reviewer`, or a common role) |
 | A confidence number as a review | Defects, or a statement that none remain |
 

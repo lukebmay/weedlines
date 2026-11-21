@@ -1,7 +1,7 @@
 ---
 title: Documentation
 order: 60
-version: 4.9.1
+version: 4.9.3
 ---
 
 # Documentation
@@ -31,7 +31,7 @@ human checklist.
 
 | Kind | Place |
 | --- | --- |
-| Product README (install and usage) | Repo-root `README.md`. **Human-owned.** Agents read it; write only with explicit permission in the current message. Anything beyond install and basic usage belongs in `docs/`. |
+| Product README (install and usage) | Repo-root `README.md`. **Human-owned.** Agents read it; write only as Changing the guide in `agents/plans/README.md` says. Anything beyond install and basic usage belongs in `docs/`. |
 | What the product is | `agents/project.md` |
 | How it is built and how it runs (the guide) | `agents/architecture.md`, the index and how the parts fit. One part is `agents/architecture/<part>.md` when that directory exists. Until a project has that directory, `agents/architecture.md` is the whole guide. What the guide refuses to become is the stone row in `agents/glossary.md` |
 | What words mean | `agents/glossary.md` |

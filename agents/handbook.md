@@ -102,11 +102,10 @@ Do not keep a second full copy of a catalog file under `agents/`.
 For one id, use one project form, not a mix. The names are the
 extension and override rows in [`glossary.md`](glossary.md).
 
-Human-owned files change only when the current message gives
-permission. Those files are the product README, `project.md`,
-and `acceptance.md`.
-`architecture.md` and the files under `architecture/` follow
-[The guide](#the-guide).
+Human-owned files are the product README, `project.md`,
+`acceptance.md`, `architecture.md`, and the files under
+`architecture/`. When they may change is
+[Changing the guide](plans/README.md#changing-the-guide).
 `agents/installed/` is refreshed by `agent-handbook update`. Do not
 hand-edit it.
 
@@ -125,14 +124,12 @@ one.
 The end is a useful product. Matching a bad design exactly is
 not the end.
 
-Filing a plan writes the rule, the reason, and the plan link.
-Finishing the plan takes the link off. The reason is a short
-why beside the rule. It is not a bug diary and not a list of
-what was rejected. A decision with no plan says so. Do not
-write a tape, a session note, or a wish.
+How the guide changes is
+[Changing the guide](plans/README.md#changing-the-guide).
+Opening a plan does not write the guide.
 
-A part file that still says the human owns it follows this
-section.
+A part file that still says the human owns it follows
+[Changing the guide](plans/README.md#changing-the-guide).
 
 ## Asking
 
@@ -141,10 +138,12 @@ context. Do not use the `ask_user_question` tool. Stop. Do not
 edit, commit, or delegate until the human answers in this chat.
 
 A chat answer is for this session. It is not a file. Write it
-down only when it changes the guide or a product check and the
-human says to, or when the task note would otherwise leave the
-next agent guessing. Do not open a conflict row, an issues row,
-or an architecture paragraph to store the conversation.
+down only when
+[Changing the guide](plans/README.md#changing-the-guide)
+says the guide or a product check may change, or when the task
+note would otherwise leave the next agent guessing. Do not open
+a conflict row, an issues row, or an architecture paragraph to
+store the conversation.
 
 Do not re-ask or ignore a prior answer. Re-ask only when new
 context changed the meaning.

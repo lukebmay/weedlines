@@ -1,6 +1,7 @@
 # Project
 
-**Owner:** human. Agents may propose edits; apply only with explicit permission.
+**Owner:** human. Agents may propose edits. Apply them only as
+[Changing the guide](plans/README.md#changing-the-guide) says.
 
 **This is the only file you must fill out after `agent-handbook init`.**
 

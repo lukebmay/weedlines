@@ -1,8 +1,8 @@
 schema = 1
 tool_version = "0.7.1"
-catalog_version = "0.9.12"
+catalog_version = "0.9.14"
 installed_at = "2026-10-27T21:08:00+00:00"
-updated_at = "2026-11-20T22:52:22+00:00"
+updated_at = "2026-11-21T00:37:14+00:00"
 
 [[files]]
 id = "ansi-colors"
@@ -23,8 +23,8 @@ read_when = "Adding or editing source comments."
 [[files]]
 id = "documentation"
 path = "documentation.md"
-version = "4.9.1"
-sha256 = "0fac14a1d5092ca0d243d24fb8c05ff0950c59c60950bde8e191eee1e960e226"
+version = "4.9.3"
+sha256 = "afdfa58cfeb4c5979ee36319960dd6cb812543f67fe0cc362e52adedbb4285a2"
 title = "Documentation"
 read_when = "Writing architecture, user docs, human-facing checklists, or choosing where “why” lives."
 

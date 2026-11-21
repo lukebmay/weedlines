@@ -23,8 +23,9 @@ A flat plan file is the old shape. An architect or a maid who is
 handed one stops. Do not invent `tasks/` beside it unless that
 task says to translate it.
 
-Promote a check into `acceptance.md` only when the current message
-gives permission. The plan does not edit that file on its own
+Promote a check into `acceptance.md` only when
+[Changing the guide](#changing-the-guide) says that file
+may change. The plan does not edit that file on its own
 say-so.
 
 `plans/<name>/priority.md` is the order of that plan's active
@@ -122,13 +123,50 @@ does not gain tasks yet.
 
 ## Changing the guide
 
-When the plan is a change to the architecture, the current
-guide is how the product works now. Read it to see that.
-It is not a firm rule the plan has to keep. The meeting
-that opened the plan is why the guide changes. Write the
-new rule. Do not refuse the change because the old
-sentence forbids it. Do not keep the old sentence because
-it is the one in the file.
+A plan that would change the architecture asks first. Lay
+out the conflict: the current rule, what is wrong or bad
+about it, and the new rule. Wait for the answer. Do not
+edit the guide yet.
+
+Skip that ask when the user, while the plan is being
+created, says to go ahead and update the architecture.
+
+Wording in the planning that the current behavior is wrong
+means the architecture of the feature is changing. That
+includes "we have been going about this wrong" and "we
+have to change this behavior."
+
+When the plan finds that a current architectural rule is
+wrong or bad and should be changed, the plan is permission
+only after the human answers, unless the user already said
+to go ahead while the plan was being created. A finding
+written into the plan is not permission while the ask is
+still waiting. An agent implementing that plan writes the
+new rule, a short why, and the plan link. The agent does
+not ask again. Finishing the plan takes the plan link off
+the sentence. The sentence stays. The short why is not a
+bug diary and not a list of what was rejected.
+
+Human-owned files are the product README, `project.md`,
+`acceptance.md`, `architecture.md`, and the files under
+`architecture/`. The plan is the permission for those files
+only after the human answers, unless the user already said
+to go ahead while the plan was being created. A chat answer
+is the permission when there is no plan.
+
+Opening a plan does not by itself write the guide. A bug
+row does not change the design, and a wrong architectural
+rule is this section, not a story pasted into architecture.
+
+Do not refuse the new rule because the old sentence forbids
+it. Do not keep the old sentence because it is the one in
+the file.
+
+A decision with no plan is said in the chat. It does not
+write a tape, a session note, or a wish into the guide.
+
+Code that only lags the guide is a plan, not a change to
+the guide.
 
 ## The product
 
