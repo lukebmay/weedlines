@@ -6,7 +6,7 @@
 
 ## Goal
 
-Every product source file and test that is past 1000
+Every product source file and test that is past 1200
 lines lives in a directory of smaller files. Each file
 owns one responsibility that already has a name. The
 public import paths keep working. Frame, grid,
@@ -24,7 +24,7 @@ Conquer is not added.
 ## Checks
 
 - No product source file and no test that this plan
-  edits is over 1000 lines, except a generated file or
+  edits is over 1200 lines, except a generated file or
   one table named in that directory's index.
 - `import weedlib` still exposes the names in
   `src/weedlib/__init__.py` `__all__`.

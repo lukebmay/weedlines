@@ -17,7 +17,7 @@ figure check does not import a cutter.
    beside them.
 
 `extensions/inkscape/weedlines.py` is not edited.
-Files under 500 lines stay whole: `paths.py`, `qt.py`,
+These files stay whole: `paths.py`, `qt.py`,
 `debug.py`, `progress.py`, `arrows.py`, `svg_paths.py`,
 and the host modules other than the dialog.
 `src/weedlib/__init__.py` keeps today's `__all__` and
@@ -152,10 +152,10 @@ All do not join the child.
 ## Tests
 
 Move tests with the source they cover. A test file that
-is already one responsibility and under 1000 lines stays
-whole. `tests/test_window_surround.py` is past 1000. The
-dialog task splits it before editing it, by the window
-behaviors it already tests.
+is already one responsibility and under 1200 lines stays
+whole. The dialog task already split
+`tests/test_window_surround.py` by the window behaviors
+it tests.
 
 From `tests/test_weeds.py`:
 

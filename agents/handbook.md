@@ -44,15 +44,42 @@ agent opens the parts the task needs. That rule is
 
 ## Source files
 
-A source file owns one responsibility. 500 lines is the
-usual ceiling. When a file past 1000 lines is noticed,
-a separate plan is created to break that file apart on
-a named responsibility. The task already in progress continues.
-The split is not started inside it.
+A source file owns one responsibility. The ideal size is
+under 1200 lines. Count lines a person can read. Do not
+pack a line to come in under the count.
 
-A file under 500 lines stays whole. Do not split it to
-hit a count. From 500 to 1000, split only when the new
-code is a separate responsibility.
+Look for a logical split before the count. Split on a
+responsibility that already has a name. A window, a widget
+that is not trivial, an algorithm, or one stage of that
+algorithm. A trivial piece stays with its neighbor. Do not
+split a small file into several files unless this code
+already splits that same kind of piece that way. A 20-line
+file stays one file.
+
+A program that is a single source file stays one file
+until it passes 5000 lines. A script that is the whole
+program is the same. Do not open a file-size plan for
+it before then.
+
+When a file is over its count, or a reasonable split is
+already clear, note the file and finish the current work.
+The split is a later file-size plan. Do not start it
+inside the current task. The plan breaks the file into
+coherent pieces, or it says why the file should stay
+large. The user hears that reason before the file is
+left large.
+
+When the user leaves the file large, record it in the
+directory index. The entry names the file, the line count
+it may reach, one sentence why, and the next count. The
+usual next counts are 1500, then 1800, 2000, and 2200,
+then steps of about 200. Use the next step above the
+file's present size. A one-file program records the next
+count the same way after 5000. The usual next counts
+there are 6000, then 7000, then 8000. Reaching that
+count starts the same note and a new file-size plan.
+A directory that
+has no index yet gets one for this entry.
 
 Write code an average developer can read and change. Prefer the
 direct structure. Keep the common path cheap to run. A highly
@@ -63,12 +90,9 @@ because this sentence allows it. The rest of the architecture
 stays easy to follow. Name a long or dense algorithm in the
 directory index.
 
-Split on a responsibility that already has a name. A
-window, a widget that is not trivial, an algorithm, or
-one stage of that algorithm. A trivial piece stays with
-its neighbor. A generated file or one table may be
-longer. Name that exception in the directory index. Do
-not use it for a module that mixes responsibilities.
+A generated file or one table may be longer. Name that
+exception in the directory index. Do not use it for a
+module that mixes responsibilities.
 
 Put new code in the file that already owns that work,
 then stop. Do not shop for a finer split.
@@ -159,6 +183,101 @@ own `priority.md` lists that plan's tasks. A plan has a rank.
 The numbers are [`plans/README.md`](plans/README.md). A move
 from one handbook version group to the next is
 [`versions.md`](versions.md).
+
+## Handbook updates
+
+Updating the agent handbook in a repo, or rolling the
+catalog out to repos that already use it.
+
+The catalog version is `catalog_version` in
+`agents/installed/.meta.toml`. Changes since a version
+are `agent-handbook changelog <version>`. The file is
+`agent-handbook-catalog/changelog.md`. Headings are
+`## <version>`, newest first. A newer entry replaces an
+older one when they describe the same rule. Skip the
+older entry. Versions before 0.9.15 have no entry.
+
+A tree is on agent-handbook when `agents/handbook.md`
+and `agents/roles/` exist, and root `agents.py` is
+absent or is the retired stub that does not compose
+`AGENTS.md`. Leave a tree whose `agents.py` composes
+`AGENTS.md`. Do not `init`, `migrate`, or
+`migrate-layout` that tree.
+
+Look under `~/dev` and `~/Desktop`. Nested handbooks
+that share a git repo are one update. A nested
+directory with its own `.git` is its own update. Do
+not commit the parent gitlink when that nested HEAD
+moves. Skip `agents/.quarantine/`.
+
+Record the repo's catalog version, then run
+`agent-handbook update` with no `--all` and no
+`--force`. The command refreshes `agents/installed/`
+and root `AGENTS.md`. It does not copy
+`agent-handbook-catalog/handbook/` into a project
+that already has those files. Carry the seed changes
+since the recorded version:
+
+- Insert a missing section into `agents/handbook.md`.
+  Keep a sentence the project added.
+- Leave a project `architecture.md` that is no longer
+  the blank seed. Apply the seed change only when
+  that file is still the seed.
+- Do the same for the other handbook seeds the
+  command does not copy. Leave a file the project
+  has rewritten.
+
+Do not hand-edit `agents/installed/` or root
+`AGENTS.md`. Do not edit the catalog during a
+rollout. If update moves a file out of
+`agents/installed/`, name that path.
+
+After the update, create `agents/plans/handbook-update/`
+or bring that plan up to date if it exists. The plan
+names the catalog version from before the update and
+the version now installed. It tells agents to bring
+the code in line with `agent-handbook changelog`
+for that range. It does not make those product edits.
+Each correction is a plan named `handbook-<topic>`.
+Related corrections share one plan.
+`handbook-update` lists them.
+
+The same plan reads the plans already in the repo.
+A handbook may be updated again before that work is
+finished, so check on every update. A plan whose
+instructions disagree with the installed handbook is
+rewritten to match, or dropped.
+
+Plans opened before catalog 0.9.18 may not use the
+`handbook-` prefix. The first `handbook-update` in a
+repo says so. Find those plans by what they change,
+not only by the prefix. After that repo has finished
+the handbook plans opened for 0.9.18, every later
+handbook plan uses the prefix.
+
+Stage only the handbook paths this update changed,
+including `agents/plans/handbook-update/` and any
+handbook plan this update rewrote. Leave every other
+dirty path unstaged.
+
+Commit on `master` or `main`. Fetch first. Push when
+that branch has an origin and was even with it before
+this commit, so the push publishes only this update.
+If the branch was already ahead, commit and do not
+push, and report the ahead count. Push anyway only
+when the current message says to publish that repo.
+No origin means commit only. If fetch fails, still
+update and commit, and do not push. Do not
+force-push. Do not push `test` or `prod`.
+
+When the change is to the catalog itself, a `files/`
+row needs a version bump and a `sha256` of that file.
+`agent-handbook update` stops when the hash does not
+match. Handbook seeds under
+`agent-handbook-catalog/handbook/` are not `[[files]]`
+rows. A seed change bumps `catalog_version` once.
+The same change adds a changelog entry headed by
+that version.
 
 ## Your role
 

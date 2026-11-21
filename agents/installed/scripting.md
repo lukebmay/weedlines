@@ -19,8 +19,7 @@ Language style: `agents/languages/<lang>.md` when relevant. In-repo formatter/LS
 - Fail gracefully; solid errors/exit codes
 - Colors: `ansi-colors.md`. `NO_COLOR` and `TERM=dumb` stay on for output the agent parses, and come off only for a program a person will look at.
 - Comments: `comments.md`
-- Prefer single-file ~500–1000 lines; larger → multi-file project.
-  Not the rule for all source; that is `Source files` in `agents/handbook.md`
+- File size is `Source files` in `agents/handbook.md`
 - Almost never emoji in code (except test ✓/X)
 
 ## Missing dependencies (FIRM)
