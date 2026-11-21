@@ -1,6 +1,6 @@
 # Handbook XDG
 
-**Rank:** 3
+**Rank:** 5
 
 ## Goal
 

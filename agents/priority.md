@@ -15,7 +15,7 @@ A waiting plan stays under its rank. The notes say why. Skip it.
 
 | Plan | Notes |
 | --- | --- |
-| *(none yet)* | |
+| [handbook-xdg](plans/handbook-xdg/plan.md) | The resolver is in. The runtime sentence still waits on the human. Skip it until that answer. |
 
 ## 4 high
 

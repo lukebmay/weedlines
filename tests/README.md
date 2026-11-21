@@ -8,6 +8,7 @@
 - `test_default_mode.py` Unchosen job mode is Surround and Conquer.
 - `test_figures.py` Figure check: classify, dangling ends, twins, subject, and swap.
 - `test_inkscape_args.py` Regression: Inkscape weed extension must register --layer_name etc.
+- `test_job_cache.py` Job cache directory: app home, then XDG, then the platform default.
 - `test_job_records.py` Job path records: open geometry, computed fill, correction skip.
 - `test_overlap.py` Separate-figure overlap: one defect for each connected shared area.
 - `test_progress.py` Progress / cancel / pause hooks for long-running solvers.

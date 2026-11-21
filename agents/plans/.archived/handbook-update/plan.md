@@ -19,8 +19,8 @@ change, not by that prefix.
 
 ## Guide
 
-- [`../../handbook.md`](../../handbook.md)
-- [`../../installed/scripting.md`](../../installed/scripting.md)
+- [`../../../handbook.md`](../../../handbook.md)
+- [`../../../installed/scripting.md`](../../../installed/scripting.md)
 
 ## Range
 
@@ -35,7 +35,7 @@ lines. 0.9.15 is the app directory resolver.
 
 ## Plans already here
 
-Rewritten: [source-split](../source-split/plan.md).
+Rewritten: [source-split](../../source-split/plan.md).
 The size bar is 1200 lines, not 1000. The stage no
 longer cites a 500-line ceiling. The named small
 files stay whole. It stays on the queue. The split
@@ -55,10 +55,9 @@ one-file program under 5000 lines.
 
 ## Topic plans
 
-Not added to [`../../priority.md`](../../priority.md):
-
-- [handbook-xdg](../handbook-xdg/plan.md) — the job
-  cache does not read `WEEDLINES_CACHE_HOME`.
+- [handbook-xdg](../../handbook-xdg/plan.md) — the job
+  cache does not read `WEEDLINES_CACHE_HOME`. A
+  later message queued it at rank 5.
 
 Nothing else lags. No product source file or test
 is over 1200 lines. The longest is
@@ -72,5 +71,5 @@ config home, so it is not a second topic.
 - The catalog version in this plan is 0.9.15, then
   0.9.18.
 - Product code is not edited from this plan.
-- This plan and `handbook-xdg` stay off the queue
-  unless a later message adds them.
+- This record stays off the queue. `handbook-xdg`
+  is queued.

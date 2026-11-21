@@ -23,18 +23,23 @@ _JOB_PREFIX = 'job-'
 
 def cache_dir():
     """User cache directory for Weedlines job/result files."""
-    xdg = os.environ.get('XDG_CACHE_HOME')
-    if xdg:
-        base = os.path.join(xdg, 'weedlines')
-    elif sys.platform == 'win32':
-        base = os.path.join(
-            os.environ.get('LOCALAPPDATA') or os.path.expanduser('~'),
-            'weedlines', 'cache')
-    elif sys.platform == 'darwin':
-        base = os.path.join(
-            os.path.expanduser('~'), 'Library', 'Caches', 'weedlines')
+    cache_home = os.environ.get('WEEDLINES_CACHE_HOME')
+    if cache_home:
+        base = cache_home
     else:
-        base = os.path.join(os.path.expanduser('~'), '.cache', 'weedlines')
+        xdg = os.environ.get('XDG_CACHE_HOME')
+        if xdg:
+            base = os.path.join(xdg, 'weedlines')
+        elif sys.platform == 'win32':
+            base = os.path.join(
+                os.environ.get('LOCALAPPDATA') or os.path.expanduser('~'),
+                'weedlines', 'cache')
+        elif sys.platform == 'darwin':
+            base = os.path.join(
+                os.path.expanduser('~'), 'Library', 'Caches', 'weedlines')
+        else:
+            base = os.path.join(
+                os.path.expanduser('~'), '.cache', 'weedlines')
     try:
         os.makedirs(base, exist_ok=True)
     except TypeError:
