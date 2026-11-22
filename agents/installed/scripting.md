@@ -51,9 +51,21 @@ When an installer runs as root or via `sudo`:
 
 ## XDG directory variables (FIRM)
 
-An installable app that follows XDG knows the spec
-defaults. An unset XDG variable means that default.
-A set XDG variable wins over the default.
+Any app or script that keeps config, data, state, cache,
+logs, or runtime files follows this section. A program
+that is not installed follows it too.
+
+Unset XDG variables are the normal case. An unset
+variable means the spec default. A set XDG variable
+wins over the default. There is no XDG system to
+detect, and no package to test for. Do not look for
+`~/.config` to decide. A fresh home has neither the
+variables nor that directory, and the defaults still
+apply. Do not switch to a home dot directory such as
+`~/.<app>/` when the variables are unset. Some
+programs keep `~/.ssh` or `~/.gitconfig` because they
+chose that layout. This rule does not follow them.
+One program uses one layout.
 
 The app has its own variable for each of those homes.
 Code uses the app variable. The XDG variables are read
@@ -99,15 +111,20 @@ always `$<APP>_CONFIG_HOME/<file>`, for example
   `~/a/b/c/my-app/foo.json`. That wins over both of
   the others.
 
-Data and state are pinned. Install resolves them once
-and records the absolute paths. If the app variable is
-already set at install, record that value and do not
-overwrite the variable. After install the running
-command uses the record. A later set or unset of
-`<APP>_DATA_HOME`, `<APP>_STATE_HOME`, or the XDG data
-and state variables does not move those homes. Moving
-them is a reinstall. Do not write a shell rc entry for
-these variables.
+Data and state are pinned when the program is installed.
+Install resolves them once and records the absolute
+paths. If the app variable is already set at install,
+record that value and do not overwrite the variable.
+After install the running command uses the record. A
+later set or unset of `<APP>_DATA_HOME`,
+`<APP>_STATE_HOME`, or the XDG data and state variables
+does not move those homes. Moving them is a reinstall.
+Do not write a shell rc entry for these variables.
+
+A program with no install record resolves data and
+state on each run, the same way it resolves config.
+Do not create an install record only to hold those
+paths.
 
 Records that differ per machine go in
 `$<APP>_*_HOME/hosts/<hostname>/` for the homes that
