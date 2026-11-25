@@ -22,7 +22,7 @@ the law for the target words.
 | Word | Meaning |
 | --- | --- |
 | **handbook** | The `agents/` directory: policies and procedures for agents operating on this codebase. In prose, say handbook, not “the agents folder.” |
-| **stone** | The current guide. Architecture records what has worked and warns about what has failed. Acceptance records the product checks. When it is written is [Changing the guide](plans/README.md#changing-the-guide). An old sentence is not kept because it is old. Not a history, and not a ban on a better design. Chat, plan notes, `priority.md` quotes, and rows in `conflicts-resolved.md` are not stone. |
+| **stone** | The current guide. Architecture records what has worked and warns about what has failed. Acceptance records the product checks. When it is written is [Changing the guide](plans/README.md#changing-the-guide). An old sentence is removed when the plan that replaced it is finished. While the plan is open, the deprecated block is the behavior that is still shipping, and the accepted block is the decision that has not shipped. Both are the guide for that fact until the plan finishes. Not a history, and not a ban on a better design. Chat, plan notes, `priority.md` quotes, and rows in `conflicts-resolved.md` are not stone. |
 | **leftover** | Code or an old name that lags a settled handbook rule. Track it under **Leftovers** in `conflicts.md`. Do not mint more of it. |
 | **active conflict** | Two living rules disagree. Track it under **Active** in `conflicts.md`. Do not implement either side until the human picks. |
 | **one home per fact** | A rule lives in exactly one file. Other files link; they do not restate. |
@@ -51,11 +51,12 @@ the law for the target words.
 | **version group** | A range of tool versions that share one handbook shape. The ranges and the migration from one group to the next are `agents/versions.md`. |
 | **orchestrator** | The role Orchestrate assigns. Speaking does not assign it. It reads the whole architecture. It does not choose the solution. It accepts a delegate's unit of work, or it says why and sends that agent back or assigns another delegate. The procedure is `agents/roles/orchestrator.md`. |
 | **delegate** | An agent the orchestrator starts. The prompt says so. It reads the files the brief names. It does not start other agents. |
-| **role** | The kind of work. The prompt assigns it. A file cannot assign a role to the agent who merely opened it. The roles with a process are orchestrator, delegate, developer, code reviewer, architect, and maid. |
-| **developer** | The role that makes the change. It writes a short note on `task.md`. It does not change the status, move the directory, write the `cr-` file, or start the reviewer. |
+| **role** | The kind of work. The prompt assigns it. A file cannot assign a role to the agent who merely opened it. The roles with a process are orchestrator, delegate, developer (a senior developer), code reviewer, architect, maid, and regression. |
+| **developer** | The developer is the senior developer. The role that changes the code. On a task whose brief includes an interaction note from another expert, the senior developer implements that note and does not redesign it. It writes the note on `task.md`. It does not change the status, move the directory, write the `cr-` file, or start the reviewer. |
 | **code reviewer** | The role that reads the change and writes `cr-01.md`, `cr-02.md`, and so on in the task directory, then updates `task.md`. The orchestrator starts it. |
 | **architect** | The role that compares one directory plan to the guide and updates its tasks. A flat plan file is the old shape. It stops and does not invent `tasks/` unless the task says to translate. |
 | **maid** | The role that makes plan files match. She does not choose the next product work and does not move archives. |
+| **regression** | The role that reads the catalog, or a project's handbook, for a sentence that would make a later agent repeat a failure the project has already decided to leave behind. It names the file and the sentence. It writes the replacement in the file that owns the fact. It does not implement product code. The procedure is `agents/roles/regression.md`. |
 | **CR** | `cr-01.md`, `cr-02.md`, and so on, in the task directory. The code reviewer writes them. The developer does not. The orchestrator does not read them. |
 | **brief** | The assignment: a role, the task path, the checks, and the architecture files that are the start. Open a further file when the task needs it, as [`roles/delegate.md`](roles/delegate.md) says. The brief does not paste a role's process. |
 | **panel** | Readers asked to examine one question. The orchestrator accepts or sends back a unit of work. The rule is `agents/roles/orchestrator.md`. |
@@ -68,7 +69,7 @@ the law for the target words.
 
 | Word | Meaning |
 | --- | --- |
-| **architecture** | `agents/architecture.md` is the index and how the parts fit. Each part lives under `agents/architecture/` when that directory exists. Until then, `architecture.md` is the whole guide. The guide of what has worked and what has failed. Not a snapshot, not a history, and not a bug diary. It is not a ban on a better design. When an agent may write a sentence here is [Changing the guide](plans/README.md#changing-the-guide). Opening a plan does not write it. |
+| **architecture** | `agents/architecture.md` is the index and how the parts fit. Each part lives under `agents/architecture/` when that directory exists. Until then, `architecture.md` is the whole guide. The guide of what has worked and what has failed. Not a snapshot, not a history, and not a bug diary. It is not a ban on a better design. When an agent may write a sentence here is [Changing the guide](plans/README.md#changing-the-guide). A plan that replaces a rule writes both blocks when the plan is created, after the human has accepted the change. An unaccepted change does not write the guide. |
 | **acceptance** | `agents/acceptance.md`: when work is complete. Human-owned. |
 | **conflicts** | `agents/conflicts.md`: leftover names and contradictions. Agent-owned. Not a second architecture. |
 | **project** | `agents/project.md`: what the product is. Human-owned. |
@@ -94,8 +95,8 @@ the law for the target words.
 | `PRIORITY.md` (ALL-CAPS) as the queue | **priority.md** |
 | A separate `blockers/` item as the unit of work | A **waiting** task that names the blocker |
 | A flat file as the plan | `plans/<name>/plan.md` |
-| Chat “don’t do X” as architecture | [Changing the guide](plans/README.md#changing-the-guide). A decision with no plan stays in the chat. A slice fence stays on the plan. |
-| A/B taskforce, taskforce, verifier, review pair, or implementer | **delegate** with a **role** (`developer`, `code reviewer`, or a common role) |
+| Chat “don’t do X” as architecture | [Changing the guide](plans/README.md#changing-the-guide). A slice fence stays on the plan. |
+| A/B taskforce, taskforce, verifier, review pair, or implementer | **delegate** with a **role** (`developer`, a senior developer, `code reviewer`, or a common role) |
 | A confidence number as a review | Defects, or a statement that none remain |
 
 ## Project words

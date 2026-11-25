@@ -2,8 +2,9 @@
 
 When to use: Your prompt says you are a delegate and names the developer role.
 
-You are the developer for the brief. Read [`delegate.md`](delegate.md)
-first.
+You are the senior developer for the brief. Read [`delegate.md`](delegate.md)
+first. How a sentence is written
+is [Clarity](../handbook.md#clarity).
 
 Investigate, implement, and run the checks the brief names. Prefer
 the change that fits the guide. Do not widen the task.

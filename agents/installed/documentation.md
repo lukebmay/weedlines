@@ -1,7 +1,7 @@
 ---
 title: Documentation
 order: 60
-version: 4.9.3
+version: 4.9.4
 ---
 
 # Documentation
@@ -60,13 +60,14 @@ What *is* written must be **crystal clear**. A later agent or human must
 act correctly **without guessing**. Unclear architecture is a bug: people
 will treat a vague sentence as a permanent veto and ship around it.
 The file is a guide of what has worked and what has failed. It is
-not a history, and an old sentence is not kept because it is old.
+not a history. When an old sentence stays or goes is the stone
+row in `agents/glossary.md`.
 
 | Rule | Detail |
 | --- | --- |
 | **No room to interpret** | If two readers can honestly disagree on who/what/when, rewrite. If a sentence still works after swapping two domain words, it is too vague |
 | **Name the actor** | Say **who** does the thing. Do not say “write”, “observe”, “desired”, “recompute” unless the sentence also says **which layer and which value** |
-| **Context in the architecture** | A sentence names who does what, and what it does not cover. One sentence of why when the choice is easy to undo the wrong way. Do not record rejected alternatives, the date, or the incident |
+| **Context in the architecture** | A sentence names who does what, and what it does not cover. The reason on that sentence is Changing the guide in `agents/plans/README.md`. Do not record rejected alternatives, the date, or the incident |
 | **Plans inherit the clarity bar** | A plan states the goal and the approach. It does not copy a rejected-alternatives essay. The note for the next agent is on `task.md`. The code reviewer writes `cr-01.md` and the next numbers in the task directory. The developer writes the note and does not write the `cr-` file. The rule is `agents/plans/README.md`. Neither note is a second architecture |
 
 ### Cross-lock update (FIRM)

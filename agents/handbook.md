@@ -150,10 +150,24 @@ not the end.
 
 How the guide changes is
 [Changing the guide](plans/README.md#changing-the-guide).
-Opening a plan does not write the guide.
+A change the human has not accepted asks first and does not
+edit the guide yet. A plan which replaces a human-owned
+rule, after the human has accepted that change, writes the
+two blocks in the turn the plan is created.
 
 A part file that still says the human owns it follows
 [Changing the guide](plans/README.md#changing-the-guide).
+
+## Clarity
+
+Prefer a clear sentence to a short one. Name the decision,
+who it applies to, and what remains true while it has not
+shipped. A short label that leaves the next agent to guess
+the actor, the condition, or the result is not the sentence.
+This applies to a plan, a task, the guide, and the note on a
+task. Do not add words that do not change the decision. Do
+not cut a sentence so far that the condition, the actor, or
+the result disappears.
 
 ## Asking
 
@@ -293,8 +307,9 @@ A role is assigned only in one of these ways:
    [`roles/orchestrator.md`](roles/orchestrator.md) and follow it.
 1. Your prompt says you are a delegate. Read
    [`roles/delegate.md`](roles/delegate.md) and follow it.
-1. Your prompt names `developer`, `code reviewer`, `architect`,
-   or `maid`. Read that role file as well.
+1. Your prompt names `developer` (a senior developer),
+   `code reviewer`, `architect`, `maid`, or `regression`.
+   Read that role file as well.
 
 Role files live in [`roles/`](roles/). The prompt that assigns the
 role is what makes it true. A file cannot assign a role to the

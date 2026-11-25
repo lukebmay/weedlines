@@ -11,7 +11,6 @@ not start another agent.
 
 When that plan would change the architecture, follow
 [Changing the guide](../plans/README.md#changing-the-guide).
-Opening the plan does not write the guide.
 
 If the plan is still a single file, stop. Say that it is the old
 shape and that converting it was not asked. Do not create the
@@ -34,7 +33,7 @@ unless a task says the attempt matters. Read the guide parts
    archive. Do not move it into `.archived` unless the brief
    says to.
 1. New tasks come from the current stage only. A later stage
-   may gain a short note. It does not gain tasks.
+   may gain a note. It does not gain tasks.
 1. `priority.md` lists the active tasks in the order to do
    them. Each active task appears once.
 

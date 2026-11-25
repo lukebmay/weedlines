@@ -112,61 +112,50 @@ stays open, and this one is the pattern, not a plan.
 
 ## Stages
 
-Stages are optional. `plans/<name>/stages/<stage>.md` is a short
+Stages are optional. `plans/<name>/stages/<stage>.md` is a
 note for one part of the plan. `plan.md` names the current stage
 with `Stage: <stage>` only when `stages/<stage>.md` exists. Omit
 that line when the file does not exist.
 
 The architect writes tasks from the current stage only. A later
-stage may gain a short note when the product shape changes. It
+stage may gain a note when the product shape changes. It
 does not gain tasks yet.
 
 ## Changing the guide
 
-A plan that would change the architecture asks first. Lay
-out the conflict: the current rule, what is wrong or bad
-about it, and the new rule. Wait for the answer. Do not
-edit the guide yet.
+A change the human has not accepted asks first. Lay out the current rule, what is wrong or bad about it, and the new rule. Wait for the answer. Do not edit the guide yet. A finding written into the plan is not permission while that ask is still waiting.
 
-Skip that ask when the user, while the plan is being
-created, says to go ahead and update the architecture.
+Wording that the current behavior is wrong means the architecture of that feature is changing. That includes "we have been going about this wrong" and "we have to change this behavior."
 
-Wording in the planning that the current behavior is wrong
-means the architecture of the feature is changing. That
-includes "we have been going about this wrong" and "we
-have to change this behavior."
+Skip that ask when the human asked for the plan that contains the change, or when the human, while the plan is being created, says to go ahead and update the guide.
 
-When the plan finds that a current architectural rule is
-wrong or bad and should be changed, the plan is permission
-only after the human answers, unless the user already said
-to go ahead while the plan was being created. A finding
-written into the plan is not permission while the ask is
-still waiting. An agent implementing that plan writes the
-new rule, a short why, and the plan link. The agent does
-not ask again. Finishing the plan takes the plan link off
-the sentence. The sentence stays. The short why is not a
-bug diary and not a list of what was rejected.
+A plan that changes what a human-owned file says is written into that file in the same turn the plan is created. The human has accepted that change by asking for the plan, or by answering while the plan was being created. Do not leave the old sentence standing as the only text an agent will find.
 
-Human-owned files are the product README, `project.md`,
-`acceptance.md`, `architecture.md`, and the files under
-`architecture/`. The plan is the permission for those files
-only after the human answers, unless the user already said
-to go ahead while the plan was being created. A chat answer
-is the permission when there is no plan.
+Write two blocks next to each other, in the file that already owns the fact. Do not open a second home for it.
 
-Opening a plan does not by itself write the guide. A bug
-row does not change the design, and a wrong architectural
-rule is this section, not a story pasted into architecture.
+The first block is the accepted decision. Its first line is `Not yet implemented.` and the link to the plan. The sentences under that line are the rule the plan will implement. Write them so a later planning session can design against them without opening the plan. Name who does the thing, what they do, and what the person sees.
 
-Do not refuse the new rule because the old sentence forbids
-it. Do not keep the old sentence because it is the one in
-the file.
+The second block is the language that plan replaces. Its first line is `Deprecated until that plan ships.` The sentences under that line are what the product still does. They are not a diary, and they are not a list of ideas that were rejected. A later planning session reads this block to see the current behavior while the plan is open.
 
-A decision with no plan is said in the chat. It does not
-write a tape, a session note, or a wish into the guide.
+An agent who is writing a new plan reads both blocks. An agent who is implementing this plan implements the accepted block. That agent does not implement the deprecated block. An agent who is implementing a different plan treats the deprecated block as what the product does today, and does not treat the accepted block as if it had already shipped.
 
-Code that only lags the guide is a plan, not a change to
-the guide.
+When the plan changes before it is finished, update the accepted block in that same turn so it matches what the plan will now implement. Leave the deprecated block in place while that old behavior is still what the product does. If the plan change means the product no longer does that old behavior, replace the deprecated block with the behavior the product does now.
+
+When the plan is finished, delete the deprecated block. Delete the `Not yet implemented.` line and the plan link. The accepted sentences remain as ordinary sentences of the guide. Then read every human-owned file that plan changed, and compare each changed sentence to what shipped. If a sentence does not describe the shipped behavior, correct it in that same turn. The correction matches the ship. It is not a new question for the human, and it is not a story of the attempt.
+
+A plan that does not change a human-owned rule does not write those files.
+
+A bug row does not change the design. Code that only lags a rule the guide already states is a plan, and that plan does not rewrite the sentence.
+
+Do not refuse the accepted rule because the deprecated block still states the old one. The deprecated block is what the product does until the plan ships. It is not permission to keep the old design.
+
+A chat answer is the permission when there is no plan. Write that rule into the file that already owns the fact, in that same turn. There is no open plan, so there is no `Not yet implemented.` line and no deprecated block. The sentence is the current rule. Do not write the conversation, a tape, a session note, or a wish into the guide.
+
+The reason on an accepted rule is one or two sentences. It is not a bug diary and not a list of what was rejected.
+
+Human-owned files are the product README, `project.md`, `acceptance.md`, `architecture.md`, and the files under `architecture/`. The product rows of `glossary.md` follow this section when they state a product fact.
+
+Prefer a clear sentence to a short one. The next agent must be able to tell what is accepted, what is still shipping, and what has shipped, without guessing from a label.
 
 ## The product
 
@@ -234,7 +223,7 @@ the user says to.
 ## Who writes what
 
 The orchestrator sets `in-progress` when it starts the developer.
-The developer writes a short note on `task.md` before returning:
+The developer writes the note on `task.md` before returning:
 what changed, why, and how it was checked. The developer does not
 change the status and does not move the directory.
 

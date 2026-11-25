@@ -1,8 +1,8 @@
 schema = 1
 tool_version = "0.7.1"
-catalog_version = "0.9.19"
+catalog_version = "0.9.20"
 installed_at = "2026-10-27T21:08:00+00:00"
-updated_at = "2026-11-22T21:28:16+00:00"
+updated_at = "2026-11-25T21:18:09+00:00"
 
 [[files]]
 id = "ansi-colors"
@@ -23,8 +23,8 @@ read_when = "Adding or editing source comments."
 [[files]]
 id = "documentation"
 path = "documentation.md"
-version = "4.9.3"
-sha256 = "afdfa58cfeb4c5979ee36319960dd6cb812543f67fe0cc362e52adedbb4285a2"
+version = "4.9.4"
+sha256 = "c7264551333128234a323487f5372704e81cd05927e058bb6fe249d155413c43"
 title = "Documentation"
 read_when = "Writing architecture, user docs, human-facing checklists, or choosing where “why” lives."
 
@@ -71,8 +71,8 @@ read_when = "Writing or editing markdown docs, plans, tasks, or README prose."
 [[files]]
 id = "scripting"
 path = "scripting.md"
-version = "2.10.0"
-sha256 = "99cce53fc7f5e916f0e855c30364c27e3f1652aa62bc9afb44f6bc027649f832"
+version = "2.10.1"
+sha256 = "411b5b088a93599c91ac9dba9143eb55bb6140d6022116e3c6558503d19006a4"
 title = "Scripting"
 read_when = "Writing or changing shell/Python scripts, installers, CLI tools, bin entries, or launching user-visible apps from a Grok agent."
 

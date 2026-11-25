@@ -51,8 +51,15 @@ task to `done`, move it to `tasks/inactive/`, remove it
 from the plan's `priority.md`, and commit that slice on
 `master` as [`../git.md`](../git.md) describes. Sending it
 back does not commit.
-When the task is done, the plan link comes off the guide
-sentence. The sentence stays. When the plan has no active
+When the plan is finished, delete the deprecated block.
+Delete the `Not yet implemented.` line and the plan link.
+The accepted sentences remain as ordinary sentences of the
+guide. Then read every human-owned file that plan changed,
+and compare each changed sentence to what shipped. If a
+sentence does not describe the shipped behavior, correct
+it in that same turn. The correction matches the ship. It
+is not a new question for the human, and it is not a story
+of the attempt. When the plan has no active
 task left, follow Archive in
 [`../plans/README.md`](../plans/README.md). A perpetual
 plan stays on the queue.
@@ -92,8 +99,9 @@ failing, or because it is fixture debt.
 Start a subagent only for that work. Put this in its prompt, in
 this order:
 
-1. The role sentence: "You are a delegate." Name `developer`,
-   `code reviewer`, `architect`, or `maid` when that is the role.
+1. The role sentence: "You are a delegate." Name `developer`
+   (a senior developer), `code reviewer`, `architect`,
+   `maid`, or `regression` when that is the role.
 1. The path of [`delegate.md`](delegate.md), plus the role file.
 1. The task path, the checks, and the architecture files that
    are the start.

@@ -4,69 +4,64 @@
 
 ## Goal
 
-The installed catalog is 0.9.19. It was 0.9.18.
+The installed catalog is 0.9.20. It was 0.9.19.
 A later agent brings this repo in line with
-`agent-handbook changelog 0.9.18`. That command
-prints 0.9.18 and every newer heading. A newer
-entry replaces an older one on the same rule. Skip
-the older entry. This plan does not make those
-product edits.
+`agent-handbook changelog 0.9.19`. That command
+prints 0.9.19 and every newer heading. A newer
+entry replaces an older one on the same rule. Do
+not copy the changelog. This plan does not make
+those product edits.
 
 ## Guide
 
 - [`../../handbook.md`](../../handbook.md)
-- [`../../installed/scripting.md`](../../installed/scripting.md)
 
 ## Range
 
-0.9.19 replaces the 0.9.15 XDG home rule. The
-statement is "XDG directory variables" in
-scripting 2.10.0. Any app or script that keeps
-config, data, state, cache, logs, or runtime
-files uses those homes, including a program that
-is not installed. There is no detector for a
-missing XDG system, no `~/.<app>/` default,
-runtime does not fall back to `/tmp`, and logs
-stay in the state home. A program with no install
-record resolves data and state on each run.
-0.9.18 is the handbook-update shape. It is
-already in [`../../handbook.md`](../../handbook.md).
+0.9.20 changes how an accepted plan writes the
+guide, adds Clarity, names the developer as the
+senior developer, and adds the regression role.
+
+The code does not say the installed command runs
+from the checkout. No product correction was filed
+for 0.9.20.
+
+`agents/architecture.md` still says "Opening a plan
+does not write this file." `agents/acceptance.md`
+still says "before or with the plan." Those files
+are not the blank seed. This plan does not edit
+them, and it does not open a handbook plan to edit
+them.
 
 ## Plans already here
 
-Rewritten: [handbook-xdg](../handbook-xdg/plan.md).
-It now follows scripting 2.10.0. The cache
-resolver stays. Logs in the cache, and the
-platform cache defaults, wait on the runtime
-sentences. It stays at rank 5. It was already on
-the queue. This update does not add it again.
+Left: [handbook-xdg](../handbook-xdg/plan.md). It
+waits on the human for the runtime sentences. The
+guide was not edited. It stays at rank 5. It was
+already on the queue. This update does not add it
+again.
 
 Dropped: none.
 
-No other plan's instructions disagree. No plan
-tells an agent to detect an XDG system, to use
-`~/.weedlines`, or to put runtime files in
-`/tmp`.
+No other active plan's instructions disagree with
+the installed handbook. None were rewritten.
 
 ## Topic plans
 
 Not added to [`../../priority.md`](../../priority.md):
 
-- [handbook-xdg](../handbook-xdg/plan.md) — `host.log`
-  and `ready.log` still go to the cache directory,
-  and the unset cache path is still the runtime
-  part's Windows and macOS directories. No second
-  homes plan.
-
-`~/.ssh` and `~/.gitconfig` are not this rule.
-Inkscape's extensions directory is the host path.
-That read of `XDG_CONFIG_HOME` is not a weedlines
-config home.
+- This update opened no `handbook-<topic>` plan.
+  [handbook-xdg](../handbook-xdg/plan.md) remains
+  the earlier correction.
 
 ## Checks
 
-- The catalog version in this plan is 0.9.18, then
-  0.9.19.
+- The catalog version in this plan is 0.9.19, then
+  0.9.20.
+- `agent-handbook update` refreshed documentation
+  and scripting. Nothing moved out of
+  `agents/installed/`. Root `AGENTS.md` was left
+  unchanged. `agents.py` was not restored.
 - Product code is not edited from this plan.
 - This plan stays off the queue unless a later
   message adds it.

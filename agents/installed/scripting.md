@@ -173,12 +173,14 @@ The public URL is `https`, recorded when the command is
 installed. The download uses `$<APP>_CACHE_HOME/src` after
 the live resolver runs for that process. The snapshot is
 copied into the data home resolved at install. The copy
-contains no `.git`. The command is found at
-`~/.local/bin/<app>`, which points at the executable in
-the data copy. The cache home is only the download. No
+contains no `.git`. The file at `~/.local/bin/<app>` runs
+the executable inside the data-home copy. It is not a link
+into the checkout. The cache home is only the download. No
 installed command runs from it. Deleting the cache, or
 deleting any checkout, leaves the installed command
-working.
+working. After either a release install or a dev install,
+changing the checkout or deleting it does not change the
+installed command or the installed host files.
 
 A release install does not record a developer checkout. It
 does not fetch, pull, or write one. `./install` from inside
@@ -204,8 +206,9 @@ A dev install is `./install --dev` from a git checkout, and
 later `<app> install --dev`. `./install --dev` records that
 checkout. The dev checkout path stays under
 `$<APP>_STATE_HOME/hosts/<hostname>/`, using the state
-home from the record. Copy that directory as it sits,
-including uncommitted files, into the data home.
+home from the record. A dev install from a local checkout
+copies that checkout, as it sits, including uncommitted
+files, into the data home. That copy is what runs.
 Do not fetch. Then install the tools the project names in
 its guide. An empty tool list still leaves a dev install.
 Editing the checkout does not change the running command
